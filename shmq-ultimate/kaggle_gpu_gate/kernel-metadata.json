@@ -1,0 +1,10 @@
+{
+  "id": "freedomform/shmq-ultimate-gpu-gate",
+  "title": "SHMQ Ultimate GPU Gate",
+  "code_file": "shmq_gpu_gate.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true
+}
