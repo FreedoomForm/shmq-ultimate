@@ -1,0 +1,53 @@
+{
+  "schema_version": 3,
+  "capability": [
+    7,
+    5
+  ],
+  "gpu_name": "Tesla T4",
+  "selected_production_backend": "reference",
+  "cuda_available": true,
+  "reference_contract_gate": "passed",
+  "t4_hardware_gate": true,
+  "sm75_correctness_kernel_gate": "passed",
+  "sm75_production_backend_ready": false,
+  "native_three_level_gate": "correctness_only",
+  "vllm_plugin_gate": "contract_only",
+  "model_quality_gate": "not_run",
+  "throughput_gate": "operator_microbenchmark_measured",
+  "fake_quant_gate": "passed",
+  "sm75_graph_capture_gate": "passed",
+  "sm75_operator_benchmark": {
+    "status": "measured",
+    "shapes": [
+      {
+        "rows": 1,
+        "sm75": {"p50_ms": 0.23046399652957916, "p95_ms": 0.29635199904441833},
+        "dense_fp32_reference": {"p50_ms": 0.05326399952173233, "p95_ms": 0.0799039974808693},
+        "p50_ratio_vs_dense": 4.326824846030332,
+        "max_abs_error": 7.62939453125e-06
+      },
+      {
+        "rows": 8,
+        "sm75": {"p50_ms": 0.22488000243902206, "p95_ms": 0.24383999407291412},
+        "dense_fp32_reference": {"p50_ms": 0.05110400170087814, "p95_ms": 0.06499200314283371},
+        "p50_ratio_vs_dense": 4.400438223121729,
+        "max_abs_error": 1.1444091796875e-05
+      },
+      {
+        "rows": 32,
+        "sm75": {"p50_ms": 0.24080000072717667, "p95_ms": 0.2826560139656067},
+        "dense_fp32_reference": {"p50_ms": 0.05655999854207039, "p95_ms": 0.08009599894285202},
+        "p50_ratio_vs_dense": 4.257425865173336,
+        "max_abs_error": 1.52587890625e-05
+      },
+      {
+        "rows": 128,
+        "sm75": {"p50_ms": 0.3360639959573746, "p95_ms": 0.3548479974269867},
+        "dense_fp32_reference": {"p50_ms": 0.0655359998345375, "p95_ms": 0.10489600151777267},
+        "p50_ratio_vs_dense": 5.127929638761209,
+        "max_abs_error": 2.288818359375e-05
+      }
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+[submodule "shmq-ultimate/external/MixLLM"]
+	path = shmq-ultimate/external/MixLLM
+	url = https://github.com/FreedoomForm/Multi-main.git
+	branch = mixllm-3level

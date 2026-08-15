@@ -1,3 +1,9 @@
+.env
+shmq-ultimate/kaggle_results/
+shmq-ultimate/mixllm_3level_kaggle/output*/
+tool-results/
+__pycache__/
+*.py[cod]
 skills/
 node_modules/
 # Large model artifacts — use Git LFS or external storage
