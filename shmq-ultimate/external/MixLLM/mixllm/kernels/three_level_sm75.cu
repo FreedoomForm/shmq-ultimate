@@ -566,10 +566,17 @@ void run_cutlass_int_partition(
     c10::cuda::CUDACachingAllocator::recordStream(
         matrix_zero.storage().data_ptr(), allocation_stream);
   }
-  shmq_cutlass_sm75::Int8Runner::run(
-      rows, static_cast<int>(indices.numel()), width,
-      input_int8, weight, scale_act, matrix_scale,
-      matrix_zero, indices, output, stream);
+  if (rows >= 64) {
+    shmq_cutlass_sm75::WideInt8Runner::run(
+        rows, static_cast<int>(indices.numel()), width,
+        input_int8, weight, scale_act, matrix_scale,
+        matrix_zero, indices, output, stream);
+  } else {
+    shmq_cutlass_sm75::Int8Runner::run(
+        rows, static_cast<int>(indices.numel()), width,
+        input_int8, weight, scale_act, matrix_scale,
+        matrix_zero, indices, output, stream);
+  }
 }
 
 std::tuple<at::Tensor, at::Tensor> quantize_activation_sm75(

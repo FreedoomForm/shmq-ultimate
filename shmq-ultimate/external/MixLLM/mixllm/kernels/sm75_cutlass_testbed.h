@@ -190,6 +190,14 @@ using Core = cutlass::gemm::threadblock::DefaultMmaCore<
     cutlass::arch::OpClassTensorOp, 2, cutlass::arch::OpMultiplyAddSaturate>;
 
 
-using Int8Runner = Runner<Core, 3>;
+using WideCore = cutlass::gemm::threadblock::DefaultMmaCore<
+    cutlass::gemm::GemmShape<64, 128, 64>,
+    cutlass::gemm::GemmShape<32, 32, 64>,
+    cutlass::gemm::GemmShape<8, 8, 16>,
+    ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC,
+    cutlass::arch::OpClassTensorOp, 2, cutlass::arch::OpMultiplyAddSaturate>;
+
+using Int8Runner = Runner<Core, 2>;
+using WideInt8Runner = Runner<WideCore, 2>;
 
 }  // namespace shmq_cutlass_sm75

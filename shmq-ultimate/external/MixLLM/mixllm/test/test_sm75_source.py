@@ -61,14 +61,22 @@ class SM75SourceContractTest(unittest.TestCase):
     def test_v197_sm75_three_stage_runner_contract(self):
         self.assertIn("template <typename Core, int Stages>", self.cutlass_testbed)
         self.assertIn("MQMmaPipelinedSm75<", self.cutlass_testbed)
-        self.assertIn("Core, 3>", self.cutlass_testbed)
+        self.assertIn("Stages>", self.cutlass_testbed)
         self.assertIn("DefaultMmaCore<", self.cutlass_testbed)
         self.assertIn("OpMultiplyAddSaturate>;", self.cutlass_testbed)
 
     def test_v198_supported_core_three_stage_pipeline_contract(self):
         cutlass_compact = "".join(self.cutlass_testbed.split())
         self.assertIn("OpClassTensorOp,2,cutlass::arch::OpMultiplyAddSaturate>", cutlass_compact)
-        self.assertIn("usingInt8Runner=Runner<Core,3>", cutlass_compact)
+        self.assertIn("usingInt8Runner=Runner<Core,2>", cutlass_compact)
+
+    def test_v199_supported_wide_large_m_dispatch_contract(self):
+        source_compact = "".join(self.source.split())
+        cutlass_compact = "".join(self.cutlass_testbed.split())
+        self.assertIn("GemmShape<64,128,64>", cutlass_compact)
+        self.assertIn("GemmShape<32,32,64>", cutlass_compact)
+        self.assertIn("usingWideInt8Runner=Runner<WideCore,2>", cutlass_compact)
+        self.assertIn("if(rows>=64)", source_compact)
 
     def test_v193_rejected_geometry_is_not_present(self):
         cutlass_compact = "".join(self.cutlass_testbed.split())
@@ -76,7 +84,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("GemmShape<32,32,64>", cutlass_compact)
         self.assertIn("GemmShape<8,8,16>", cutlass_compact)
         self.assertIn("typenameCore::MmaPolicy,Stages>", cutlass_compact)
-        self.assertNotIn("GemmShape<64,128,64>", cutlass_compact)
+        self.assertNotIn("GemmShape<16,8,32>", cutlass_compact)
         self.assertNotIn("typenameCore::MmaPolicy,5>", cutlass_compact)
 
     def test_v188_cutlass_prefill_dispatch_contract(self):
