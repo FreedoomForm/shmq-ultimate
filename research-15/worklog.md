@@ -799,3 +799,10 @@ Prediction: native correctness and decode remain unchanged; rows>=32 CUTLASS lat
 ## v190 model-source correction
 
 Kaggle rejected the first `model_sources` form because it required the full `{owner}/{model}/{framework}/{instance}/{version}` handle. The candidate now uses `qwen-lm/qwen2.5/Transformers/0.5b/1`, preserving the exact Qwen2.5-0.5B base model.
+
+
+## v191 — exact Qwen model discovery and rejected parallel-stream reintroduction
+
+v190 T4 preserved correctness/decode and improved large-M CUTLASS versus v189, but mixed prefill remained no-go. A fresh original-versus-current audit found the tempting original parallel precision-stream design, then checked the historical ledger: v153/v154 already tested it, with allocator-safe v154 still only `0.20294x` rows=16 and `0.29165x` rows=128 E2E, so it is explicitly not reintroduced. The new v191 red stream contract was removed before implementation.
+
+The remaining safe v191 fix improves the full-model gate’s environment handling: instead of assuming one `/kaggle/input/qwen2.5/...` path, the notebook now discovers `config.json` files under `/kaggle/input` and accepts only the exact Qwen2.5-0.5B architecture fingerprint (`qwen2`, hidden size 896, 24 layers, vocab 151936, intermediate 4864, 14 attention heads). Missing input remains an explicit unavailable blocker; no substitute model is accepted. Notebook rebuild, freshness, 11 sandbox source/audit tests, py_compile, and diff checks pass. Kaggle T4 validation is required.

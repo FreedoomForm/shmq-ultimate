@@ -194,8 +194,31 @@ report['allocator_check'] = allocation_summary
     'reason': 'requires the exact Kaggle Qwen2.5-0.5B model input',
 }
 if capability == (7, 5):
-    model_root = Path('/kaggle/input/qwen2.5/transformers/0.5b/1')
-    if model_root.exists():
+    expected_model = {
+        'model_type': 'qwen2', 'hidden_size': 896, 'num_hidden_layers': 24,
+        'vocab_size': 151936, 'intermediate_size': 4864,
+        'num_attention_heads': 14,
+    }
+    model_roots = [
+        Path('/kaggle/input/qwen2.5/transformers/0.5b/1'),
+        Path('/kaggle/input/qwen2-5/transformers/0.5b/1'),
+    ]
+    for config_path in sorted(Path('/kaggle/input').rglob('config.json')):
+        model_roots.append(config_path.parent)
+    discovered = []
+    for candidate in model_roots:
+        config_path = candidate / 'config.json'
+        if not config_path.is_file():
+            continue
+        try:
+            config = json.loads(config_path.read_text(encoding='utf-8'))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if all(config.get(key) == value for key, value in expected_model.items()):
+            discovered.append(candidate)
+    model_root = next(iter(dict.fromkeys(discovered)), None)
+    quality['model_candidates'] = [str(path) for path in discovered]
+    if model_root is not None:
         try:
             from transformers import AutoModelForCausalLM, AutoTokenizer
             from mixllm.model_gate import run_model_gate
@@ -240,7 +263,7 @@ if capability == (7, 5):
         except Exception as exc:
             quality.update(status='failed', reason=repr(exc))
     else:
-        quality['reason'] = f'model input not mounted: {model_root}'
+        quality['reason'] = 'exact Qwen2.5-0.5B config fingerprint not found under /kaggle/input'
 else:
     quality['reason'] = 'requires Tesla T4 / SM75'
 report['full_model_quality'] = quality

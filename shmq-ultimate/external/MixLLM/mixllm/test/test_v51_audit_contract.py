@@ -81,6 +81,9 @@ class V51AuditContractTest(unittest.TestCase):
         self.assertIn("full_model_qwen_quality", self.builder)
         self.assertIn("vllm_apply_path", self.builder)
         self.assertIn("qwen-lm/qwen2.5/Transformers/0.5b", self.builder)
+        self.assertIn("rglob('config.json')", self.builder)
+        self.assertIn("hidden_size", self.builder)
+        self.assertIn("num_hidden_layers", self.builder)
 
 
 if __name__ == "__main__":
