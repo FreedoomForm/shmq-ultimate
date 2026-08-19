@@ -9,6 +9,6 @@
   "enable_internet": false,
   "machine_shape": "NvidiaTeslaT4",
   "model_sources": [
-    "qwen-lm/qwen2.5/transformers/0.5b/1"
+    "qwen-lm/qwen2.5/Transformers/0.5b"
   ]
 }

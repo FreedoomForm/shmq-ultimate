@@ -292,7 +292,7 @@ def three_level_linear_prequantized(module, x, input_int8, scale_act, torch_modu
     if x.shape[0] >= 32 and (module.indices_4.numel() or module.indices_8.numel()):
         metadata = _prefill_metadata_for_cutlass(module, x, torch_module)
         native_v3 = getattr(torch_module.ops.mixllm_sm75,
-                            "three_level_linear_v3", None)
+                            "_three_level_linear_v3_unchecked", None)
         if native_v3 is not None:
             return native_v3(*arguments, *metadata[1:])
     return torch_module.ops.mixllm_sm75._three_level_linear_v2_unchecked(*arguments)

@@ -66,6 +66,9 @@ class V51AuditContractTest(unittest.TestCase):
         self.assertIn("three_level_linear_v3", self.backend)
         self.assertIn('m.def("three_level_linear_v3', self.cuda)
         self.assertIn('m.impl("three_level_linear_v3"', self.cuda)
+        self.assertIn("_three_level_linear_v3_unchecked", self.backend)
+        self.assertIn('m.def("_three_level_linear_v3_unchecked', self.cuda)
+        self.assertIn('m.impl("_three_level_linear_v3_unchecked"', self.cuda)
         self.assertIn("cached_scale_int4", self.cuda)
         self.assertIn("cached_zero_int4", self.cuda)
         self.assertIn("cached_scale_int8", self.cuda)
@@ -77,6 +80,7 @@ class V51AuditContractTest(unittest.TestCase):
         self.assertIn("model_vllm_production", self.builder)
         self.assertIn("full_model_qwen_quality", self.builder)
         self.assertIn("vllm_apply_path", self.builder)
+        self.assertIn("qwen-lm/qwen2.5/Transformers/0.5b", self.builder)
 
 
 if __name__ == "__main__":

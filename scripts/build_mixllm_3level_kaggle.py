@@ -305,7 +305,7 @@ def metadata():
         'machine_shape': 'NvidiaTeslaT4',
         # Exact base model requested by the project; never substitute an
         # instruction-tuned or differently sized Qwen checkpoint.
-        'model_sources': ['qwen-lm/qwen2.5/transformers/0.5b/1'],
+        'model_sources': ['qwen-lm/qwen2.5/Transformers/0.5b'],
     }
 def build():
     sources = {n: (FORK / n).read_text(encoding='utf-8') for n in SOURCE_FILES}
