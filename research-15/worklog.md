@@ -795,3 +795,7 @@ Sandbox source/audit contracts (11 tests), notebook rebuild/freshness, Python co
 Kaggle v189 proved the metadata cache is active (`prefill_metadata_bytes` reported) and preserved correctness, but mixed rows=128 regressed from v188 `0.2762x` to `0.2197x` E2E speedup. Deep comparison with the original MixLLM and the SHMQ call chain found that v189's new public v3 wrapper calls `validate_partition()` on every large-prefill invocation, while Python already caches the exact partition signature before CUDA execution and the original hot path does not sort/allocate index validation tensors per GEMM. v190 adds an unchecked v3 operator wrapper, routes only the already-validated Python path to it, preserves the public validated v3 API for external callers, and corrects the Kaggle `model_sources` handle to the documented Qwen2.5-0.5B variation form.
 
 Prediction: native correctness and decode remain unchanged; rows>=32 CUTLASS latency should improve if repeated validation caused the v189 regression. If T4 does not confirm improvement, the metadata-cache path will not be retained as a performance claim. No arithmetic, model, quality threshold, partition budget, or benchmark setting changed. Sandbox notebook/source/audit contracts (11), py_compile, freshness, and diff checks pass.
+
+## v190 model-source correction
+
+Kaggle rejected the first `model_sources` form because it required the full `{owner}/{model}/{framework}/{instance}/{version}` handle. The candidate now uses `qwen-lm/qwen2.5/Transformers/0.5b/1`, preserving the exact Qwen2.5-0.5B base model.
