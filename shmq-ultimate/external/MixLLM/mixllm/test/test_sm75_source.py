@@ -36,14 +36,16 @@ class SM75SourceContractTest(unittest.TestCase):
     def test_cutlass_sm75_port_contract(self):
         self.assertIn('#include "sm75_cutlass_testbed.h"', self.source)
         self.assertIn("run_cutlass_int_partition", self.source)
-        self.assertIn("DefaultMmaCore<", self.cutlass_testbed)
-        self.assertIn("GemmShape<8, 8, 16>", self.cutlass_testbed)
-        self.assertIn("MQMmaPipelinedSm75", self.cutlass_testbed)
-        self.assertIn("GemmShape<32, 128, 64>", self.cutlass_testbed)
-        self.assertIn("typename Core::MmaPolicy, 2>", self.cutlass_testbed)
-        self.assertIn("sync_copy", self.cutlass_pipeline)
-        self.assertIn("using ArchTag = arch::Sm75", self.cutlass_pipeline)
-        self.assertNotIn("cp_async", self.cutlass_pipeline)
+        cutlass_compact = "".join(self.cutlass_testbed.split())
+        pipeline_compact = "".join(self.cutlass_pipeline.split())
+        self.assertIn("DefaultMmaCore<", cutlass_compact)
+        self.assertIn("GemmShape<8,8,16>", cutlass_compact)
+        self.assertIn("MQMmaPipelinedSm75", cutlass_compact)
+        self.assertIn("GemmShape<32,128,64>", cutlass_compact)
+        self.assertIn("typenameCore::MmaPolicy,2>", cutlass_compact)
+        self.assertIn("sync_copy", pipeline_compact)
+        self.assertIn("usingArchTag=arch::Sm75", pipeline_compact)
+        self.assertNotIn("cp_async", pipeline_compact)
 
     def test_native_three_level_linear_forward_is_present(self):
         text = self.linear

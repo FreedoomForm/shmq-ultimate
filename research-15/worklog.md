@@ -709,3 +709,25 @@ Kaggle version 180 passed native correctness and both decode gates but was drama
 
 ## v161 restoration — stable direct WMMA baseline
 After v160’s DP4A failure, restored the v155 dispatch semantics: all non-decode mixed prefill partitions use the existing four-warp 16x16 signed-INT8/FP16 WMMA kernel in one launch. The rejected wide, barrier-free, and DP4A kernels remain non-dispatched experimental source only and do not affect runtime behavior. No quantization, model, benchmark, or quality behavior was changed. Revalidation is required because the source now contains the accumulated experiments.
+
+## v182 — v51 audit telemetry and focused regression enforcement
+
+Deep research compared the accepted v51 snapshots with the bundled original MixLLM implementation and the later active experimental source. The v51 result remains the correctness-passing baseline: best GEMM-only speedup 1.4156x and best end-to-end speedup 1.2210x on the same T4 gate, with mixed prefill still failing. The detailed result shows quantization at roughly 0.027–0.029 ms while mixed prefill GEMM costs roughly 0.49 ms at rows=16 and 1.00 ms at rows=128, so CPU fallback is not the cause.
+
+Restored the active SM75 host/CUDA sources to the clean v51 snapshots, preserving the later source only under `research-15/audit_tmp/active_before_v51_repair/` for comparison. Added `audit_v51_initial.md` and `qwen_quality_sources.md` with source-backed findings. Added `test_v51_audit_contract.py` covering the packed decode/no-expansion v51 contract, focused Kaggle regression coverage, and memory telemetry requirements. Added honest per-shape peak allocated-memory and persistent-storage telemetry to `benchmark_sm75_backend` without changing timed workloads, arithmetic, model, or benchmark shapes. Updated the Kaggle builder to embed and execute the focused unit/contract suites instead of only `test_three_level.py`.
+
+Local dependency-light vLLM/runtime and audit-contract tests pass. CUDA-dependent suites cannot run in this sandbox because PyTorch is not installed; Kaggle T4 remains the authoritative measurement environment. This iteration is not a performance claim and is retained only if the unchanged T4 correctness/decode/prefill gates continue to pass, with the new contract suite passing as well.
+
+## v183 — restore embedded CUTLASS include extraction after v182 compile failure
+
+The v182 Kaggle submission failed before tests and benchmarks because `sm75_cutlass_testbed.h` included `cutlass/array.h`, but the notebook did not unpack the embedded `cutlass_sm75_vendor.b64` archive or pass its include root to nvcc. This was a real missing build component exposed by restoring the v51 source-contract CUTLASS port.
+
+The backend loader now validates the embedded archive, decodes it as ZIP, checks every member for path traversal, extracts it under the pinned MixLLM package root, verifies `cutlass/include/cutlass/array.h`, and passes `extra_include_paths=[cutlass/include]` to `torch.utils.cpp_extension.load`. No kernel dispatch, arithmetic, model, quality target, or benchmark setting changed. The v182 memory telemetry and focused regression suite remain included. Added a regression assertion for the vendor extraction contract.
+
+Local source, runtime, vLLM, audit-contract, compileall, notebook rebuild, and notebook freshness checks pass. Kaggle T4 validation is required; v183 is not accepted unless the expanded tests and all required performance/correctness gates execute successfully.
+
+## v184 — correct CUTLASS helper ABI and portable audit contracts
+
+Deep diagnosis of the v183 Kaggle log found that embedded CUTLASS extraction succeeded, but nvcc rejected the optional helper because `shmq_cutlass_sm75::Int8Runner::run` takes mutable Tensor-handle references while `run_cutlass_int_partition` passed const references. Changed the helper's Tensor handles to pass by value, preserving the same storage and non-dispatched runtime behavior. The expanded audit test also assumed the sandbox repository root and failed in Kaggle; it now resolves the builder from either the sandbox root or the embedded package working directory. The CUTLASS source contract now normalizes whitespace before checking shape and pipeline markers.
+
+No native dispatch, arithmetic, model, quality, memory, or benchmark workload was changed. Local source, runtime, vLLM, audit-contract, compileall, notebook rebuild, and freshness checks pass. v184 requires a fresh Kaggle T4 run; previous v183 is rejected because the extension did not compile.

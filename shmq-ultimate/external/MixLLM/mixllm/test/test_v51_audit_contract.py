@@ -1,0 +1,57 @@
+from pathlib import Path
+import unittest
+
+
+class V51AuditContractTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        package_root = Path(__file__).resolve().parents[1]
+        repo_candidates = [
+            package_root.parents[3],
+            Path.cwd(),
+        ]
+        repo_root = next(
+            candidate for candidate in repo_candidates
+            if (candidate / "scripts" / "build_mixllm_3level_kaggle.py").exists()
+        )
+        cls.backend = (package_root / "sm75_backend.py").read_text(encoding="utf-8")
+        cls.cuda = (package_root / "kernels" / "three_level_sm75.cu").read_text(encoding="utf-8")
+        cls.builder = (repo_root / "scripts" / "build_mixllm_3level_kaggle.py").read_text(encoding="utf-8")
+
+    def test_v51_decode_keeps_packed_int4_and_skips_expansion(self):
+        self.assertIn("if x.shape[0] == 1 or not module.indices_4.numel():", self.backend)
+        decode_start = self.cuda.index("__global__ void three_level_decode_kernel")
+        decode_end = self.cuda.index("void check_cuda_contiguous", decode_start)
+        decode = self.cuda[decode_start:decode_end]
+        self.assertIn("const uint8_t* packed_int4", decode)
+        self.assertIn("const uint8_t* weights = packed_int4", decode)
+        launch_start = self.cuda.index("if (rows == 1)")
+        launch_end = self.cuda.index("} else {", launch_start)
+        launch = self.cuda[launch_start:launch_end]
+        self.assertIn("weight_int4.data_ptr<uint8_t>()", launch)
+        self.assertNotIn("expanded_int4.data_ptr<int8_t>()", launch)
+
+    def test_gate_executes_sm75_regressions_not_only_reference_tests(self):
+        self.assertIn("test_sm75_backend.py", self.builder)
+        self.assertIn("test_sm75_source.py", self.builder)
+        self.assertIn("test_vllm_three_level.py", self.builder)
+        self.assertIn("test_runtime_capability.py", self.builder)
+        self.assertIn("'mixllm.test.test_sm75_backend'", self.builder)
+        self.assertIn("'mixllm.test.test_sm75_source'", self.builder)
+        self.assertIn("'mixllm.test.test_v51_audit_contract'", self.builder)
+
+    def test_sm75_build_unpacks_embedded_cutlass_vendor(self):
+        self.assertIn("cutlass_sm75_vendor.b64", self.backend)
+        self.assertIn("base64.b64decode", self.backend)
+        self.assertIn("extra_include_paths", self.backend)
+        self.assertIn("vendor_include / \"cutlass\" / \"array.h\"", self.backend)
+
+    def test_benchmark_exposes_runtime_memory_telemetry(self):
+        self.assertIn("peak_cuda_memory", self.backend)
+        self.assertIn("expanded_int4_bytes", self.backend)
+        self.assertIn("activation_quantized_bytes", self.backend)
+        self.assertIn("output_bytes", self.backend)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -23,6 +23,7 @@ SOURCE_FILES = (
     "mixllm/test/test_three_level.py", "mixllm/test/test_runtime_capability.py",
     "mixllm/test/test_sm75_backend.py", "mixllm/test/test_sm75_source.py",
     "mixllm/test/test_model_gate.py", "mixllm/test/test_vllm_three_level.py",
+    "mixllm/test/test_v51_audit_contract.py",
     "vllm_v0.9.0_patch/0002-add-mixllm-three-level-support.patch",
     "vllm_v0.9.0_patch/THREE_LEVEL_MANIFEST.md")
 # CUTLASS and custom headers are unpacked from the embedded vendor archive
@@ -161,7 +162,16 @@ report = {'schema_version': 4, 'target': 'NVIDIA T4 / SM75', 'provenance': sourc
 """), cell("code", """test_env = os.environ.copy()
 test_env['PYTHONPATH'] = str(root) + os.pathsep + test_env.get('PYTHONPATH', '')
 if capability == (7, 5): test_env['MIXLLM_TEST_SM75'] = '1'
-tests = subprocess.run([sys.executable, '-m', 'unittest', 'discover', '-s', str(root / 'mixllm/test'), '-p', 'test_three_level.py'], cwd=root, env=test_env, text=True, capture_output=True, timeout=600)
+test_modules = [
+    'mixllm.test.test_three_level',
+    'mixllm.test.test_runtime_capability',
+    'mixllm.test.test_sm75_backend',
+    'mixllm.test.test_sm75_source',
+    'mixllm.test.test_model_gate',
+    'mixllm.test.test_vllm_three_level',
+    'mixllm.test.test_v51_audit_contract',
+]
+tests = subprocess.run([sys.executable, '-m', 'unittest', '-v', *test_modules], cwd=root, env=test_env, text=True, capture_output=True, timeout=600)
 print(tests.stdout); print(tests.stderr)
 report['tests'] = {'returncode': tests.returncode, 'model_gate_test_embedded': 'mixllm/test/test_model_gate.py' in sources}
 report['gates']['embedded_contract_tests'] = 'passed' if tests.returncode == 0 else 'failed'
@@ -219,7 +229,7 @@ def build():
 def validate():
     notebook = json.loads(NOTEBOOK.read_text(encoding='utf-8')); assert json.loads(METADATA.read_text()) == metadata(); sources = {n: (FORK / n).read_text(encoding='utf-8') for n in SOURCE_FILES}; assert notebook == build_notebook(sources, provenance(sources)), 'notebook is stale; rebuild it'
     text = ''.join(''.join(c['source']) for c in notebook['cells'] if c['cell_type'] == 'code')
-    for marker in ('model_gate.py', 'three_level_sm75.cu', 'test_model_gate.py', 'source_sha256', 'workspace_commit', 'qwen_qkv_mixed_4_8_16', 'qwen_qkv_pure_int4', 'qwen_qkv_pure_int8', 'qwen_qkv_pure_fp16', 'full_model_qwen_quality', 'terminal_decision', 'mixllm_3level_source_manifest.json', 'mixllm_3level_benchmarks.json'): assert marker in text, marker
+    for marker in ('model_gate.py', 'three_level_sm75.cu', 'test_model_gate.py', 'test_v51_audit_contract.py', 'source_sha256', 'workspace_commit', 'qwen_qkv_mixed_4_8_16', 'qwen_qkv_pure_int4', 'qwen_qkv_pure_int8', 'qwen_qkv_pure_fp16', 'full_model_qwen_quality', 'terminal_decision', 'mixllm_3level_source_manifest.json', 'mixllm_3level_benchmarks.json'): assert marker in text, marker
     for c in notebook['cells']:
         if c['cell_type'] == 'code': compile(''.join(c['source']), c['id'], 'exec')
     print(f'Validated {NOTEBOOK} ({len(SOURCE_FILES)} embedded files)')
