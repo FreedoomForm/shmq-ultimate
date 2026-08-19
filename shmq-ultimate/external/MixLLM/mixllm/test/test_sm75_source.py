@@ -47,22 +47,18 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("usingArchTag=arch::Sm75", pipeline_compact)
         self.assertNotIn("cp_async", pipeline_compact)
 
-    def test_v186_wide_prefill_launch_contract(self):
+    def test_v188_cutlass_prefill_dispatch_contract(self):
         text = self.source
-        self.assertIn("constexpr int kPrefillWideWarps = 8;", text)
-        self.assertIn("constexpr int kPrefillWideChannels = kPrefillWideWarps * kTile;", text)
-        self.assertIn("template <int PrefillWarps = kPrefillWarps>", text)
-        self.assertIn("three_level_tensorcore_kernel<kPrefillWideWarps>", text)
-        self.assertIn("kPrefillWideChannels - 1", text)
-        self.assertNotIn("three_level_tensorcore_kernel<<<grid, kPrefillWarps", text)
-
-    def test_v187_shape_stratified_prefill_dispatch(self):
-        text = self.source
-        self.assertIn("} else if (rows == 16) {", text)
-        self.assertIn("three_level_tensorcore_kernel<kPrefillWideWarps>", text)
-        self.assertIn("three_level_tensorcore_kernel<kPrefillWarps>", text)
-        self.assertIn("kPrefillWideChannels - 1", text)
-        self.assertIn("kPrefillChannels - 1", text)
+        self.assertIn("} else if (rows >= 32 && (n4 > 0 || n8 > 0)) {", text)
+        self.assertIn("run_cutlass_int_partition(", text)
+        self.assertIn("expanded_int4, scale_int4, zero_int4", text)
+        self.assertIn("weight_int8, scale_int8, zero_int4", text)
+        self.assertIn("output_width, 0, 0, n16", text)
+        cutlass_branch = text.index("} else if (rows >= 32 && (n4 > 0 || n8 > 0)) {")
+        fallback_branch = text.index("} else {", cutlass_branch)
+        self.assertLess(cutlass_branch, fallback_branch)
+        self.assertIn("three_level_tensorcore_kernel<kPrefillWarps>", text[cutlass_branch:])
+        self.assertNotIn("kPrefillWideWarps", text)
 
     def test_native_three_level_linear_forward_is_present(self):
         text = self.linear

@@ -771,3 +771,13 @@ v186's eight-warp one-subtile kernel improved rows=16 mixed GEMM from 0.2623x to
 ## v187 implementation — shape-stratified dispatch
 
 Restored the measured v186 eight-warp kernel without its unconditional dispatch, and changed only the host launch selection: rows==16 uses the 8-warp/128-channel kernel; all other prefill rows use the v185 4-warp/64-channel kernel. Added source-contract coverage for both branches and corrected the audit test to stop at any `} else` boundary. Local 23 contract/runtime/vLLM tests, compileall, notebook rebuild, freshness, and diff checks pass. Kaggle T4 validation is required; no production claim is made yet.
+
+## v187 Kaggle T4 result — NO-GO
+
+Kaggle v187 completed on Tesla T4 with native correctness, decode GEMM, and decode end-to-end gates passing, but mixed prefill end-to-end failed. For the real Qwen QKV mixed 4/8/16 scenario, rows=1 was 1.2023x, rows=16 was 0.3104x (3.2216x latency ratio), and rows=128 was 0.0995x (10.0525x latency ratio) versus the identical torch FP16 baseline. The rows==16 eight-warp dispatch did not generalize: rows=16 improved versus v185's 0.2661x, but rows=128 regressed versus v185's 0.1539x. Gate decision: no_go; preserve artifacts under `shmq-ultimate/mixllm_3level_kaggle/latest-output-v187-computer` and revert v187 as a production candidate.
+
+## v188 hypothesis and implementation — activate staged CUTLASS only for rows>=32
+
+Deep research compared the original MixLLM launcher (`mix_mma_multistage.cuh`) with v187. The original uses iterator-based multistage shared-memory Tensor Core GEMMs, many shape families, and separate precision streams; v187 still used direct global WMMA loads with only two fixed channel geometries. Historical measurements reject another simple tile widening, private shared-memory WMMA, DP4A, and a small-M SM75 CUTLASS core. The existing 32x128x64 SM75 CUTLASS helper is compiled but dormant in the active v187 dispatch. v188 restores the v185 direct-WMMA path for rows<32 and activates the existing signed-INT8 CUTLASS helper for INT4/INT8 partitions only when rows>=32; FP16 remains a separate direct-WMMA launch on the caller stream. No arithmetic, quantization, model, quality, or benchmark setting changes. NVIDIA Turing/CUDA primary documentation was consulted and saved in `research-15/prefill_deep_research_v188.md`.
+
+Local 22 contract/runtime/vLLM tests, compileall, notebook rebuild, freshness, and diff checks pass. Kaggle T4 validation is required; v188 is not accepted before all four gates pass.

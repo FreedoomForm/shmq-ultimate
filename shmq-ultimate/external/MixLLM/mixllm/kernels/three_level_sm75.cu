@@ -27,11 +27,6 @@ constexpr int kDecodeChannelsPerWarp = 2;
 constexpr int kDecodeSubwarp = kWarpSize / kDecodeChannelsPerWarp;
 constexpr int kPrefillWarps = 4;
 constexpr int kPrefillChannels = kPrefillWarps * kTile;
-// v186 candidate: keep one 16x16 WMMA tile per warp while doubling the
-// channel tile. This avoids the two-subtile-per-warp register pressure rejected
-// in v158 and is used only by the explicit templated launch below.
-constexpr int kPrefillWideWarps = 8;
-constexpr int kPrefillWideChannels = kPrefillWideWarps * kTile;
 constexpr int kReuseRows = 2 * kTile;
 // Four warps per block; each warp quantizes one contiguous 128-element group.
 // This mirrors the upstream MixLLM activation contract without constructing a
@@ -708,26 +703,40 @@ at::Tensor three_level_linear_v2_core(
         reinterpret_cast<const __half*>(weight_fp16.data_ptr<at::Half>()),
         indices_fp16.data_ptr<int32_t>(), output.data_ptr<float>(), width,
         output_width, n4, n8, n16);
-  } else if (rows == 16) {
-    const int channel_tiles =
-        (n4 + kPrefillWideChannels - 1) / kPrefillWideChannels +
-        (n8 + kPrefillWideChannels - 1) / kPrefillWideChannels +
-        (n16 + kPrefillWideChannels - 1) / kPrefillWideChannels;
-    const dim3 grid(channel_tiles, (rows + 15) / 16);
-    three_level_tensorcore_kernel<kPrefillWideWarps>
-        <<<grid, kPrefillWideWarps * kWarpSize, 0, stream>>>(
-      reinterpret_cast<const __half*>(input_fp16.data_ptr<at::Half>()),
-      input_int8.data_ptr<int8_t>(),
-      reinterpret_cast<const __half*>(scale_act.data_ptr<at::Half>()),
-      expanded_int4.data_ptr<int8_t>(),
-      reinterpret_cast<const __half*>(scale_int4.data_ptr<at::Half>()),
-      indices_int4.data_ptr<int32_t>(),
-      weight_int8.data_ptr<int8_t>(),
-      reinterpret_cast<const __half*>(scale_int8.data_ptr<at::Half>()),
-      indices_int8.data_ptr<int32_t>(),
-      reinterpret_cast<const __half*>(weight_fp16.data_ptr<at::Half>()),
-      indices_fp16.data_ptr<int32_t>(), output.data_ptr<float>(), rows, width,
-      output_width, n4, n8, n16);
+  } else if (rows >= 32 && (n4 > 0 || n8 > 0)) {
+    // The original MixLLM relies on iterator-based, staged Tensor Core GEMMs
+    // for larger M. The helper is deliberately selected only for rows>=32:
+    // the SM75 16x128 CUTLASS geometry is not a valid portable small-M core,
+    // and rows==16 remains on the validated direct-WMMA control path.
+    if (n4 > 0) {
+      run_cutlass_int_partition(
+          input_int8, scale_act, expanded_int4, scale_int4, zero_int4,
+          indices_int4, output, rows, width, stream.stream());
+    }
+    if (n8 > 0) {
+      run_cutlass_int_partition(
+          input_int8, scale_act, weight_int8, scale_int8, zero_int4,
+          indices_int8, output, rows, width, stream.stream());
+    }
+    if (n16 > 0) {
+      const dim3 grid_fp16(
+          (n16 + kPrefillChannels - 1) / kPrefillChannels,
+          (rows + 15) / 16);
+      three_level_tensorcore_kernel<kPrefillWarps>
+          <<<grid_fp16, kPrefillWarps * kWarpSize, 0, stream>>>(
+        reinterpret_cast<const __half*>(input_fp16.data_ptr<at::Half>()),
+        input_int8.data_ptr<int8_t>(),
+        reinterpret_cast<const __half*>(scale_act.data_ptr<at::Half>()),
+        expanded_int4.data_ptr<int8_t>(),
+        reinterpret_cast<const __half*>(scale_int4.data_ptr<at::Half>()),
+        indices_int4.data_ptr<int32_t>(),
+        weight_int8.data_ptr<int8_t>(),
+        reinterpret_cast<const __half*>(scale_int8.data_ptr<at::Half>()),
+        indices_int8.data_ptr<int32_t>(),
+        reinterpret_cast<const __half*>(weight_fp16.data_ptr<at::Half>()),
+        indices_fp16.data_ptr<int32_t>(), output.data_ptr<float>(), rows, width,
+        output_width, 0, 0, n16);
+    }
   } else {
     const int channel_tiles =
         (n4 + kPrefillChannels - 1) / kPrefillChannels +
