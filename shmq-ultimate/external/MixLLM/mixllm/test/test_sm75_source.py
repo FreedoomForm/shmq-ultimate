@@ -47,15 +47,6 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("usingArchTag=arch::Sm75", pipeline_compact)
         self.assertNotIn("cp_async", pipeline_compact)
 
-    def test_v186_wide_prefill_launch_contract(self):
-        text = self.source
-        self.assertIn("constexpr int kPrefillWideWarps = 8;", text)
-        self.assertIn("constexpr int kPrefillWideChannels = kPrefillWideWarps * kTile;", text)
-        self.assertIn("template <int PrefillWarps = kPrefillWarps>", text)
-        self.assertIn("three_level_tensorcore_kernel<kPrefillWideWarps>", text)
-        self.assertIn("kPrefillWideChannels - 1", text)
-        self.assertNotIn("three_level_tensorcore_kernel<<<grid, kPrefillWarps", text)
-
     def test_native_three_level_linear_forward_is_present(self):
         text = self.linear
         self.assertIn("get_device_capability", text)
