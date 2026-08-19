@@ -27,7 +27,7 @@ class V51AuditContractTest(unittest.TestCase):
         self.assertIn("const uint8_t* packed_int4", decode)
         self.assertIn("const uint8_t* weights = packed_int4", decode)
         launch_start = self.cuda.index("if (rows == 1)")
-        launch_end = self.cuda.index("} else {", launch_start)
+        launch_end = self.cuda.index("} else", launch_start)
         launch = self.cuda[launch_start:launch_end]
         self.assertIn("weight_int4.data_ptr<uint8_t>()", launch)
         self.assertNotIn("expanded_int4.data_ptr<int8_t>()", launch)

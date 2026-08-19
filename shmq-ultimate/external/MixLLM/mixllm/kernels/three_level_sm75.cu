@@ -27,6 +27,11 @@ constexpr int kDecodeChannelsPerWarp = 2;
 constexpr int kDecodeSubwarp = kWarpSize / kDecodeChannelsPerWarp;
 constexpr int kPrefillWarps = 4;
 constexpr int kPrefillChannels = kPrefillWarps * kTile;
+// v186 candidate: keep one 16x16 WMMA tile per warp while doubling the
+// channel tile. This avoids the two-subtile-per-warp register pressure rejected
+// in v158 and is used only by the explicit templated launch below.
+constexpr int kPrefillWideWarps = 8;
+constexpr int kPrefillWideChannels = kPrefillWideWarps * kTile;
 constexpr int kReuseRows = 2 * kTile;
 // Four warps per block; each warp quantizes one contiguous 128-element group.
 // This mirrors the upstream MixLLM activation contract without constructing a
@@ -95,6 +100,7 @@ __global__ void expand_int4_sm75_kernel(
 
 // SM75 has no Ampere mixed INT8 x INT4 MMA. Prefill reads a cached signed INT8
 // expansion while decode continues to consume the packed checkpoint weights.
+template <int PrefillWarps = kPrefillWarps>
 __global__ void three_level_tensorcore_kernel(
     const __half* input_fp16, const int8_t* input_int8,
     const __half* scale_act, const int8_t* expanded_int4,
@@ -104,8 +110,9 @@ __global__ void three_level_tensorcore_kernel(
     const __half* weight_fp16, const int32_t* indices_fp16, float* output,
     int rows, int width, int output_width, int n4, int n8, int n16) {
 #if __CUDA_ARCH__ >= 750
-  const int tiles4 = (n4 + kPrefillChannels - 1) / kPrefillChannels;
-  const int tiles8 = (n8 + kPrefillChannels - 1) / kPrefillChannels;
+  constexpr int prefill_channels = PrefillWarps * kTile;
+  const int tiles4 = (n4 + prefill_channels - 1) / prefill_channels;
+  const int tiles8 = (n8 + prefill_channels - 1) / prefill_channels;
   const int tile_id = blockIdx.x;
   const int row_base = blockIdx.y * kTile;
   const int warp = threadIdx.x / kWarpSize;
@@ -114,22 +121,22 @@ __global__ void three_level_tensorcore_kernel(
   int channel_base;
   if (tile_id < tiles4) {
     precision = 4;
-    channel_base = tile_id * kPrefillChannels + warp * kTile;
+    channel_base = tile_id * prefill_channels + warp * kTile;
   } else if (tile_id < tiles4 + tiles8) {
     precision = 8;
-    channel_base = (tile_id - tiles4) * kPrefillChannels + warp * kTile;
+    channel_base = (tile_id - tiles4) * prefill_channels + warp * kTile;
   } else {
     precision = 16;
-    channel_base = (tile_id - tiles4 - tiles8) * kPrefillChannels +
+    channel_base = (tile_id - tiles4 - tiles8) * prefill_channels +
                    warp * kTile;
   }
 
   __shared__ __align__(16) int8_t a_int8[kTile * kTile];
-  __shared__ __align__(16) int8_t b_int8[kPrefillWarps][kTile * kTile];
-  __shared__ __align__(16) int accumulator_int[kPrefillWarps][kTile * kTile];
+  __shared__ __align__(16) int8_t b_int8[PrefillWarps][kTile * kTile];
+  __shared__ __align__(16) int accumulator_int[PrefillWarps][kTile * kTile];
   __shared__ __align__(16) __half a_fp16[kTile * kTile];
-  __shared__ __align__(16) __half b_fp16[kPrefillWarps][kTile * kTile];
-  __shared__ __align__(16) float accumulator_fp32[kPrefillWarps][kTile * kTile];
+  __shared__ __align__(16) __half b_fp16[PrefillWarps][kTile * kTile];
+  __shared__ __align__(16) float accumulator_fp32[PrefillWarps][kTile * kTile];
 
   if (precision == 16) {
     wmma::fragment<wmma::accumulator, kTile, kTile, kTile, float> accumulator;
@@ -701,13 +708,14 @@ at::Tensor three_level_linear_v2_core(
         reinterpret_cast<const __half*>(weight_fp16.data_ptr<at::Half>()),
         indices_fp16.data_ptr<int32_t>(), output.data_ptr<float>(), width,
         output_width, n4, n8, n16);
-  } else {
+  } else if (rows == 16) {
     const int channel_tiles =
-        (n4 + kPrefillChannels - 1) / kPrefillChannels +
-        (n8 + kPrefillChannels - 1) / kPrefillChannels +
-        (n16 + kPrefillChannels - 1) / kPrefillChannels;
+        (n4 + kPrefillWideChannels - 1) / kPrefillWideChannels +
+        (n8 + kPrefillWideChannels - 1) / kPrefillWideChannels +
+        (n16 + kPrefillWideChannels - 1) / kPrefillWideChannels;
     const dim3 grid(channel_tiles, (rows + 15) / 16);
-    three_level_tensorcore_kernel<<<grid, kPrefillWarps * kWarpSize, 0, stream>>>(
+    three_level_tensorcore_kernel<kPrefillWideWarps>
+        <<<grid, kPrefillWideWarps * kWarpSize, 0, stream>>>(
       reinterpret_cast<const __half*>(input_fp16.data_ptr<at::Half>()),
       input_int8.data_ptr<int8_t>(),
       reinterpret_cast<const __half*>(scale_act.data_ptr<at::Half>()),
@@ -718,8 +726,28 @@ at::Tensor three_level_linear_v2_core(
       reinterpret_cast<const __half*>(scale_int8.data_ptr<at::Half>()),
       indices_int8.data_ptr<int32_t>(),
       reinterpret_cast<const __half*>(weight_fp16.data_ptr<at::Half>()),
-       indices_fp16.data_ptr<int32_t>(), output.data_ptr<float>(), rows, width,
-       output_width, n4, n8, n16);
+      indices_fp16.data_ptr<int32_t>(), output.data_ptr<float>(), rows, width,
+      output_width, n4, n8, n16);
+  } else {
+    const int channel_tiles =
+        (n4 + kPrefillChannels - 1) / kPrefillChannels +
+        (n8 + kPrefillChannels - 1) / kPrefillChannels +
+        (n16 + kPrefillChannels - 1) / kPrefillChannels;
+    const dim3 grid(channel_tiles, (rows + 15) / 16);
+    three_level_tensorcore_kernel<kPrefillWarps>
+        <<<grid, kPrefillWarps * kWarpSize, 0, stream>>>(
+      reinterpret_cast<const __half*>(input_fp16.data_ptr<at::Half>()),
+      input_int8.data_ptr<int8_t>(),
+      reinterpret_cast<const __half*>(scale_act.data_ptr<at::Half>()),
+      expanded_int4.data_ptr<int8_t>(),
+      reinterpret_cast<const __half*>(scale_int4.data_ptr<at::Half>()),
+      indices_int4.data_ptr<int32_t>(),
+      weight_int8.data_ptr<int8_t>(),
+      reinterpret_cast<const __half*>(scale_int8.data_ptr<at::Half>()),
+      indices_int8.data_ptr<int32_t>(),
+      reinterpret_cast<const __half*>(weight_fp16.data_ptr<at::Half>()),
+      indices_fp16.data_ptr<int32_t>(), output.data_ptr<float>(), rows, width,
+      output_width, n4, n8, n16);
   }
   C10_CUDA_KERNEL_LAUNCH_CHECK();
   return output;

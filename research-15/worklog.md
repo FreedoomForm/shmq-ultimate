@@ -759,3 +759,15 @@ The v185 gate report, benchmark JSON, source manifest, and Kaggle log are preser
 ## v186 hypothesis — eight-warp one-subtile SM75 prefill candidate
 
 Deep comparison with the original MixLLM showed that its advantage is a family of M/N/warp configurations rather than a fixed tile; the current direct WMMA path uses one fixed 16x64 channel CTA. Historical v70/v88/v150 measurements rejected the existing 8-warp 2x4 reuse kernel, and v158 rejected two 16x16 subtiles per warp because of register/shared-memory pressure. v186 therefore keeps one 16x16 WMMA subtile per warp, templates the stable kernel over the number of warps, and launches an explicit 8-warp/128-channel variant. It preserves the signed-INT8 arithmetic, FP16 partition, per-group scales, output indices, quantization, benchmark scenarios, and decode dispatch. Local 22 contract/runtime/vLLM tests, compileall, notebook rebuild, freshness, and diff checks pass. Kaggle T4 validation is required; the candidate is not accepted before all gates pass.
+
+## v186 result — eight-warp one-subtile candidate improves rows=16 but remains NO-GO
+
+v186 compiled and executed on Tesla T4 / SM75 with all embedded contracts passing. Native correctness, allocator/import checks, and both mixed decode gates passed. The candidate improved mixed QKV rows=16 end-to-end speedup from v185's 0.2661x to 0.3102x and rows=128 end-to-end from 0.1539x to 0.1883x, but mixed prefill remained far below the required gate. Mixed GEMM was 0.3116x at rows=16 and 0.1044x at rows=128; the rows=128 GEMM result regressed versus v185's 0.1511x. The candidate is rejected and must not replace the accepted path. Peak memory for mixed rows=128 remained 62,401,536 bytes end-to-end versus 60,461,056 bytes dense; no quality or benchmark-setting changes were made. Artifacts are preserved under `shmq-ultimate/mixllm_3level_kaggle/latest-output-v186-computer/`.
+
+## v187 hypothesis — shape-stratified dispatch from v185/v186 evidence
+
+v186's eight-warp one-subtile kernel improved rows=16 mixed GEMM from 0.2623x to 0.3116x but regressed rows=128 from 0.1511x to 0.1044x. v187 will re-use the exact v186 kernel only for rows==16 and retain the v185 four-warp path for rows>16. This is a dispatch-only combination of two measured, correctness-passing kernels; no arithmetic, metadata, model, quality, memory policy, or benchmark workload changes are planned. Kaggle T4 validation is required.
+
+## v187 implementation — shape-stratified dispatch
+
+Restored the measured v186 eight-warp kernel without its unconditional dispatch, and changed only the host launch selection: rows==16 uses the 8-warp/128-channel kernel; all other prefill rows use the v185 4-warp/64-channel kernel. Added source-contract coverage for both branches and corrected the audit test to stop at any `} else` boundary. Local 23 contract/runtime/vLLM tests, compileall, notebook rebuild, freshness, and diff checks pass. Kaggle T4 validation is required; no production claim is made yet.
