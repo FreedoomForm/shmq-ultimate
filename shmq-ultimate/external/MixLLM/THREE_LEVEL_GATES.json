@@ -1,0 +1,79 @@
+{
+  "schema_version": 3,
+  "target": "NVIDIA T4 / SM75",
+  "evidence": {
+    "model_quality_and_model_shaped_operator": "mixllm_3level_kaggle/output-v18/mixllm_3level_gate.json",
+    "single_physical_kernel": "mixllm_3level_kaggle/output-v20/mixllm_3level_gate.json",
+    "optimized_native_quantization_and_gemm": "mixllm_3level_kaggle/output-v22/mixllm_3level_gate.json",
+    "model_shaped_decode_and_prefill_initial": "mixllm_3level_kaggle/output-v28/mixllm_3level_gate.json",
+    "model_shaped_decode_and_prefill_repeat": "mixllm_3level_kaggle/output-v31/mixllm_3level_gate.json",
+    "post_correctness_fixes_repeat": "mixllm_3level_kaggle/output-1786887928/mixllm_3level_gate.json"
+  },
+  "gates": {
+    "allocation_and_serialization": "passed",
+    "reference_contract": "passed",
+    "sm75_native_correctness": "passed",
+    "sm75_stream_ordering": "passed",
+    "sm75_cuda_graph_capture": "passed",
+    "sm75_single_physical_kernel_correctness": "passed",
+    "sm75_decode_gemm_performance": "passed_at_m1_on_qwen_qkv_shape",
+    "sm75_decode_end_to_end_performance": "failed_at_m1_on_qwen_qkv_shape",
+    "sm75_prefill_performance": "failed",
+    "sm75_full_operator_performance": "failed",
+    "production_backend_selection": "blocked",
+    "vllm_native_plugin": "blocked_by_sm75_performance",
+    "qwen_small_model_equal_bit_quality": "passed_auto_budget_calibration_subset",
+    "qwen_7b_three_level_quality": "not_run_blocked_by_production_backend",
+    "qwen_model_throughput": "blocked_by_production_backend"
+  },
+  "performance_gate": {
+    "required_max_regression_percent": 5.0,
+    "baseline": "torch_fp16_linear",
+    "repeat_run": "output-1786887928",
+    "qwen_qkv_mixed_decode_gemm_speedup": 1.066212131859473,
+    "qwen_qkv_mixed_decode_end_to_end_speedup": 0.9506890050714427,
+    "qwen_qkv_int4_decode_gemm_speedup": 1.424499548371376,
+    "qwen_qkv_int4_decode_end_to_end_speedup": 1.2782116696975865,
+    "qwen_qkv_int8_decode_gemm_speedup": 1.3201280745594735,
+    "qwen_qkv_int8_decode_end_to_end_speedup": 1.2289066990047868,
+    "qwen_qkv_mixed_prefill_speedup_m16": 0.2589035666728302,
+    "qwen_qkv_mixed_prefill_speedup_m128": 0.14558461973688416,
+    "timing_scope": "custom_operator_only_after_cached_partition_validation",
+    "implementation": "native_sm75_activation_quantization_followed_by_decode_warp_kernel_or_tiled_multiwarp_wmma_prefill",
+    "decision_basis": "end_to_end_quantization_plus_gemm",
+    "four_x_assessment": {
+      "requested_speedup": 4.0,
+      "ideal_weight_bandwidth_ceiling_at_six_average_bits": 2.6666666666666665,
+      "ideal_weight_bandwidth_ceiling_at_four_bits": 4.0,
+      "classification": "not_a_valid_gate_for_a_six_bit_4_8_16_mix",
+      "reason": "The 16/6 weight-byte ratio is below 4x before activation traffic, scales, launches, synchronization, and compute are included."
+    }
+  },
+  "single_physical_kernel_gate": {
+    "implementation": "one_sm75_wmma_kernel_for_int4_int8_fp16_output_tiles",
+    "tested_shape": "M={1,8,32,128}, N=96, K=512",
+    "max_abs_error_min": 0.0060634613037109375,
+    "max_abs_error_max": 0.02967071533203125,
+    "p50_ratio_vs_dense_min": 53.20803656523611,
+    "p50_ratio_vs_dense_max": 61.438338916250224,
+    "correctness": "passed",
+    "performance": "failed",
+    "production_selected": false
+  },
+  "quality_gate": {
+    "model": "Qwen/Qwen2.5-0.5B",
+    "evaluation_tokens": 48,
+    "average_weight_bits": 5.96,
+    "two_level_4_8_loss": 5.944732189178467,
+    "allocator": "lagrangian_marginal_loss_auto_budget",
+    "auto_three_level_loss": 5.928255081176758,
+    "loss_improvement_vs_two_level": 0.016477108001708984,
+    "selected_fp16_channels": 26,
+    "selected_fp16_percentage": 0.008549031986531987,
+    "average_bit_delta_vs_two_level": 0.0,
+    "fp16_benefit_observed": true,
+    "decision": "quality_hypothesis_passed_small_gate_but_production_blocked_by_sm75_performance"
+  },
+  "terminal_decision": "no_go_for_t4_production_backend_after_repeated_qwen_shape_decode_and_prefill_measurement",
+  "policy": "A failed prerequisite is not converted into a pass by adding downstream integration code."
+}

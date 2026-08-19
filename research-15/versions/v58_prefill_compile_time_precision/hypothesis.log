@@ -1,0 +1,7 @@
+﻿# v58 compile-time specialized prefill precision path
+
+Original-first finding: the original test instantiates separate MmaCore_INT8 and MmaCore_INT4 TensorOp paths, while mq_mma_multistage.h keeps precision-specific iterators and staged fragments. Current SM75 prefill is one kernel but the INT8 loop contains runtime precision ternaries for weight loads, scale loads, and output index loads.
+
+Single hypothesis: replace only those inner-loop precision ternaries with two compile-time macro-expanded paths selected once per block by the existing precision partition. The kernel remains one monolithic launch and arithmetic/data are unchanged; the change removes per-iteration branch/ternary selection in the hot WMMA loop.
+
+Falsification: correctness must pass and mixed prefill GEMM/e2e must improve versus v51; otherwise restore v51.

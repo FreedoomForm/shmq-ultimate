@@ -1,0 +1,1 @@
+v81 deep research: native PTX INT8/INT4 references confirm potential instruction-count gains but use incompatible layouts and/or newer-architecture async pipelines. Exact gate workload extraction was blocked by remote quoting/path issues. No code change, no Kaggle measurement, clean v51 preserved.

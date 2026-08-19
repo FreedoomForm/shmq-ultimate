@@ -1,0 +1,5 @@
+﻿# v65 result
+
+No Kaggle submission. Original-first audit identified separate original MmaCore_INT4/INT8 paths versus current runtime precision branches. The attempted pointer-hoist edit was statically rejected before build because the broad condition replacement touched the FP16 branch and produced a duplicate else in the INT branch.
+
+Decision: abort without measurement and restore v51. This version is not evidence of correctness or performance. Future edits must use exact function/region boundaries, not broad string replacement.

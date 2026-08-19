@@ -1,0 +1,8 @@
+﻿# v60 result
+
+Kaggle output: output-1787024825, kernel version 81.
+Original-first finding: original_linear.py uses a padded M_even scale tensor; v60 applied the padded backend plus explicit scale_rows to both prefill kernels and preserved real-row reference reconstruction.
+
+Result: native correctness failed again with the same smoke max_abs_error pattern, so no performance result is admissible. The decode GEMM gate passed, but decode/prefill end-to-end gates failed as required by the failed correctness/production gate.
+
+Decision: reject v60 and restore v51. The repeated failure proves the remaining padded-scale mismatch is outside the two prefill consumers; do not continue padding changes without a new source-level contract audit.

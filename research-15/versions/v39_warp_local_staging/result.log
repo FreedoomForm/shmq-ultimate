@@ -1,0 +1,9 @@
+v39 STATUS=NO_GO_CORRECTNESS_PASSED_PERFORMANCE_FAILED 
+HYPOTHESIS=decode_read_only_ldg_loads 
+T4_HARDWARE=passed 
+SM75_NATIVE_CORRECTNESS=passed 
+SM75_NATIVE_BENCHMARKS=passed 
+END_TO_END_SPEEDUPS=0.121_to_1.095_in_16_scenarios 
+QWEN_MIXED_NOT_2_6X 
+TERMINAL_DECISION=no_go 
+NEXT_HYPOTHESIS=fused_activation_quantization_or_occupancy_measurement 

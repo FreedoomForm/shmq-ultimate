@@ -1,0 +1,7 @@
+﻿# v68 INT prefill K-loop unroll
+
+Original-first: original multistage header uses compile-time stage and K iteration counts; current first SM75 INT prefill uses fixed group_k loop over 128/16 without explicit unroll.
+
+Hypothesis: add one pragma unroll before the first tensorcore INT group_k loop only. No precision, layout, arithmetic, benchmark, FP16, reuse, or decode changes.
+
+Falsification: correctness and every required performance mode must pass; otherwise restore v51.

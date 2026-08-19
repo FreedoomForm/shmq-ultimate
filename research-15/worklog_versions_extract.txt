@@ -1,0 +1,88 @@
+﻿| Version | Differential finding / hypothesis | Correctness | Best GEMM p50 | Best end-to-end p50 | Decision |
+| v41 | Native vLLM patch bypassed SM75 ABI; replaced dense fallback with native dispatch. | passed | 1.6324x | 1.1100x | Keep integration fix; no-go performance |
+| v42 | Original scale_act used M_even; naive padded stride/layout implementation. | failed (max_abs_error 0.124847) | invalid | invalid | Rejected and rolled back |
+| v43 | Decode still unpacked packed INT4 nibbles; tried existing expanded INT4 cache for rows=1 decode. | gate did not complete (cudaErrorIllegalAddress) | invalid | invalid | Rejected and rolled back |
+| v44 | Four 8-lane subwarps duplicated activation reads; tried one full warp per channel. | passed | 1.3434x | 1.1365x | Rejected; slower/no meaningful improvement |
+| v45 | Same mapping audit; tried 16-lane subwarps as intermediate activation reuse. | passed | 1.6452x | 1.1971x | Current best correctness-passing baseline; still below 2.6x |
+| v46 | v45 8-warps block may limit occupancy; tried 4 decode warps. | passed | 1.5966x | 1.1973x | Rejected; no meaningful improvement |
+| v47 | v45 subwarps still duplicate global activations; tried dynamic shared activation staging. | passed | 1.4674x | 1.1059x | Rejected; regression; v45 restored |
+Current source is restored to v45: kDecodeWarps=8, kDecodeChannelsPerWarp=2. The best validated result is 1.6452x GEMM-only and 1.1971x end-to-end, with 	erminal_decision: no_go. The mandatory 2.6x target has not been reached. Continue with a new differential audit before any further change.
+| v48 | v45 subwarps duplicate activation loads; register-level full-warp shuffle reuse. | passed after address fix | 1.0860x | 1.0530x | Rejected; regression; v45 restored |
+| v49 | Original CUTLASS non-aliasing iterators vs raw decode pointers; added __restrict__. | passed | 1.5737x | 1.1589x | Rejected; below v45; v45 restored |
+| v50 | Original packed/interleaved access vs two byte loads; used one aligned uint16 packed pair load. | passed | 1.4180x | 1.1706x | Rejected; below v45; v45 restored |
+| v51 | v43 illegal-address root cause: rows=1 used empty expanded cache; initialized signed expanded INT4 cache and decoded from it. | passed | 1.4156x | 1.2210x | Current best end-to-end baseline; still no-go |
+| v52 | Precision-tiled decode block mapping audit; static rewrite contaminated prefill scope before submission. | not measured | invalid | invalid | Aborted and v51 restored |
+| v53 | Original static threadblock/resource configuration vs no decode launch bounds; added __launch_bounds__(256,2). | passed | 1.4449x | 1.2093x | Rejected; below v51; v51 restored |
+| v54 | v51 expanded cache left a stale zero_int4 load; removed only that unused read. | passed | 1.5597x | 1.1625x | Rejected; below v51; v51 restored |
+| v55 | Original read-only iterator audit vs v51 expanded INT4 ordinary loads; added __ldg only to expanded INT4 load. | passed | 1.3683x | 1.1602x | Rejected; below v51; v51 restored |
+| v56 | Original-first audit identified CUTLASS multistage/interleaved-layout/padded-scale mismatches; scoped precision-tiled decode mapping was measured. | native correctness passed; mixed prefill e2e gate failed | decode GEMM/e2e gates passed; prefill e2e failed | no_go | Rejected; restored v51 |
+| v57 | Original-first audit: original @torch.compile activation quantization versus our custom native quantizer; replaced only activation dispatch. | passed | mixed decode GEMM passed; decode/prefill e2e failed | no_go | Rejected; restored v51 |
+| v58 | Original-first audit: original separate INT4/INT8 MmaCore paths versus v51 runtime precision ternaries; attempted macro-expanded compile-time inner loop | not executed; nvcc syntax failure | no measurement | rejected | Restored v51 |
+| v59 | Original-first audit: original padded scale_act M_even; added backend padding, explicit prefill stride, and sliced reference reconstruction | native correctness failed | no admissible performance result | no_go | Rejected; restored v51 |
+| v60 | Original-first audit: completed padded scale contract across both prefill kernels with explicit scale_rows | native correctness failed (same max_abs_error pattern) | no admissible performance result; decode GEMM passed | no_go | Rejected; restored v51 |
+| v61 | Original-first audit of actual ops.quantize padded scale_act; attempted decode scale_rows ABI correction | not executed; nvcc too many arguments at decode launch | no measurement | rejected | Restored v51 |
+| v62 | Original-first audit of actual ops.quantize padded M_even; corrected atomic scale_rows ABI for decode and both prefill kernels | passed | mixed decode GEMM passed; decode/prefill e2e failed | no_go | Rejected; restored v51 |
+| v63 | Original-first audit: original direct packed-buffer path vs repeated wrapper contiguous conversion; cached 9 packed tensors by id/version | passed | decode GEMM/e2e passed; prefill e2e failed | no_go | Rejected; restored v51 |
+| v64 | Original-first audit: original stage-level pipeline vs first SM75 INT path full CTA barrier; changed one post-MMA barrier to __syncwarp | passed | decode GEMM/e2e passed; prefill e2e failed | no_go | Rejected; restored v51 |
+| v65 | Original-first audit: separate original MmaCore_INT4/INT8 vs current runtime branches; attempted pointer hoist was statically contaminated across FP16/INT scopes | aborted before build | no measurement | rejected | Restored v51 |
+| v66 | Original-first audit: separate INT4/INT8 MmaCore vs runtime precision branch; scoped pointer hoist in first prefill kernel | not executed; nvcc expected statement at line 223 | no measurement | rejected | Restored v51 |
+| v67 | Original-first audit: INT4 K interleave [0,4,1,5,2,6,3,7] and original InstructionShape<16,8,32> vs current WMMA 16x16x16 row-major path | audit-only; no code change | not measured | not_applicable | Kept v51 baseline |
+| v68 | Original-first audit: compile-time multistage/K iterations vs first INT prefill loop; added one scoped #pragma unroll | passed | decode GEMM/e2e passed; prefill e2e failed | no_go | Rejected; restored v51 |
+| v69 | Original-first audit: original column-oriented output plus transpose vs current direct row-oriented stores | audit-only; no code change | not measured | not_applicable | Kept v51 baseline |
+| v70 | Original-first audit: original CTA tile reuse vs current always-simple prefill dispatch; routed rows>1 to existing 8-warp reuse kernel | passed | decode GEMM/e2e passed; prefill e2e failed | no_go | Rejected; restored v51 |
+| v71 | Original-first audit: original kStages/cp_async circular pipeline vs current synchronous single-pass prefill loop | audit-only; no code change | not measured | not_applicable | Kept v51 baseline |
+| v72 | Original-first architecture guard: original cp.async multistage header requires Sm80; direct pipeline port is invalid for SM75 | audit-only; no code change | not measured | not_applicable | Kept v51 baseline |
+| v73 | Precision-plane warp parallelism based on original separate INT4/INT8 streams | Patch did not apply; no measurement | No source change; v51 preserved | Implementation attempt stalled; no correctness/performance evidence |
+| v74 | Add launch_bounds to active four-warp prefill kernel | Local validation passed; Kaggle T4 v89: correctness passed, decode GEMM/e2e passed, prefill e2e failed | Reverted completely; v51 preserved | Occupancy annotation alone did not pass the prefill gate |
+| v75 | Hoist precision-selected INT4/INT8 pointers out of the hot loop | Local validation passed; Kaggle T4 v90: correctness passed, decode GEMM/e2e passed, prefill e2e failed | Reverted completely; v51 preserved | Removing repeated runtime pointer ternaries was insufficient |
+| v76 | Direct global WMMA load for full-row INT activation tiles | Local validation passed; Kaggle T4 v91: correctness passed, decode GEMM/e2e passed, prefill e2e failed | Reverted completely; v51 preserved | Removing full-row INT A staging alone did not solve the prefill bottleneck |
+| v77 | Direct global INT A load plus conditional full-tile CTA barrier bypass | Kaggle T4 v92: correctness failed; decode gates passed; prefill e2e failed | Reverted completely; v51 preserved | Barrier removal is unsafe even for full tiles |
+| v79 | Two-slot software B-tail double-buffer design audit | No code change; no measurement | Rejected as unsafe; v51 preserved | A local B-slot tweak cannot prove overlap or shared-A synchronization on SM75 |
+| v80 | Deep-research-informed M-stratified prefill dispatch | No code change; no Kaggle measurement | Rejected before implementation | vLLM evidence supports shape stratification, but current kernels cannot encode safe M=128 geometry without repeating failed v70 reuse routing |
+| v81 | Deep research of native SM75 PTX INT8/INT4 microkernel references | No code change; no Kaggle measurement | Research-only; baseline preserved | Existing references do not prove a safe ABI-compatible PTX replacement; exact gate extraction blocked by remote quoting |
+| v82 | Deep-research-informed vectorized 4-byte activation A staging | Patch failed before validation; no Kaggle measurement | Reverted to v51 | Remote InsertRange failure occurred; before-snapshot restored source |
+| v83 | Aligned 4-byte vectorized full-row activation A staging | Local validation passed; Kaggle T4 correctness failed; no_go | Reverted | Vector load mapping was not numerically equivalent to the WMMA tile despite alignment proof |
+| v83-corrected | Exact INT8/INT4 branch vectorized A staging after forensic repair | Native correctness passed; prefill e2e failed badly; no_go | Reverted | Correct target fixed correctness, but 4-byte vectors cover only 64 of 128 lanes for a 16x16 int8 tile; further improvement requires a larger tile/pipeline redesign |
+| v84 | Deep-research explicit 8-warp 64x32 tile redesign | No code change; no Kaggle measurement | Rejected before implementation | Existing reuse kernel is structurally 32x64; safe 64x32 conversion requires an atomic full-kernel rewrite, not local edits |
+| v85 | Deep-research compile-time precision specialization | No code change; no Kaggle measurement | Rejected before implementation | Current monolithic grid mixes precision CTAs via blockIdx.x; specialization requires separate launches or a full template-body refactor |
+## v87 — invariant scale/index pointer hoist (rejected: prefill e2e regression)
+## v88 existing reuse dispatch rejected
+## v89 corrected — quantizer max-reduction micro-optimization (rejected: prefill e2e regression)
+## v90 — SM75 read-only activation load hint (rejected: prefill e2e regression)
+## v92 — full 8-warp 128-channel active prefill tile (rejected: prefill e2e regression)
+## v93 — INT prefill group-K unroll directive (rejected: prefill e2e regression)
+## v95 — INT4 predicate hoist (rejected: prefill e2e regression)
+## v100 — packed INT4 prefill (compile failure)
+## v100.1 — duplicate control-flow terminator correction (pending Kaggle)
+## v100.2 — kernel launch ABI correction (pending Kaggle)
+## v100.3 — WMMA const-cast correction (pending Kaggle)
+## v100.4 — diagnostic traceback capture (pending Kaggle)
+## v100.5 — captured ninja diagnostic (pending Kaggle)
+## v100.6 — restore missing expansion-launch close (pending Kaggle)
+## v100.7 — restore expansion channels and width arguments (pending Kaggle)
+## v100.8 — restore loader state assignment (pending Kaggle)
+## v100.8 result — packed INT4 path executes but prefill rejected
+## v100.9 — inline PTX INT8 MMA (pending Kaggle)
+## v101 Frankenstein safe set (v51 cumulative)
+## v101 Frankenstein result (Kaggle version 118 / output-1787050809)
+## v102 Frankenstein m8n32k16 INT8/INT4 prefill tile (pending Kaggle)
+## v102 Frankenstein m8n32k16 result (Kaggle version 119 / output-1787051874)
+## v102.1 Frankenstein m8n32k16 shared-B layout correction (pending Kaggle)
+## v102.2 Frankenstein m8n32k16 output indexing correction (pending Kaggle)
+## v102.3 result (Kaggle version 122 / output-1787052769)
+## v102.4 result (Kaggle version 123 / output-1787053175)
+## v102.5 result (Kaggle version 124 / output-1787053473)
+## v102.6 result (Kaggle version 125 / output-1787053687)
+## v102.7 result (Kaggle version 126 / output-1787053943)
+## v103 — vLLM SM75 native contract correction (static validation only)
+## v104 — block-uniform m8n32 A barrier correction (Kaggle version 127 / output-1787056456)
+## v105 â€” native ThreeLevelLinear SM75 forward path
+## v106 â€” vLLM contract tests aligned with native SM75 execution
+## v107 â€” vLLM patch format corrected
+## v108 â€” runtime SM75 guard and contract assertion
+## v109 â€” manifest contract reconciliation
+## v110 â€” CUDA source-contract test repair and invariant coverage
+## v111 â€” real vLLM apply-path gate attempt
+## v112 â€” honest offline vLLM gate behavior
+## v113 â€” classify incompatible preinstalled vLLM honestly
+## v114 â€” remove stale generated vLLM assertion from repaired v129 gate

@@ -1,0 +1,7 @@
+﻿# v60 complete padded scale contract across all prefill paths
+
+Original-first finding: original_linear.py uses one padded scale_act tensor, while our source contains two prefill kernels. v59 updated the active kernel stride but left the second reuse kernel signature inconsistent with the new scale_rows contract. v60 applies the same explicit stride to both prefill kernel signatures and their scale loads, while retaining the v59 backend padding and reference slicing.
+
+Single hypothesis: the native correctness failure in v59 came from an incomplete padded-scale consumer contract. This version changes no arithmetic, weights, inputs, or benchmark settings; it only makes every prefill kernel declaration consistent with the padded leading dimension.
+
+Falsification: native correctness must pass; otherwise restore v51.

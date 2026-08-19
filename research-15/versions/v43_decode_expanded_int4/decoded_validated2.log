@@ -1,0 +1,234 @@
+﻿0.00s - Debugger warning: It seems that frozen modules are being used, which may
+
+0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+
+0.00s - to python to disable frozen modules.
+
+0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+
+0.00s - Debugger warning: It seems that frozen modules are being used, which may
+
+0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+
+0.00s - to python to disable frozen modules.
+
+0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+
+Python 3.12.13 (main, Mar  4 2026, 09:23:07) [GCC 11.4.0]
+
+STARTUP_HEARTBEAT
+
+PyTorch 2.10.0+cu128
+
+DEVICE_COUNT 2
+
+ACTIVE_DEVICE Tesla T4
+
+Embedded source SHA-256: 822d09674cef4f4cda0a057139e898f3eab6f576d89095449740c7f2cc6c31c5
+
+
+
+..................
+
+----------------------------------------------------------------------
+
+Ran 18 tests in 0.138s
+
+
+
+OK
+
+
+
+[1/2] /usr/local/cuda/bin/nvcc --generate-dependencies-with-compile --dependency-output three_level_sm75.cuda.o.d -DTORCH_EXTENSION_NAME=mixllm_sm75_backend -DTORCH_API_INCLUDE_EXTENSION_H -isystem /usr/local/lib/python3.12/dist-packages/torch/include -isystem /usr/local/lib/python3.12/dist-packages/torch/include/torch/csrc/api/include -isystem /usr/local/cuda/include -isystem /usr/include/python3.12 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options '-fPIC' -O3 -lineinfo -gencode=arch=compute_75,code=sm_75 -std=c++17 -c /kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu -o three_level_sm75.cuda.o 
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(135): warning #177-D: variable "full_rows" was declared but never referenced
+
+      const bool full_rows = row_base + kTile <= rows;
+
+                 ^
+
+
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(189): warning #177-D: variable "full_rows" was declared but never referenced
+
+    const bool full_rows = row_base + kTile <= rows;
+
+               ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(454): warning #177-D: variable "zero" was declared but never referenced
+
+        const int zero = static_cast<int>(zero_int4[channel * groups + group]);
+
+                  ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(276): warning #177-D: function "<unnamed>::three_level_tensorcore_reuse_kernel" was declared but never referenced
+
+            void three_level_tensorcore_reuse_kernel(
+
+                 ^
+
+
+
+[1/2] /usr/local/cuda/bin/nvcc --generate-dependencies-with-compile --dependency-output three_level_sm75.cuda.o.d -DTORCH_EXTENSION_NAME=mixllm_sm75_backend -DTORCH_API_INCLUDE_EXTENSION_H -isystem /usr/local/lib/python3.12/dist-packages/torch/include -isystem /usr/local/lib/python3.12/dist-packages/torch/include/torch/csrc/api/include -isystem /usr/local/cuda/include -isystem /usr/include/python3.12 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options '-fPIC' -O3 -lineinfo -gencode=arch=compute_75,code=sm_75 -std=c++17 -c /kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu -o three_level_sm75.cuda.o 
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(135): warning #177-D: variable "full_rows" was declared but never referenced
+
+      const bool full_rows = row_base + kTile <= rows;
+
+                 ^
+
+
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(189): warning #177-D: variable "full_rows" was declared but never referenced
+
+    const bool full_rows = row_base + kTile <= rows;
+
+               ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(454): warning #177-D: variable "zero" was declared but never referenced
+
+        const int zero = static_cast<int>(zero_int4[channel * groups + group]);
+
+                  ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(276): warning #177-D: function "<unnamed>::three_level_tensorcore_reuse_kernel" was declared but never referenced
+
+            void three_level_tensorcore_reuse_kernel(
+
+                 ^
+
+
+
+[2/2] c++ three_level_sm75.cuda.o -shared -L/usr/local/lib/python3.12/dist-packages/torch/lib -lc10 -lc10_cuda -ltorch_cpu -ltorch_cuda -ltorch -ltorch_python -L/usr/local/cuda/lib64 -lcudart -o mixllm_sm75_backend.so
+
+[2/2] c++ three_level_sm75.cuda.o -shared -L/usr/local/lib/python3.12/dist-packages/torch/lib -lc10 -lc10_cuda -ltorch_cpu -ltorch_cuda -ltorch -ltorch_python -L/usr/local/cuda/lib64 -lcudart -o mixllm_sm75_backend.so
+
+Traceback (most recent call last):
+
+  File "<string>", line 1, in <module>
+
+  File "/usr/local/lib/python3.12/dist-packages/papermill/execute.py", line 131, in execute_notebook
+
+    raise_for_execution_errors(nb, output_path)
+
+  File "/usr/local/lib/python3.12/dist-packages/papermill/execute.py", line 251, in raise_for_execution_errors
+
+    raise error
+
+papermill.exceptions.PapermillExecutionError: 
+
+---------------------------------------------------------------------------
+
+Exception encountered at "In [6]":
+
+---------------------------------------------------------------------------
+
+RuntimeError                              Traceback (most recent call last)
+
+/tmp/ipykernel_24/2002635375.py in <cell line: 0>()
+
+     11         return benchmark_sm75_backend(packed, rows=rows, torch_module=torch, warmup=10, iterations=50)
+
+     12     cases = {'smoke_mixed_4_8_16': (96, 512, (64, 24, 8), (1, 8, 32, 128)), 'qwen_qkv_mixed_4_8_16': (3584, 3584, (2400, 896, 288), (1, 16, 128)), 'qwen_qkv_pure_int4': (3584, 3584, (3584, 0, 0), (1, 16, 128)), 'qwen_qkv_pure_int8': (3584, 3584, (0, 3584, 0), (1, 16, 128)), 'qwen_qkv_pure_fp16': (3584, 3584, (0, 0, 3584), (1, 16, 128))}
+
+---> 13     benchmarks['scenarios'] = {name: make_case(*args) for name, args in cases.items()}
+
+     14     benchmarks['status'] = 'measured'
+
+     15 report['benchmarks'] = benchmarks
+
+
+
+/tmp/ipykernel_24/2002635375.py in make_case(n, width, counts, rows)
+
+      9         alloc = ThreeLevelAllocation(indices={4: tuple(range(n4)), 8: tuple(range(n4, n4+n8)), 16: tuple(range(n4+n8, n))}, scores={b: (0.0,) * n for b in (4, 8, 16)}, budget=ThreeLevelBudget(*(100*c/n for c in counts)))
+
+     10         packed = ThreeLevelLinear.from_weight(torch.randn(n, width, device='cuda', dtype=torch.float16), alloc).cuda()
+
+---> 11         return benchmark_sm75_backend(packed, rows=rows, torch_module=torch, warmup=10, iterations=50)
+
+     12     cases = {'smoke_mixed_4_8_16': (96, 512, (64, 24, 8), (1, 8, 32, 128)), 'qwen_qkv_mixed_4_8_16': (3584, 3584, (2400, 896, 288), (1, 16, 128)), 'qwen_qkv_pure_int4': (3584, 3584, (3584, 0, 0), (1, 16, 128)), 'qwen_qkv_pure_int8': (3584, 3584, (0, 3584, 0), (1, 16, 128)), 'qwen_qkv_pure_fp16': (3584, 3584, (0, 0, 3584), (1, 16, 128))}
+
+     13     benchmarks['scenarios'] = {name: make_case(*args) for name, args in cases.items()}
+
+
+
+/kaggle/working/mixllm-3level/mixllm/sm75_backend.py in benchmark_sm75_backend(module, rows, torch_module, warmup, iterations)
+
+    310             x, torch_module, module.group_size,
+
+    311         )
+
+--> 312         actual = three_level_linear_prequantized(
+
+    313             module, x, input_int8, scale_act, torch_module,
+
+    314         )
+
+
+
+/kaggle/working/mixllm-3level/mixllm/sm75_backend.py in three_level_linear_prequantized(module, x, input_int8, scale_act, torch_module)
+
+    195         )
+
+    196     expanded_int4 = _expanded_int4_for_prefill(module, x, torch_module)
+
+--> 197     return torch_module.ops.mixllm_sm75._three_level_linear_v2_unchecked(
+
+    198         x if x.is_contiguous() else x.contiguous(),
+
+    199         input_int8 if input_int8.is_contiguous() else input_int8.contiguous(),
+
+
+
+/usr/local/lib/python3.12/dist-packages/torch/_ops.py in __call__(self, *args, **kwargs)
+
+   1207             # pyrefly: ignore [bad-argument-type]
+
+   1208             return _call_overload_packet_from_python(self, *args, **kwargs)
+
+-> 1209         return self._op(*args, **kwargs)
+
+   1210 
+
+   1211     # TODO: use this to make a __dir__
+
+
+
+RuntimeError: expected scalar type Byte but found Char
+
+
+
+/usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\|'
+
+  cells[i][c] = re.sub('\\\\\|', '|', cell)
+
+/usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\_'
+
+  text = re.sub(r'_', '\_', text) # Escape underscores in display text
+
+[NbConvertApp] Converting notebook __notebook__.ipynb to notebook
+
+[NbConvertApp] Writing 182546 bytes to __notebook__.ipynb
+
+[NbConvertApp] Converting notebook __notebook__.ipynb to html
+
+[NbConvertApp] Writing 638296 bytes to __results__.html
+

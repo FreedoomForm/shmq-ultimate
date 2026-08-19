@@ -1,0 +1,10 @@
+﻿# v53 — decode launch bounds
+
+## Differential audit finding
+Original CUTLASS instantiates kernels with explicit static threadblock shapes and resource expectations. The current 256-thread v51 decode kernel has no launch-bounds contract, so nvcc may choose a register allocation that reduces resident blocks or fails to expose the intended occupancy tradeoff.
+
+## Single hypothesis
+Add __launch_bounds__(256, 2) to only 	hree_level_decode_kernel, requesting at least two resident 256-thread blocks per SM while letting nvcc adjust registers accordingly. No data, arithmetic, precision, mapping, model or benchmark setting changes.
+
+## Falsification criteria
+Any correctness failure rejects v53. If correctness passes but speedup is not above v51, restore v51.

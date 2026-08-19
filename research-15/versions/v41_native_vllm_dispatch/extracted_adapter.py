@@ -1,0 +1,239 @@
+﻿"""MixLLM packed FP16/INT8/INT4 linear adapter for pinned vLLM 0.9.0."""
+
+from typing import Any, Optional
+
+import torch
+import torch.nn.functional as F
+from torch.nn.parameter import Parameter
+
+from vllm.distributed import (get_tensor_model_parallel_rank,
+                              get_tensor_model_parallel_world_size)
+from vllm.model_executor.layers.linear import LinearBase, LinearMethodBase
+from vllm.model_executor.layers.quantization.base_config import QuantizationConfig
+from vllm.model_executor.utils import set_weight_attrs
+
+
+_LEVELS = (4, 8, 16)
+_WEIGHT_NAMES = {
+    16: "weight_fp16",
+    8: "weight_int8",
+    4: "weight_int4",
+}
+_AUX_NAMES = ("scale_int8", "scale_int4", "zero_int4")
+
+
+def _contract_config(config: dict[str, Any]):
+    try:
+        from mixllm.vllm_three_level import VLLMThreeLevelConfig
+    except ImportError as exc:
+        raise ImportError(
+            "mixllm_three_level requires the pinned MixLLM package; "
+            "install this fork before starting vLLM"
+        ) from exc
+    return VLLMThreeLevelConfig.from_quantization_config(config)
+
+
+def _validate_indices(indices: dict[int, torch.Tensor], size: int) -> None:
+    try:
+        from mixllm.vllm_three_level import validate_partition_indices
+    except ImportError as exc:
+        raise RuntimeError("MixLLM contract helper disappeared after config loading") from exc
+    validate_partition_indices(
+        {bit: values.detach().cpu().tolist() for bit, values in indices.items()},
+        size,
+    )
+
+
+class MixLLMThreeLevelConfig(QuantizationConfig):
+    """Configuration for the explicit three-level checkpoint format.
+
+    Legacy two-level checkpoints continue to use the separate ``mixllm``
+    method installed by the original vLLM patch.
+    """
+
+    def __init__(self, config: Any) -> None:
+        super().__init__()
+        self.contract = config
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "mixllm_three_level"
+
+    @classmethod
+    def get_supported_act_dtypes(cls) -> list[torch.dtype]:
+        return [torch.half]
+
+    @classmethod
+    def get_min_capability(cls) -> int:
+        return 70
+
+    @staticmethod
+    def get_config_filenames() -> list[str]:
+        return ["quant_config.json", "quantize_config.json"]
+
+    @classmethod
+    def from_config(cls, config: dict[str, Any]) -> "MixLLMThreeLevelConfig":
+        contract = _contract_config(config)
+        if contract.backend not in {"auto", "reference"}:
+            raise ValueError(
+                "vLLM 0.9.0 three-level serving is gated to backend=reference; "
+                "the native fused operator has not passed the packed ABI gate"
+            )
+        return cls(contract)
+
+    def get_quant_method(self, layer: torch.nn.Module,
+                         prefix: str) -> Optional["MixLLMThreeLevelLinearMethod"]:
+        if isinstance(layer, LinearBase):
+            return MixLLMThreeLevelLinearMethod(self)
+        return None
+
+
+class MixLLMThreeLevelLinearMethod(LinearMethodBase):
+
+    def __init__(self, quant_config: MixLLMThreeLevelConfig) -> None:
+        self.quant_config = quant_config
+
+    @staticmethod
+    def _packed_loader(param: Parameter, loaded_weight: torch.Tensor,
+                       loaded_shard_id: Optional[int] = None) -> None:
+        shard_ids = {"q": 0, "k": 1, "v": 2}
+        shard = shard_ids.get(loaded_shard_id, loaded_shard_id)
+        shard = 0 if shard is None else int(shard)
+        pieces = getattr(param, "mixllm_loaded_shards", None)
+        if pieces is None:
+            pieces = {}
+            param.mixllm_loaded_shards = pieces
+        if shard in pieces:
+            raise ValueError(f"MixLLM tensor shard {shard} was loaded twice")
+        pieces[shard] = loaded_weight.detach().to(
+            device=param.device, non_blocking=True)
+
+    def create_weights(self, layer: torch.nn.Module,
+                       input_size_per_partition: int,
+                       output_partition_sizes: list[int], input_size: int,
+                       output_size: int, params_dtype: torch.dtype,
+                       **extra_weight_attrs) -> None:
+        if input_size % self.quant_config.contract.group_size:
+            raise ValueError("MixLLM input size must be divisible by group_size")
+        if (input_size_per_partition != input_size and
+                input_size_per_partition % self.quant_config.contract.group_size):
+            raise ValueError(
+                "row-parallel MixLLM input shard must be divisible by group_size")
+        layer.mixllm_input_size = input_size
+        layer.mixllm_input_size_per_partition = input_size_per_partition
+        layer.mixllm_output_partition_sizes = tuple(output_partition_sizes)
+
+        specs = {
+            "weight_fp16": torch.float16,
+            "weight_int8": torch.int8,
+            "scale_int8": torch.float16,
+            "weight_int4": torch.uint8,
+            "scale_int4": torch.float16,
+            "zero_int4": torch.uint8,
+            "indices_4": torch.int32,
+            "indices_8": torch.int32,
+            "indices_16": torch.int32,
+        }
+        for name, dtype in specs.items():
+            param = Parameter(torch.empty(0, dtype=dtype), requires_grad=False)
+            layer.register_parameter(name, param)
+            set_weight_attrs(param, {"weight_loader": self._packed_loader})
+
+    @staticmethod
+    def _loaded(param: Parameter, shard: int) -> torch.Tensor:
+        pieces = getattr(param, "mixllm_loaded_shards", {})
+        if shard not in pieces:
+            raise ValueError(f"checkpoint is missing MixLLM packed shard {shard}")
+        return pieces[shard]
+
+    def process_weights_after_loading(self, layer: torch.nn.Module) -> None:
+        tp_rank = get_tensor_model_parallel_rank()
+        tp_size = get_tensor_model_parallel_world_size()
+        input_size = layer.mixllm_input_size
+        local_input = layer.mixllm_input_size_per_partition
+        input_sharded = local_input != input_size
+        local_output_sizes = layer.mixllm_output_partition_sizes
+        global_output_sizes = (local_output_sizes if input_sharded else
+                               tuple(size * tp_size for size in local_output_sizes))
+        group_size = self.quant_config.contract.group_size
+        input_start = tp_rank * local_input
+
+        assembled: dict[str, list[torch.Tensor]] = {
+            name: [] for name in (*_WEIGHT_NAMES.values(), *_AUX_NAMES,
+                                  "indices_4", "indices_8", "indices_16")
+        }
+        output_offset = 0
+        for shard, (global_output, local_output) in enumerate(
+                zip(global_output_sizes, local_output_sizes)):
+            indices = {
+                bit: self._loaded(getattr(layer, f"indices_{bit}"), shard).to(torch.int32)
+                for bit in _LEVELS
+            }
+            _validate_indices(indices, global_output)
+            output_start = tp_rank * local_output
+            output_end = output_start + local_output
+
+            for bit in _LEVELS:
+                index = indices[bit]
+                if input_sharded:
+                    keep = torch.ones_like(index, dtype=torch.bool)
+                    local_index = index
+                else:
+                    keep = (index >= output_start) & (index < output_end)
+                    local_index = index[keep] - output_start
+                assembled[f"indices_{bit}"].append(local_index + output_offset)
+
+                weight = self._loaded(getattr(layer, _WEIGHT_NAMES[bit]), shard)[keep]
+                if input_sharded:
+                    start = input_start // 2 if bit == 4 else input_start
+                    width = local_input // 2 if bit == 4 else local_input
+                    weight = weight.narrow(1, start, width)
+                assembled[_WEIGHT_NAMES[bit]].append(weight)
+
+                if bit in (4, 8):
+                    scale_name = f"scale_int{bit}"
+                    scale = self._loaded(getattr(layer, scale_name), shard)[keep]
+                    if input_sharded:
+                        scale = scale.narrow(1, input_start // group_size,
+                                             local_input // group_size)
+                    assembled[scale_name].append(scale)
+                if bit == 4:
+                    zero = self._loaded(layer.zero_int4, shard)[keep]
+                    if input_sharded:
+                        zero = zero.narrow(1, input_start // group_size,
+                                           local_input // group_size)
+                    assembled["zero_int4"].append(zero)
+            output_offset += local_output
+
+        for name, pieces in assembled.items():
+            value = torch.cat(pieces, dim=0).contiguous()
+            setattr(layer, name, Parameter(value, requires_grad=False))
+        _validate_indices({bit: getattr(layer, f"indices_{bit}")
+                           for bit in _LEVELS}, output_offset)
+
+    @staticmethod
+    def _unpack_int4(weight: torch.Tensor) -> torch.Tensor:
+        output = torch.empty((weight.shape[0], weight.shape[1] * 2),
+                             dtype=torch.uint8, device=weight.device)
+        output[:, 0::2] = weight & 0x0F
+        output[:, 1::2] = weight >> 4
+        return output
+
+    def apply(self, layer: torch.nn.Module, x: torch.Tensor,
+              bias: Optional[torch.Tensor] = None) -> torch.Tensor:
+        input_width = x.shape[-1]
+        output_width = sum(layer.mixllm_output_partition_sizes)
+        group_size = self.quant_config.contract.group_size
+        layer.in_features = input_width
+        layer.out_features = output_width
+        layer.group_size = group_size
+        if not hasattr(layer,  _sm75_int4_expanded):
+            layer._sm75_int4_expanded = None
+        if not hasattr(layer, _sm75_fp16_placeholders):
+            layer._sm75_fp16_placeholders = None
+        from mixllm.sm75_backend import load_sm75_backend, three_level_linear
+        load_sm75_backend(torch)
+        output = three_level_linear(layer, x.reshape(-1, input_width), torch)
+        if bias is not None:
+            output = output + bias
+        return output.reshape(*x.shape[:-1], output_width)

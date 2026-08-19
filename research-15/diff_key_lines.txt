@@ -1,0 +1,306 @@
+37:-from mixllm.nn.modules.linear_for_vllm import LinearMixLLM4vLLM
+47:+    if name == "LinearMixLLM4vLLM":
+49:+        from mixllm.nn.modules.linear_for_vllm import LinearMixLLM4vLLM
+50:+        return LinearMixLLM4vLLM
+60: DEPS = mix_mma_config.h mix_mma_multistage.cuh mma_multistage_testbed.h cutlass_extension/mq_default_epilogue_tensor_op.h cutlass_extension/mq_epilogue.h cutlass_extension/mq_fine_grained_scale_zero_iterator.h cutlass_extension/mq_mma_base.h cutlass_extension/mq_mma_mixed_input_tensor_op.h cutlass_extension/mq_mma_multistage.h cutlass_extension/mq_mma_tensor_op_dequantizer.h cutlass_extension/mq_mma_tensor_op_sm80.h cutlass_extension/mq_numeric_conversion.h
+64:+$(error Upstream MixLLM CUTLASS source is SM80-specific; use the reference backend until a validated SM75 source is added)
+79:diff --git a/mixllm/kernels/three_level_sm75.cu b/mixllm/kernels/three_level_sm75.cu
+83:+++ b/mixllm/kernels/three_level_sm75.cu
+111:+__global__ void three_level_partition_kernel(
+114:+    const int32_t* indices_int4, const int8_t* weight_int8,
+115:+    const __half* scale_int8, const int32_t* indices_int8,
+116:+    const __half* weight_fp16, const int32_t* indices_fp16, float* output,
+117:+    int64_t rows, int64_t width, int64_t output_width, int64_t n4,
+118:+    int64_t n8, int64_t n16, int64_t group_size) {
+119:+  const int64_t row = blockIdx.y;
+121:+  const int64_t groups = width / group_size;
+130:+      const int64_t group = channel * groups + k / group_size;
+131:+      const float dequantized =
+134:+      accumulator += load_activation(input, row * width + k) * dequantized;
+139:+      const float dequantized =
+141:+          __half2float(scale_int8[channel * groups + k / group_size]);
+142:+      accumulator += load_activation(input, row * width + k) * dequantized;
+147:+      accumulator += load_activation(input, row * width + k) *
+170:+        output_channel = indices_int4[partition_channel];
+172:+        output_channel = indices_int8[partition_channel - n4];
+174:+        output_channel = indices_fp16[partition_channel - n4 - n8];
+176:+      output[row * output_width + output_channel] = value;
+186:+at::Tensor three_level_linear_cuda(
+189:+    const at::Tensor& indices_int4, const at::Tensor& weight_int8,
+190:+    const at::Tensor& scale_int8, const at::Tensor& indices_int8,
+191:+    const at::Tensor& weight_fp16, const at::Tensor& indices_fp16,
+192:+    int64_t group_size) {
+197:+  check_cuda_contiguous(indices_int4, "indices_int4");
+200:+  check_cuda_contiguous(indices_int8, "indices_int8");
+202:+  check_cuda_contiguous(indices_fp16, "indices_fp16");
+203:+  TORCH_CHECK(input.dim() == 2, "input must have shape [rows, in_features]");
+219:+  TORCH_CHECK(indices_int4.scalar_type() == at::kInt &&
+220:+                  indices_int8.scalar_type() == at::kInt &&
+221:+                  indices_fp16.scalar_type() == at::kInt,
+222:+              "all channel indices must be int32");
+223:+  TORCH_CHECK(group_size > 0 && input.size(1) % group_size == 0,
+224:+              "group_size must divide in_features");
+226:+  const auto rows = input.size(0);
+228:+  const auto n4 = indices_int4.numel();
+229:+  const auto n8 = indices_int8.numel();
+230:+  const auto n16 = indices_fp16.numel();
+239:+  const auto groups = width / group_size;
+247:+  auto output = at::empty({rows, output_width}, input.options().dtype(at::kFloat));
+250:+  const dim3 grid(output_width, rows);
+252:+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "three_level_sm75", [&] {
+253:+    three_level_partition_kernel<scalar_t><<<grid, block, 0, stream>>>(
+256:+        zero_int4.data_ptr<uint8_t>(), indices_int4.data_ptr<int32_t>(),
+259:+        indices_int8.data_ptr<int32_t>(),
+261:+        indices_fp16.data_ptr<int32_t>(), output.data_ptr<float>(), rows, width,
+262:+        output_width, n4, n8, n16, group_size);
+270:+TORCH_LIBRARY(mixllm_sm75, m) {
+271:+  m.def("three_level_linear(Tensor input, Tensor weight_int4, Tensor scale_int4, "
+272:+        "Tensor zero_int4, Tensor indices_int4, Tensor weight_int8, "
+273:+        "Tensor scale_int8, Tensor indices_int8, Tensor weight_fp16, "
+274:+        "Tensor indices_fp16, int group_size) -> Tensor");
+277:+TORCH_LIBRARY_IMPL(mixllm_sm75, CUDA, m) {
+278:+  m.impl("three_level_linear", &three_level_linear_cuda);
+297:+    group_size: int = 128
+324:+        if quant_config.group_size <= 0:
+325:+            raise ValueError("group_size must be positive")
+341:+            "group_size": self.group_size,
+354:+            "group_size": self.group_size,
+368:+            "group_size": transformers_dict.get("group_size", 128),
+382:-__all__ = ["quantize", "transpose", "mixllm_gemm"]
+383:+__all__ = ["quantize", "transpose", "mixllm_gemm", "mixllm_three_level_gemm"]
+385:@@ -23,2 +23,47 @@ def mixllm_gemm(a, scale_act, zero, scale_int8, scale_int4, indices_int8,
+387:+def mixllm_three_level_gemm(a, scale_act, zero_int4, scale_int8,
+388:+                            scale_int4, indices_int8, indices_int4,
+389:+                            indices_fp16, b_int8, b_int4, b_fp16):
+390:+    """Correctness-first 4/8/16 ABI using the existing MixLLM quantized op.
+392:+    The quantized partitions run through the upstream CUDA extension. The FP16
+397:+    partitions = (indices_int4, indices_int8, indices_fp16)
+398:+    total_n = sum(indices.numel() for indices in partitions)
+403:+        raise ValueError("4/8/16 indices must form a complete output-channel partition")
+409:+    n8, n4 = indices_int8.numel(), indices_int4.numel()
+413:+        quantized = mixllm_gemm(
+418:+            quantized = quantized.t().contiguous()
+419:+        output.index_copy_(1, torch.cat((indices_int8, indices_int4)).long(), quantized)
+421:+    if indices_fp16.numel():
+428:+        output.index_copy_(1, indices_fp16.long(), fp16_result.to(torch.float16))
+432: @torch.library.register_fake("kernels_mixllm::quantize")
+433:diff --git a/mixllm/nn/modules/three_level_linear.py b/mixllm/nn/modules/three_level_linear.py
+437:+++ b/mixllm/nn/modules/three_level_linear.py
+448:+from mixllm.quantization.three_level import LEVELS, ThreeLevelAllocation
+469:+    quant_method = "mixllm_three_level"
+471:+    def __init__(self, in_features: int, out_features: int, group_size: int = 128,
+474:+        if in_features <= 0 or out_features <= 0 or group_size <= 0:
+475:+            raise ValueError("linear dimensions and group_size must be positive")
+476:+        if in_features % group_size:
+477:+            raise ValueError("in_features must be divisible by group_size")
+480:+        self.group_size = group_size
+483:+        self.register_buffer("scale_int8", torch.empty(0, in_features // group_size, dtype=torch.float16))
+485:+        self.register_buffer("scale_int4", torch.empty(0, in_features // group_size, dtype=torch.float16))
+486:+        self.register_buffer("zero_int4", torch.empty(0, in_features // group_size, dtype=torch.uint8))
+488:+            self.register_buffer(f"indices_{bit}", torch.empty(0, dtype=torch.int32))
+494:+                    group_size: int = 128,
+500:+        layer = cls(in_features, out_features, group_size, bias).to(weight.device)
+501:+        groups = in_features // group_size
+504:+            indices = torch.tensor(allocation.indices[bit], dtype=torch.int32,
+506:+            setattr(layer, f"indices_{bit}", indices)
+507:+            if not indices.numel():
+509:+            chunk = weight.index_select(0, indices.long()).float()
+513:+                viewed = chunk.reshape(-1, groups, group_size)
+519:+                viewed = chunk.reshape(-1, groups, group_size)
+530:+    def dequantize_weight(self) -> torch.Tensor:
+534:+        if self.indices_16.numel():
+535:+            output.index_copy_(0, self.indices_16.long(), self.weight_fp16.float())
+536:+        if self.indices_8.numel():
+537:+            scales = self.scale_int8.float().repeat_interleave(self.group_size, dim=1)
+538:+            output.index_copy_(0, self.indices_8.long(), self.weight_int8.float() * scales)
+539:+        if self.indices_4.numel():
+541:+            scales = self.scale_int4.float().repeat_interleave(self.group_size, dim=1)
+542:+            zeros = self.zero_int4.float().repeat_interleave(self.group_size, dim=1)
+543:+            output.index_copy_(0, self.indices_4.long(), (codes - zeros) * scales)
+553:+            "indices_16": self.indices_16,
+559:+            "scale_int4", "zero_int4", "indices_4", "indices_8", "indices_16",
+571:+        result = torch.nn.functional.linear(x.float(), self.dequantize_weight(),
+575:diff --git a/mixllm/quantization/three_level.py b/mixllm/quantization/three_level.py
+579:+++ b/mixllm/quantization/three_level.py
+622:+    indices: Dict[int, tuple[int, ...]]
+629:+        assigned = [index for bit in LEVELS for index in self.indices[bit]]
+641:+            "indices": {str(k): list(v) for k, v in self.indices.items()},
+655:+            indices={int(bit): tuple(int(i) for i in values)
+656:+                     for bit, values in payload["indices"].items()},
+663:+        if set(allocation.indices) != set(LEVELS):
+691:+    is quantized at ``bit``.  Lower is better.  The allocation is global across
+724:+        indices={bit: tuple(sorted(selected[bit])) for bit in LEVELS},
+743:+    The returned per-layer allocations preserve original channel indices.  A
+832:+        indices = {bit: tuple(sorted(chosen[name][bit])) for bit in LEVELS}
+833:+        indices[4] = tuple(i for i in range(values[4].numel())
+836:+            indices=indices,
+851:+                            group_size: int = 128
+861:+    if weight.shape[1] % group_size:
+862:+        raise ValueError("in_features must be divisible by group_size")
+867:+        indices={4: (), 8: (), 16: tuple(range(weight.shape[0]))},
+872:+        indices = {level: () for level in LEVELS}
+873:+        indices[bit] = tuple(range(weight.shape[0]))
+875:+            indices=indices, scores=all_fp16.scores,
+880:+        output = fake_linear(x, weight.float(), allocation, group_size)
+888:+                group_size: int = 128) -> torch.Tensor:
+894:+        indices = allocation.indices[bit]
+895:+        if not indices:
+897:+        chunk = weight[list(indices)]
+899:+            quantized = chunk
+901:+            if chunk.shape[1] % group_size:
+902:+                raise ValueError("in_features must be divisible by group_size")
+903:+            groups = chunk.reshape(chunk.shape[0], -1, group_size)
+906:+                quantized = (groups / (maximum / 127)).round().clamp(-128, 127) * (maximum / 127)
+912:+                quantized = ((groups / scale).round() + zero).clamp(0, 15)
+913:+                quantized = (quantized - zero) * scale
+914:+            quantized = quantized.reshape_as(chunk)
+915:+        output[..., list(indices)] = torch.nn.functional.linear(x, quantized)
+937:+    sm75_available: bool = False
+948:+    def supports_sm75_backend(self) -> bool:
+949:+        return self.sm75_available and (self.major, self.minor) == (7, 5)
+952:+        if self.requested_backend not in {"auto", "sm75", "ampere", "reference"}:
+960:+        if self.requested_backend == "sm75":
+961:+            if not self.supports_sm75_backend:
+963:+                    "SM75 backend requires compute capability 7.5 and a validated SM75 build"
+965:+            return "sm75"
+968:+        if self.supports_sm75_backend:
+969:+            return "sm75"
+980:diff --git a/mixllm/sm75_backend.py b/mixllm/sm75_backend.py
+984:+++ b/mixllm/sm75_backend.py
+986:+"""Build and invoke the standalone SM75 three-level correctness backend."""
+998:+def load_sm75_backend(torch_module, build_directory: Optional[str | Path] = None) -> None:
+999:+    """JIT-build the SM75-only torch operator and load it into this process."""
+1004:+        raise RuntimeError("SM75 backend requires CUDA")
+1007:+        raise RuntimeError(f"SM75 backend requires capability 7.5, got {capability}")
+1011:+    source = Path(__file__).resolve().parent / "kernels" / "three_level_sm75.cu"
+1018:+        name="mixllm_sm75_backend",
+1029:+def three_level_linear(module, x, torch_module):
+1030:+    """Run a packed ``ThreeLevelLinear`` through the loaded SM75 operator."""
+1032:+        raise RuntimeError("call load_sm75_backend before using the SM75 operator")
+1034:+        raise ValueError("SM75 correctness backend currently requires a 2D input")
+1035:+    indices = (module.indices_4, module.indices_8, module.indices_16)
+1041:+        complete = torch_module.cat(indices).long()
+1045:+            raise ValueError("4/8/16 indices must form a complete output partition")
+1047:+        module.weight_int4, module.scale_int4, module.zero_int4, module.indices_4,
+1048:+        module.weight_int8, module.scale_int8, module.indices_8,
+1049:+        module.weight_fp16, module.indices_16,
+1053:+    return torch_module.ops.mixllm_sm75.three_level_linear(
+1054:+        x.contiguous(), *(tensor.contiguous() for tensor in tensors), module.group_size,
+1058:+def benchmark_sm75_backend(
+1060:+    rows: Iterable[int],
+1065:+    """Measure the SM75 operator against its dequantized dense reference.
+1073:+        raise RuntimeError("call load_sm75_backend before benchmarking")
+1074:+    dense_weight = module.dequantize_weight()
+1094:+    for row_count in rows:
+1095:+        if int(row_count) <= 0:
+1096:+            raise ValueError("benchmark row counts must be positive")
+1098:+            int(row_count), module.in_features, device=module.weight_fp16.device,
+1101:+        actual = three_level_linear(module, x, torch_module)
+1104:+        sm75 = measure(lambda: three_level_linear(module, x, torch_module))
+1107:+            "rows": int(row_count),
+1108:+            "sm75": sm75,
+1110:+            "p50_ratio_vs_dense": sm75["p50_ms"] / max(dense["p50_ms"], 1e-9),
+1132:+        self.assertEqual(RuntimeCapability(7, 5, sm75_available=True).select_backend(), "sm75")
+1144:+    def test_rejects_unavailable_sm75_backend(self):
+1146:+            RuntimeCapability(7, 5, "sm75").select_backend()
+1156:diff --git a/mixllm/test/test_sm75_backend.py b/mixllm/test/test_sm75_backend.py
+1160:+++ b/mixllm/test/test_sm75_backend.py
+1167:+from mixllm.nn.modules.three_level_linear import ThreeLevelLinear
+1168:+from mixllm.quantization.three_level import ThreeLevelAllocation, ThreeLevelBudget
+1169:+from mixllm.sm75_backend import load_sm75_backend, three_level_linear
+1173:+    os.environ.get("MIXLLM_TEST_SM75") == "1" and torch.cuda.is_available(),
+1174:+    "requires an explicit SM75 GPU test run",
+1176:+class SM75BackendTest(unittest.TestCase):
+1182:+        load_sm75_backend(torch)
+1184:+    def _run_case(self, counts, rows=3, width=128, seed=31):
+1190:+            indices={
+1199:+        x = torch.randn(rows, width, device="cuda", dtype=torch.float16)
+1202:+        actual = three_level_linear(module, x, torch)
+1203:+        expected = torch.nn.functional.linear(x.float(), module.dequantize_weight())
+1213:+    def test_random_rows_widths_and_determinism(self):
+1214:+        for rows, width in ((1, 128), (5, 128), (3, 256), (7, 384)):
+1215:+            with self.subTest(rows=rows, width=width):
+1216:+                self._run_case((4, 3, 3), rows=rows, width=width,
+1217:+                               seed=rows * 1000 + width)
+1220:+            indices={4: (1,), 8: (2,), 16: (0,)},
+1227:+        first = three_level_linear(module, x, torch)
+1228:+        second = three_level_linear(module, x, torch)
+1233:+            indices={4: (1,), 8: (2,), 16: (0,)},
+1247:+        actual = three_level_linear(module, x, torch)
+1248:+        expected = torch.nn.functional.linear(x.float(), module.dequantize_weight())
+1253:+            indices={4: (0, 3), 8: (1,), 16: (2,)},
+1265:+                three_level_linear(module, static_input, torch)
+1269:+            captured = three_level_linear(module, static_input, torch)
+1271:+        expected = torch.nn.functional.linear(static_input.float(), module.dequantize_weight())
+1278:diff --git a/mixllm/test/test_three_level.py b/mixllm/test/test_three_level.py
+1282:+++ b/mixllm/test/test_three_level.py
+1290:+from mixllm.quantization.three_level import (
+1298:+from mixllm.nn.modules.three_level_linear import ThreeLevelLinear
+1311:+        self.assertEqual(result.indices[16], (0,))
+1312:+        self.assertEqual(result.indices[8], (1,))
+1313:+        self.assertEqual(result.indices[4], (2, 3))
+1319:+        self.assertEqual(result.indices[4], ())
+1320:+        self.assertEqual(result.indices[8], ())
+1321:+        self.assertEqual(result.indices[16], (0, 1))
+1328:+        self.assertEqual({bit: len(result.indices[bit]) for bit in (4, 8, 16)},
+1358:+        counts = {bit: sum(len(value.indices[bit]) for value in result.values())
+1361:+        self.assertGreaterEqual(len(result["b"].indices[8]) +
+1362:+                                len(result["b"].indices[16]), 2)
+1399:+            indices={4: (0, 1), 8: (2,), 16: (3,)},
+1435:+        torch.testing.assert_close(loaded.dequantize_weight(), original.dequantize_weight())
+1446:+        legacy.pop("indices_16")
+1450:+        self.assertEqual(loaded.indices_16.numel(), 0)
+1451:+        torch.testing.assert_close(loaded.dequantize_weight(), original.dequantize_weight())
+1457:diff --git a/mixllm/test/test_vllm_three_level.py b/mixllm/test/test_vllm_three_level.py
+1461:+++ b/mixllm/test/test_vllm_three_level.py
+1465:+from mixllm.vllm_three_level import (
+1466:+    PINNED_VLLM_COMMIT,
+1467:+    VLLMThreeLevelConfig,
+1468:+    remap_partition_indices_for_tp,
+1469:+    restore_global_partition_indices,
+1470:+    validate_partition_indices,
+1474:+class VLLMThreeLevelContractTest(unittest.TestCase):
+1477:+        self.assertEqual(PINNED_VLLM_COMMIT,
+1481:+        config = VLLMThreeLevelConfig.from_quantization_config({
+1482:+            "quant_method": "mixllm_three_level",
+1484:+            "group_size": 128,
+1489:+    def test_requires_three_level_percentages(self):
+1491:+            VLLMThreeLevelConfig.from_quantization_config({"quant_method": "mixllm"})
+1494:+        validate_partition_indices({4: [2, 3], 8: [1], 16: [0]}, 4)
+1496:+            validate_partition_indices({4: [1], 8: [1], 16: [0]}, 3)
+1499:+        global_indices = {4: [0, 3, 6, 7], 8: [1, 5], 16: [2, 4]}
+1500:+        local = remap_partition_indices_for_tp(global_indices, 8, 2, 4)
+1502:+        restored = restore_global_partition_indices(local, 2, 4)
+1506:+        indices = {4: [0, 1], 8: [2], 16: [3]}
+1508:+            remap_partition_indices_for_tp(indices, 4, 3, 2)
+1514:diff --git a/mixllm/vllm_three_level.py b/mixllm/vllm_three_level.py
+1518:+++ b/mixllm/vllm_three_level.py
+1520:+"""Version-neutral helpers used by the pinned vLLM three-level patch."""
+1530:+PINNED_VLLM_VERSION = "0.9.0"
+1531:+PINNED_VLLM_COMMIT = "5fbbfe9a4c13094ad72ed3d6b4ef208a7ddc0fd7"
+1547:+class VLLMThreeLevelConfig:
+1548:+    group_size: int
+1554:+    def from_quantization_config(cls, config: Dict) -> "VLLMThreeLevelConfig":
+1555:+        if config.get("quant_method") not in {"mixllm_three_level", "mixllm"}:
+1565:+        group_size = int(config.get("group_size", 128))
+1566:+        if group_size != 128:
+1567:+            raise ValueError("current MixLLM CUDA ABI requires group_size=128")
+1569:+            group_size=group_size,
+1576:+                       sm75_available: bool = False) -> str:
+1577:+        return RuntimeCapability(*capability, self.backend, sm75_available).select_backend()
+1580:+def validate_partition_indices(indices: Dict[int, Iterable[int]], output_size: int) -> None:
+1581:+    values = [int(index) for bit in (4, 8, 16) for index in indices.get(bit, ())]
+1583:+        raise ValueError("vLLM partition indices must cover every output channel exactly once")
+1586:+def remap_partition_indices_for_tp(
+1587:+    indices: Dict[int, Iterable[int]],
+1592:+    """Map checkpoint-global output indices to one tensor-parallel shard.
+1594:+    vLLM loads output-parallel weights as contiguous ranges. The packed tensors
+1595:+    retain their precision order, while the operator receives indices local to
+1598:+    validate_partition_indices(indices, global_output_size)
+1603:+        bit: tuple(int(index) - shard_start for index in indices.get(bit, ())
+1607:+    validate_partition_indices(local, shard_size)
+1611:+def restore_global_partition_indices(
+1612:+    local_indices: Dict[int, Iterable[int]], shard_start: int, shard_size: int,
+1614:+    """Restore checkpoint-global indices after a local shard round trip."""
+1615:+    validate_partition_indices(local_indices, shard_size)
+1619:+        bit: tuple(int(index) + shard_start for index in local_indices.get(bit, ()))

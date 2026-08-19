@@ -1,0 +1,158 @@
+﻿0.00s - Debugger warning: It seems that frozen modules are being used, which may
+
+0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+
+0.00s - to python to disable frozen modules.
+
+0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+
+0.00s - Debugger warning: It seems that frozen modules are being used, which may
+
+0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+
+0.00s - to python to disable frozen modules.
+
+0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+
+Python 3.12.13 (main, Mar  4 2026, 09:23:07) [GCC 11.4.0]
+
+STARTUP_HEARTBEAT
+
+PyTorch 2.10.0+cu128
+
+DEVICE_COUNT 2
+
+ACTIVE_DEVICE Tesla T4
+
+Embedded source SHA-256: 25f642cad4e330ff77d9bae2f827c85c71a98bbfe8da94c405276bf01fb1c069
+
+
+
+..................
+
+----------------------------------------------------------------------
+
+Ran 18 tests in 0.136s
+
+
+
+OK
+
+
+
+[1/2] /usr/local/cuda/bin/nvcc --generate-dependencies-with-compile --dependency-output three_level_sm75.cuda.o.d -DTORCH_EXTENSION_NAME=mixllm_sm75_backend -DTORCH_API_INCLUDE_EXTENSION_H -isystem /usr/local/lib/python3.12/dist-packages/torch/include -isystem /usr/local/lib/python3.12/dist-packages/torch/include/torch/csrc/api/include -isystem /usr/local/cuda/include -isystem /usr/include/python3.12 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options '-fPIC' -O3 -lineinfo -gencode=arch=compute_75,code=sm_75 -std=c++17 -c /kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu -o three_level_sm75.cuda.o 
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(135): warning #177-D: variable "full_rows" was declared but never referenced
+
+      const bool full_rows = row_base + kTile <= rows;
+
+                 ^
+
+
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(189): warning #177-D: variable "full_rows" was declared but never referenced
+
+    const bool full_rows = row_base + kTile <= rows;
+
+               ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(276): warning #177-D: function "<unnamed>::three_level_tensorcore_reuse_kernel" was declared but never referenced
+
+            void three_level_tensorcore_reuse_kernel(
+
+                 ^
+
+
+
+[1/2] /usr/local/cuda/bin/nvcc --generate-dependencies-with-compile --dependency-output three_level_sm75.cuda.o.d -DTORCH_EXTENSION_NAME=mixllm_sm75_backend -DTORCH_API_INCLUDE_EXTENSION_H -isystem /usr/local/lib/python3.12/dist-packages/torch/include -isystem /usr/local/lib/python3.12/dist-packages/torch/include/torch/csrc/api/include -isystem /usr/local/cuda/include -isystem /usr/include/python3.12 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options '-fPIC' -O3 -lineinfo -gencode=arch=compute_75,code=sm_75 -std=c++17 -c /kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu -o three_level_sm75.cuda.o 
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(135): warning #177-D: variable "full_rows" was declared but never referenced
+
+      const bool full_rows = row_base + kTile <= rows;
+
+                 ^
+
+
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(189): warning #177-D: variable "full_rows" was declared but never referenced
+
+    const bool full_rows = row_base + kTile <= rows;
+
+               ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(276): warning #177-D: function "<unnamed>::three_level_tensorcore_reuse_kernel" was declared but never referenced
+
+            void three_level_tensorcore_reuse_kernel(
+
+                 ^
+
+
+
+[2/2] c++ three_level_sm75.cuda.o -shared -L/usr/local/lib/python3.12/dist-packages/torch/lib -lc10 -lc10_cuda -ltorch_cpu -ltorch_cuda -ltorch -ltorch_python -L/usr/local/cuda/lib64 -lcudart -o mixllm_sm75_backend.so
+
+[2/2] c++ three_level_sm75.cuda.o -shared -L/usr/local/lib/python3.12/dist-packages/torch/lib -lc10 -lc10_cuda -ltorch_cpu -ltorch_cuda -ltorch -ltorch_python -L/usr/local/cuda/lib64 -lcudart -o mixllm_sm75_backend.so
+
+TESTS_RETURNCODE 0
+
+TESTS_STDOUT_TAIL 
+
+TESTS_STDERR_TAIL ..................
+
+----------------------------------------------------------------------
+
+Ran 18 tests in 0.136s
+
+
+
+OK
+
+
+
+IS_T4 True
+
+GATES_PRE_EXEC {'t4_hardware': 'passed', 'full_model_qwen_quality': 'not_run', 'full_model_qwen_throughput': 'not_run', 'embedded_contract_tests': 'passed', 'model_gate_import': 'passed', 'fixed_allocator': 'passed', 'auto_allocator': 'passed', 'sm75_native_benchmarks': 'passed', 'sm75_native_correctness': 'passed', 'mixed_decode_gemm_performance': 'passed', 'mixed_decode_end_to_end_performance': 'passed', 'mixed_prefill_end_to_end_performance': 'failed'}
+
+BENCHMARKS_PRE_EXEC {'status': 'measured', 'baseline': 'torch_fp16_linear', 'scenarios': {'smoke_mixed_4_8_16': {'status': 'measured', 'in_features': 512, 'out_features': 96, 'partition_counts': {4: 64, 8: 24, 16: 8}, 'average_weight_bits': 6.0, 'weight_bandwidth_upper_bound_vs_fp16': 2.6666666666666665, 'shapes': [{'rows': 1, 'activation_quantization': {'p50_ms': 0.02864000014960766, 'p95_ms': 0.04700800031423569}, 'sm75_gemm': {'p50_ms': 0.05748800002038479, 'p95_ms': 0.07023999840021133}, 'sm75_end_to_end': {'p50_ms': 0.08601599931716919, 'p95_ms': 0.10716799646615982}, 'dense_fp16': {'p50_ms': 0.03276799991726875, 'p95_ms': 0.04505600035190582}, 'gemm_p50_ratio_vs_dense': 1.7543945363015148, 'gemm_p50_speedup_vs_dense': 0.5699972151692436, 'end_to_end_p50_ratio_vs_dense': 2.6249999857891453, 'end_to_end_p50_speedup_vs_dense': 0.3809523830147272, 'max_abs_error': 0.010498046875, 'max_abs_error_vs_dense_fp16': 0.3921276330947876}, {'rows': 8, 'activation_quantization': {'p50_ms': 0.030208000913262367, 'p95_ms': 0.03734400123357773}, 'sm75_gemm': {'p50_ms': 0.06665600091218948, 'p95_ms': 0.07097599655389786}, 'sm75_end_to_end': {'p50_ms': 0.10663999989628792, 'p95_ms': 0.13177600502967834}, 'dense_fp16': {'p50_ms': 0.04044799879193306, 'p95_ms': 0.05395200103521347}, 'gemm_p50_ratio_vs_dense': 1.6479431097462192, 'gemm_p50_speedup_vs_dense': 0.6068170643063028, 'end_to_end_p50_ratio_vs_dense': 2.6364715951671798, 'end_to_end_p50_speedup_vs_dense': 0.37929481274634763, 'max_abs_error': 0.02848052978515625, 'max_abs_error_vs_dense_fp16': 0.40606212615966797}, {'rows': 32, 'activation_quantization': {'p50_ms': 0.028880000114440918, 'p95_ms': 0.04262400045990944}, 'sm75_gemm': {'p50_ms': 0.0780319981276989, 'p95_ms': 0.07916799932718277}, 'sm75_end_to_end': {'p50_ms': 0.09625600278377533, 'p95_ms': 0.12464000284671783}, 'dense_fp16': {'p50_ms': 0.036288000643253326, 'p95_ms': 0.05315199866890907}, 'gemm_p50_ratio_vs_dense': 2.1503526439725915, 'gemm_p50_speedup_vs_dense': 0.4650400029981064, 'end_to_end_p50_ratio_vs_dense': 2.652557348917245, 'end_to_end_p50_speedup_vs_dense': 0.37699467663090974, 'max_abs_error': 0.02967071533203125, 'max_abs_error_vs_dense_fp16': 0.516754150390625}, {'rows': 128, 'activation_quantization': {'p50_ms': 0.028704000636935234, 'p95_ms': 0.04710400104522705}, 'sm75_gemm': {'p50_ms': 0.07976000010967255, 'p95_ms': 0.0799039974808693}, 'sm75_end_to_end': {'p50_ms': 0.09705600142478943, 'p95_ms': 0.14268800616264343}, 'dense_fp16': {'p50_ms': 0.03511999920010567, 'p95_ms': 0.0432640016078949}, 'gemm_p50_ratio_vs_dense': 2.2710706698829473, 'gemm_p50_speedup_vs_dense': 0.4403209522544452, 'end_to_end_p50_ratio_vs_dense': 2.7635536342636766, 'end_to_end_p50_speedup_vs_dense': 0.3618529373201186, 'max_abs_error': 0.0278778076171875, 'max_abs_error_vs_dense_fp16': 0.6250038146972656}]}, 'qwen_qkv_mixed_4_8_16': {'status': 'measured', 'in_features': 3584, 'out_features': 3584, 'partition_counts': {4: 2400, 8: 896, 16: 288}, 'average_weight_bits': 5.964285714285714, 'weight_bandwidth_upper_bound_vs_fp16': 2.682634730538922, 'shapes': [{'rows': 1, 'activation_quantization': {'p50_ms': 0.029120000079274178, 'p95_ms': 0.040991999208927155}, 'sm75_gemm': {'p50_ms': 0.08240000158548355, 'p95_ms': 0.08601599931716919}, 'sm75_end_to_end': {'p50_ms': 0.0979200005531311, 'p95_ms': 0.12521600723266602}, 'dense_fp16': {'p50_ms': 0.11462400108575821, 'p95_ms': 0.11584000289440155}, 'gemm_p50_ratio_vs_dense': 0.7188721454927608, 'gemm_p50_speedup_vs_dense': 1.3910679475757628, 'end_to_end_p50_ratio_vs_dense': 0.854271353517579, 'end_to_end_p50_speedup_vs_dense': 1.1705882397699086, 'max_abs_error': 0.0642852783203125, 'max_abs_error_vs_dense_fp16': 1.394369125366211}, {'rows': 16, 'activation_quantization': {'p50_ms': 0.027744000777602196, 'p95_ms': 0.034432001411914825}, 'sm75_gemm': {'p50_ms': 0.49433599412441254, 'p95_ms': 0.49564799666404724}, 'sm75_end_to_end': {'p50_ms': 0.48875199258327484, 'p95_ms': 0.4899519979953766}, 'dense_fp16': {'p50_ms': 0.13926400244235992, 'p95_ms': 0.14131200313568115}, 'gemm_p50_ratio_vs_dense': 3.549632248498772, 'gemm_p50_speedup_vs_dense': 0.281719324705517, 'end_to_end_p50_ratio_vs_dense': 3.509535730782725, 'end_to_end_p50_speedup_vs_dense': 0.28493797376924607, 'max_abs_error': 0.0950927734375, 'max_abs_error_vs_dense_fp16': 1.70574951171875}, {'rows': 128, 'activation_quantization': {'p50_ms': 0.028704000636935234, 'p95_ms': 0.04918399825692177}, 'sm75_gemm': {'p50_ms': 1.6794080138206482, 'p95_ms': 1.7249280214309692}, 'sm75_end_to_end': {'p50_ms': 0.9559839963912964, 'p95_ms': 1.0035200119018555}, 'dense_fp16': {'p50_ms': 0.1680160015821457, 'p95_ms': 0.17292800545692444}, 'gemm_p50_ratio_vs_dense': 9.995524223920773, 'gemm_p50_speedup_vs_dense': 0.10004477780233392, 'end_to_end_p50_ratio_vs_dense': 5.689838987888904, 'end_to_end_p50_speedup_vs_dense': 0.17575189774764244, 'max_abs_error': 0.1025390625, 'max_abs_error_vs_dense_fp16': 1.83734130859375}]}, 'qwen_qkv_pure_int4': {'status': 'measured', 'in_features': 3584, 'out_features': 3584, 'partition_counts': {4: 3584, 8: 0, 16: 0}, 'average_weight_bits': 4.0, 'weight_bandwidth_upper_bound_vs_fp16': 4.0, 'shapes': [{'rows': 1, 'activation_quantization': {'p50_ms': 0.028672000393271446, 'p95_ms': 0.04153599962592125}, 'sm75_gemm': {'p50_ms': 0.07372800260782242, 'p95_ms': 0.1048320010304451}, 'sm75_end_to_end': {'p50_ms': 0.10319999977946281, 'p95_ms': 0.11894399672746658}, 'dense_fp16': {'p50_ms': 0.10454399883747101, 'p95_ms': 0.10595200210809708}, 'gemm_p50_ratio_vs_dense': 0.705234192566552, 'gemm_p50_speedup_vs_dense': 1.4179686840774264, 'end_to_end_p50_ratio_vs_dense': 0.9871441778298758, 'end_to_end_p50_speedup_vs_dense': 1.0130232467139564, 'max_abs_error': 4.57763671875e-05, 'max_abs_error_vs_dense_fp16': 1.4177970886230469}, {'rows': 16, 'activation_quantization': {'p50_ms': 0.031279999762773514, 'p95_ms': 0.04131200164556503}, 'sm75_gemm': {'p50_ms': 0.2030560001730919, 'p95_ms': 0.20479999482631683}, 'sm75_end_to_end': {'p50_ms': 0.19727999716997147, 'p95_ms': 0.20028799772262573}, 'dense_fp16': {'p50_ms': 0.11691199988126755, 'p95_ms': 0.11840000003576279}, 'gemm_p50_ratio_vs_dense': 1.7368277027106687, 'gemm_p50_speedup_vs_dense': 0.5757623501970281, 'end_to_end_p50_ratio_vs_dense': 1.6874229965300682, 'end_to_end_p50_speedup_vs_dense': 0.5926196348256185, 'max_abs_error': 8.7738037109375e-05, 'max_abs_error_vs_dense_fp16': 1.6556415557861328}, {'rows': 128, 'activation_quantization': {'p50_ms': 0.0284639997407794, 'p95_ms': 0.038495998829603195}, 'sm75_gemm': {'p50_ms': 0.7438879907131195, 'p95_ms': 0.8048639893531799}, 'sm75_end_to_end': {'p50_ms': 0.7864320278167725, 'p95_ms': 0.8151040077209473}, 'dense_fp16': {'p50_ms': 0.16179199516773224, 'p95_ms': 0.1635199934244156}, 'gemm_p50_ratio_vs_dense': 4.597804668530847, 'gemm_p50_speedup_vs_dense': 0.21749510300957034, 'end_to_end_p50_ratio_vs_dense': 4.860759810777204, 'end_to_end_p50_speedup_vs_dense': 0.20572915324530436, 'max_abs_error': 0.0001926422119140625, 'max_abs_error_vs_dense_fp16': 2.130603790283203}]}, 'qwen_qkv_pure_int8': {'status': 'measured', 'in_features': 3584, 'out_features': 3584, 'partition_counts': {4: 0, 8: 3584, 16: 0}, 'average_weight_bits': 8.0, 'weight_bandwidth_upper_bound_vs_fp16': 2.0, 'shapes': [{'rows': 1, 'activation_quantization': {'p50_ms': 0.02696000039577484, 'p95_ms': 0.036159999668598175}, 'sm75_gemm': {'p50_ms': 0.07971200346946716, 'p95_ms': 0.17612800002098083}, 'sm75_end_to_end': {'p50_ms': 0.09830400347709656, 'p95_ms': 0.11827199906110764}, 'dense_fp16': {'p50_ms': 0.10446399822831154, 'p95_ms': 0.1061440035700798}, 'gemm_p50_ratio_vs_dense': 0.7630571758822825, 'gemm_p50_speedup_vs_dense': 1.3105177850450762, 'end_to_end_p50_ratio_vs_dense': 0.9410323665981845, 'end_to_end_p50_speedup_vs_dense': 1.062662704806831, 'max_abs_error': 5.030632019042969e-05, 'max_abs_error_vs_dense_fp16': 1.3958702087402344}, {'rows': 16, 'activation_quantization': {'p50_ms': 0.02783999964594841, 'p95_ms': 0.03891199827194214}, 'sm75_gemm': {'p50_ms': 0.20070399343967438, 'p95_ms': 0.2024639993906021}, 'sm75_end_to_end': {'p50_ms': 0.19251200556755066, 'p95_ms': 0.20207999646663666}, 'dense_fp16': {'p50_ms': 0.1170239970088005, 'p95_ms': 0.11849600076675415}, 'gemm_p50_ratio_vs_dense': 1.715066982582905, 'gemm_p50_speedup_vs_dense': 0.5830676061957603, 'end_to_end_p50_ratio_vs_dense': 1.645064349947586, 'end_to_end_p50_speedup_vs_dense': 0.6078789562437854, 'max_abs_error': 9.1552734375e-05, 'max_abs_error_vs_dense_fp16': 1.7460441589355469}, {'rows': 128, 'activation_quantization': {'p50_ms': 0.028672000393271446, 'p95_ms': 0.04505600035190582}, 'sm75_gemm': {'p50_ms': 0.7435040175914764, 'p95_ms': 0.8028159737586975}, 'sm75_end_to_end': {'p50_ms': 0.8356799781322479, 'p95_ms': 0.8786240220069885}, 'dense_fp16': {'p50_ms': 0.16260799765586853, 'p95_ms': 0.16527999937534332}, 'gemm_p50_ratio_vs_dense': 4.572370537179684, 'gemm_p50_speedup_vs_dense': 0.21870493475290761, 'end_to_end_p50_ratio_vs_dense': 5.139230481767686, 'end_to_end_p50_speedup_vs_dense': 0.19458166033760774, 'max_abs_error': 0.00019073486328125, 'max_abs_error_vs_dense_fp16': 1.725698471069336}]}, 'qwen_qkv_pure_fp16': {'status': 'measured', 'in_features': 3584, 'out_features': 3584, 'partition_counts': {4: 0, 8: 0, 16: 3584}, 'average_weight_bits': 16.0, 'weight_bandwidth_upper_bound_vs_fp16': 1.0, 'shapes': [{'rows': 1, 'activation_quantization': {'p50_ms': 0.027088000439107418, 'p95_ms': 0.03513599932193756}, 'sm75_gemm': {'p50_ms': 0.10788800194859505, 'p95_ms': 0.1085439994931221}, 'sm75_end_to_end': {'p50_ms': 0.10772800073027611, 'p95_ms': 0.10867200046777725}, 'dense_fp16': {'p50_ms': 0.10454399883747101, 'p95_ms': 0.10608000308275223}, 'gemm_p50_ratio_vs_dense': 1.0319865621012143, 'gemm_p50_speedup_vs_dense': 0.9690048656873139, 'end_to_end_p50_ratio_vs_dense': 1.0304560943546373, 'end_to_end_p50_speedup_vs_dense': 0.9704440640203001, 'max_abs_error': 0.07965087890625, 'max_abs_error_vs_dense_fp16': 0.07965087890625}, {'rows': 16, 'activation_quantization': {'p50_ms': 0.028624000027775764, 'p95_ms': 0.04809600114822388}, 'sm75_gemm': {'p50_ms': 0.33792001008987427, 'p95_ms': 0.3396480083465576}, 'sm75_end_to_end': {'p50_ms': 0.3312320113182068, 'p95_ms': 0.332832008600235}, 'dense_fp16': {'p50_ms': 0.11681600287556648, 'p95_ms': 0.118367999792099}, 'gemm_p50_ratio_vs_dense': 2.8927544323685677, 'gemm_p50_speedup_vs_dense': 0.34569128606647986, 'end_to_end_p50_ratio_vs_dense': 2.835502013119198, 'end_to_end_p50_speedup_vs_dense': 0.3526712361244098, 'max_abs_error': 0.0624847412109375, 'max_abs_error_vs_dense_fp16': 0.0624847412109375}, {'rows': 128, 'activation_quantization': {'p50_ms': 0.02696000039577484, 'p95_ms': 0.03510399907827377}, 'sm75_gemm': {'p50_ms': 1.1357119679450989, 'p95_ms': 1.2039040327072144}, 'sm75_end_to_end': {'p50_ms': 1.1790720224380493, 'p95_ms': 1.2196160554885864}, 'dense_fp16': {'p50_ms': 0.16793599724769592, 'p95_ms': 0.1708800047636032}, 'gemm_p50_ratio_vs_dense': 6.762766688252008, 'gemm_p50_speedup_vs_dense': 0.14786847544765336, 'end_to_end_p50_ratio_vs_dense': 7.02096061453094, 'end_to_end_p50_speedup_vs_dense': 0.14243065228572124, 'max_abs_error': 0.124847412109375, 'max_abs_error_vs_dense_fp16': 0.124847412109375}]}}}
+
+{
+
+  "execution": "passed",
+
+  "t4_production": "failed",
+
+  "terminal_decision": "no_go",
+
+  "reason": "production requires native correctness plus mixed decode and prefill end-to-end performance"
+
+}
+
+Full-model Qwen quality: not_run
+
+/usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\|'
+
+  cells[i][c] = re.sub('\\\\\|', '|', cell)
+
+/usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\_'
+
+  text = re.sub(r'_', '\_', text) # Escape underscores in display text
+
+[NbConvertApp] Converting notebook __notebook__.ipynb to notebook
+
+[NbConvertApp] Writing 179360 bytes to __notebook__.ipynb
+
+[NbConvertApp] Converting notebook __notebook__.ipynb to html
+
+[NbConvertApp] Writing 634411 bytes to __results__.html
+

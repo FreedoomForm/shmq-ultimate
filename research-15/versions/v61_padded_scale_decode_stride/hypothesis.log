@@ -1,0 +1,7 @@
+﻿# v61 original ABI padded scale decode stride
+
+Original-first finding: original mixllm/nn/modules/ops.py quantize fake implementation explicitly returns scale tensor shape [K/128, M + M % 2]. original_linear.py passes that padded tensor into the mixed GEMM. Our v59/v60 correctly added padding and prefill stride, but the SM75 decode kernel still read scale_act[group] as if groups were contiguous with one row. For padded M=1, group g must read scale_act[g * scale_rows], otherwise it reads values from the wrong group.
+
+Single hypothesis: pass actual scale_rows into decode and change only the INT4/INT8 decode scale loads to scale_act[group * scale_rows]. Prefill padding/stride remains aligned with original. This is one ABI stride correction, with no arithmetic or benchmark changes.
+
+Falsification: native correctness must pass; if correct, compare performance against v51 and reject unless it improves the relevant gate.

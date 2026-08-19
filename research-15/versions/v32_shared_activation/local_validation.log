@@ -1,0 +1,32 @@
+VERSION=v32_shared_activation 
+HYPOTHESIS=shared activation reuse in SM75 decode 
+warning: in the working copy of 'THREE_LEVEL_STATUS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apply_vllm_patche.sh', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mixllm/kernels/three_level_sm75.cu', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mixllm/nn/modules/three_level_linear.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mixllm/sm75_backend.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mixllm/test/test_sm75_backend.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mixllm/test/test_three_level.py', LF will be replaced by CRLF the next time Git touches it
+Validated C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\mixllm_3level_kaggle\mixllm_3level_gate.ipynb (19 embedded files)
+M  scripts/build_mixllm_3level_kaggle.py
+A  scripts/run_mixllm_3level_kaggle.py
+ m shmq-ultimate/external/MixLLM
+M  shmq-ultimate/mixllm_3level_kaggle/kernel-metadata.json
+MM shmq-ultimate/mixllm_3level_kaggle/mixllm_3level_gate.ipynb
+?? research-15/versions/
+REMOTE_STATUS=RUNNING 
+TOKEN_SOURCE=project_env_not_logged 
+OUTPUT_BUNDLE=not_available_yet 
+NOTE=No competing submission launched
+DECISION=invalid_pending_run 
+REASON=runtime exceeded expected Qwen2.5-0.5B gate duration; model/configuration must be audited 
+LOCAL_POLLER=stopped_on_user_request 
+PERFORMANCE_CLAIM=none 
+REMOTE_TERMINAL_LOG=not_downloaded
+LOCAL_STOP=completed 
+REMOTE_STATUS=RUNNING_at_last_authenticated_check 
+CLI_CANCEL=not_available_without_deleting_kernel 
+V33_SUBMISSION=blocked_until_v32_terminal_or_user_stops_session
+REMOTE_STATUS=KernelWorkerStatus.CANCEL_ACKNOWLEDGED 
+DECISION=invalid_run_excluded_from_performance_comparison 
+NEXT=prepare_v33_explicit_0.5B_contract

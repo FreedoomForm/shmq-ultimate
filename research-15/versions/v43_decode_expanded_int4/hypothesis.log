@@ -1,0 +1,13 @@
+﻿# v43 — decode expanded INT4 cache
+
+## Differential audit finding
+The original MixLLM design separates packed checkpoint storage from execution-oriented layouts. In the current SM75 implementation, prefill already uses expanded_int4 (signed zero-centered int8 cache), but 	hree_level_decode_kernel still receives weight_int4 and decodes two packed nibbles plus zero subtraction inside every DP4A loop. This repeats unpack/dequant preparation on every decode invocation and is a concrete current-path mismatch.
+
+## Single hypothesis
+Feeding the existing expanded_int4 cache to the decode INT4 branch will remove per-token nibble extraction and zero subtraction while preserving identical signed INT4 values and scales. The tradeoff is 2x INT4 weight bytes, which is measured honestly on the same T4 gate.
+
+## Controlled change
+Only the INT4 decode weight source and its local load are changed. INT8, FP16, activation quantization, packing, model, benchmark settings, and output mapping remain unchanged. The existing zero_int4 ABI remains available for compatibility but is not read by the expanded-cache INT4 branch.
+
+## Falsification criteria
+Any correctness failure rejects v43. If correctness passes but T4 speedup does not improve, restore baseline and continue the audit.

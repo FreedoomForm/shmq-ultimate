@@ -1,0 +1,11 @@
+ORIGINAL_KERNEL=original MixLLM HEAD~1 uses CUTLASS LinearMixLLM.gemm and comments weight column major 
+ORIGINAL_FORWARD=original linear.py quantizes activation externally, calls gemm, then transposes output at line 221 and returns quantized input plus padded scales 
+OUR_KERNEL=SM75 three_level_sm75.cu uses custom wmma prefill and DP4A decode, direct row-major output, separate quantize_activation_sm75 dispatch 
+MISMATCH_CANDIDATE=verify output layout and activation scale orientation before any performance hypothesis 
+BASELINE=v38 native correctness passed, speedup below 2.6x 
+MISMATCH_1_ORIGINAL_LAYOUT=original LinearMixLLM interleaves INT4 columns within 32-element groups and INT8 columns within 8-element groups before CUTLASS packing 
+MISMATCH_1_OUR_LAYOUT=ThreeLevelLinear stores packed INT4 and INT8 rows directly in output-channel order; no original CUTLASS interleave transform exists 
+IMPLICATION=do_not_apply_original_interleave blindly to custom SM75 kernel; first build a compatibility mapping or test prefill-only interleaved storage 
+MISMATCH_2_VLLM=original vLLM linear delegates to MixLLM native gemm path; custom 0002 apply() reconstructs dense weight and returns F.linear 
+MISMATCH_2_IMPLICATION=this is not a native three-level vLLM backend and must not be used as performance evidence; it also explains why vLLM integration cannot deliver target 
+REQUIRED_FIX=make vLLM quantization method call the same native SM75 three_level_linear_v2 ABI with activation quantization and partition tensors 

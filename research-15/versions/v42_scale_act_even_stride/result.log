@@ -1,0 +1,18 @@
+﻿# v42 — scale_act even-row stride result
+
+## Attempt history
+1. Initial padded native scale allocation reached the Python reference path, which reshaped padded rows back to M and failed with RuntimeError: shape [1, 512] is invalid for input of size 1024.
+2. After slicing padded rows in the Python reference, the pure-FP16 ABI placeholder path still allocated an unpadded scale tensor and failed the strict [K/128, rows_even] check.
+3. After padding the FP16 ABI placeholders, the T4 gate completed but sm75_native_correctness failed with max_abs_error: 0.124847412109375; therefore this iteration is rejected despite benchmark execution completing.
+
+## Final T4 status
+- IS_T4 True.
+- TESTS_RETURNCODE 0.
+- sm75_native_benchmarks: passed.
+- sm75_native_correctness: failed.
+- ull_model_qwen_quality: not_run.
+- 	erminal_decision: no_go.
+- Invalid-for-acceptance performance snapshot: best GEMM-only p50 speedup 1.6150420115x; best end-to-end p50 speedup 1.1105818441x.
+
+## Decision
+Reject v42 and restore the v41 correctness-passing baseline. The original scale_act layout mismatch is real, but this naive padded-stride implementation is not semantically equivalent in the current fused kernel. No v42 speedup is accepted as evidence.

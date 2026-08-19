@@ -1,0 +1,1 @@
+Hypothesis: fuse FP16 activation load, per-group scale/requantization, and INT4/INT8/FP16 output-channel dot products into one decode kernel to remove the separate activation-quantization launch and temporary tensors. 

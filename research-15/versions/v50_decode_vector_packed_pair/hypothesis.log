@@ -1,0 +1,13 @@
+﻿# v50 — vectorized packed INT4 pair load
+
+## Differential audit finding
+Original MixLLM uses packed/interleaved tensor layouts and tiled iterators, whereas current v45 decode loads two adjacent packed INT4 bytes with two independent byte loads for every DP4A group.
+
+## Single hypothesis
+Load the same two adjacent packed bytes as one aligned uint16_t from weights + k/2, then extract the low and high bytes. This preserves exactly the same packed values and asymmetric zero arithmetic while reducing one global memory instruction in the hot INT4 loop.
+
+## Controlled change
+Only the packed INT4 byte-load form changes. INT8, FP16, quantization, output mapping, model and benchmark settings remain unchanged.
+
+## Falsification criteria
+Any correctness failure rejects v50. If correctness passes but speedup is not above v45, restore v45.

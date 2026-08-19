@@ -1,0 +1,230 @@
+﻿
+shmq-ultimate\b_interleave_search.txt:7:Line       :       {"ColumnMajorInterle
+aved<4>",
+shmq-ultimate\b_interleave_search.txt:13:Line       :        new VisualizeLayou
+t<cutlass::layout::ColumnMajorInterleaved
+shmq-ultimate\b_interleave_search.txt:20:Line       :       {"RowMajorInterleav
+ed<4>",
+shmq-ultimate\b_interleave_search.txt:26:Line       :        new VisualizeLayou
+t<cutlass::layout::RowMajorInterleaved<4>
+shmq-ultimate\b_interleave_search.txt:33:Line       :       // mma.sync.aligned
+.m8n8k128.s32.b1.b1.s32 Interleaved-256
+shmq-ultimate\b_interleave_search.txt:39:Line       :       // mma.sync.aligned
+.m16n8k256.s32.b1.b1.s32 Interleaved-256
+shmq-ultimate\b_interleave_search.txt:45:Line       :       // Integer matrix m
+ultiply.int4 8832  Interleaved-64
+shmq-ultimate\b_interleave_search.txt:51:Line       :       // Integer matrix m
+ultiply.int4 16864 Interleaved-64
+shmq-ultimate\b_interleave_search.txt:57:Line       :       // Integer matrix m
+ultiply 8816  Interleaved-32
+shmq-ultimate\b_interleave_search.txt:63:Line       :       // Integer matrix m
+ultiply 16832 Interleaved-32
+shmq-ultimate\b_interleave_search.txt:69:Line       : /// pipeline with interle
+aved layout.
+shmq-ultimate\b_interleave_search.txt:75:Line       :   int InterleavedK
+shmq-ultimate\b_interleave_search.txt:81:Line       :   layout::TensorNCxHWx<In
+terleavedK>,
+shmq-ultimate\b_interleave_search.txt:87:Line       :   layout::TensorCxRSKx<In
+terleavedK>,
+shmq-ultimate\b_interleave_search.txt:94:             ayout::ColumnMajorInterle
+aved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:100:Line       :       ElementB, layout::
+RowMajorInterleaved<InterleavedK>, 
+shmq-ultimate\b_interleave_search.txt:107:             ayout::ColumnMajorInterl
+eaved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:113:Line       :       ElementB, layout::
+RowMajorInterleaved<InterleavedK>, 
+shmq-ultimate\b_interleave_search.txt:119:Line       :   // layout which is use
+d by the interleaved GEMM shared memory th
+shmq-ultimate\b_interleave_search.txt:126:Line       :   // The Interleaved GEM
+M global memory layout is similar to the c
+shmq-ultimate\b_interleave_search.txt:133:Line       :         ElementA, layout
+::TensorNCxHWx<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:139:Line       :   // layout which is use
+d by the interleaved GEMM shared memory th
+shmq-ultimate\b_interleave_search.txt:146:Line       :   // The Interleaved GEM
+M global memory layout is similar to the c
+shmq-ultimate\b_interleave_search.txt:153:Line       :         ElementB, layout
+::TensorCxRSKx<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:159:Line       :         ElementB, layout
+::TensorCxRSKx<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:172:Line       :     InterleavedK
+shmq-ultimate\b_interleave_search.txt:178:Line       : /// pipeline with interl
+eaved layout.
+shmq-ultimate\b_interleave_search.txt:184:Line       :   int InterleavedK
+shmq-ultimate\b_interleave_search.txt:190:Line       :   layout::TensorNCxHWx<I
+nterleavedK>,
+shmq-ultimate\b_interleave_search.txt:196:Line       :   layout::TensorCxRSKx<I
+nterleavedK>,
+shmq-ultimate\b_interleave_search.txt:203:             ayout::ColumnMajorInterl
+eaved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:209:Line       :       ElementB, layout::
+RowMajorInterleaved<InterleavedK>, 
+shmq-ultimate\b_interleave_search.txt:216:             ayout::ColumnMajorInterl
+eaved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:222:Line       :       ElementB, layout::
+RowMajorInterleaved<InterleavedK>, 
+shmq-ultimate\b_interleave_search.txt:228:Line       :   // layout which is use
+d by the interleaved GEMM shared memory th
+shmq-ultimate\b_interleave_search.txt:235:Line       :   // The Interleaved GEM
+M global memory layout is similar to the c
+shmq-ultimate\b_interleave_search.txt:242:Line       :         ElementA, layout
+::TensorNCxHWx<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:248:Line       :         ElementB, layout
+::TensorCxRSKx<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:254:Line       :         ElementB, layout
+::TensorCxRSKx<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:267:Line       :     InterleavedK
+shmq-ultimate\b_interleave_search.txt:273:Line       : /// pipeline with interl
+eaved layout.
+shmq-ultimate\b_interleave_search.txt:279:Line       :   int InterleavedK
+shmq-ultimate\b_interleave_search.txt:285:Line       :   layout::TensorNCxHWx<I
+nterleavedK>,
+shmq-ultimate\b_interleave_search.txt:291:Line       :   layout::TensorCxRSKx<I
+nterleavedK>,
+shmq-ultimate\b_interleave_search.txt:298:             ayout::ColumnMajorInterl
+eaved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:304:Line       :       ElementB, layout::
+RowMajorInterleaved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:311:             ayout::ColumnMajorInterl
+eaved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:317:Line       :       ElementB, layout::
+RowMajorInterleaved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:323:Line       :   // layout which is use
+d by the interleaved GEMM shared memory th
+shmq-ultimate\b_interleave_search.txt:330:Line       :   // The Interleaved GEM
+M global memory layout is similar to the c
+shmq-ultimate\b_interleave_search.txt:337:Line       :       ElementA, layout::
+TensorNCxHWx<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:343:Line       :   // layout which is use
+d by the interleaved GEMM shared memory th
+shmq-ultimate\b_interleave_search.txt:350:Line       :   // The Interleaved GEM
+M global memory layout is similar to the c
+shmq-ultimate\b_interleave_search.txt:357:Line       :       ElementB, layout::
+TensorCxRSKx<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:363:Line       :       ElementB, layout::
+TensorCxRSKx<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:376:Line       :     InterleavedK
+shmq-ultimate\b_interleave_search.txt:382:Line       : // multistage pipeline w
+ith interleaved layout.
+shmq-ultimate\b_interleave_search.txt:388:Line       :   int InterleavedK
+shmq-ultimate\b_interleave_search.txt:394:Line       :   layout::TensorNCxHWx<I
+nterleavedK>,
+shmq-ultimate\b_interleave_search.txt:400:Line       :   layout::TensorCxRSKx<I
+nterleavedK>,
+shmq-ultimate\b_interleave_search.txt:407:             ayout::ColumnMajorInterl
+eaved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:413:Line       :       ElementB, layout::
+RowMajorInterleaved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:420:             ayout::ColumnMajorInterl
+eaved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:426:Line       :       ElementB, layout::
+RowMajorInterleaved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:432:Line       :   // layout which is use
+d by the interleaved GEMM shared memory th
+shmq-ultimate\b_interleave_search.txt:439:Line       :   // The Interleaved GEM
+M global memory layout is similar to the c
+shmq-ultimate\b_interleave_search.txt:446:Line       :       ElementA, layout::
+TensorNCxHWx<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:452:Line       :   // layout which is use
+d by the interleaved GEMM shared memory th
+shmq-ultimate\b_interleave_search.txt:459:Line       :   // The Interleaved GEM
+M global memory layout is similar to the c
+shmq-ultimate\b_interleave_search.txt:466:Line       :       ElementB, layout::
+TensorCxRSKx<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:472:Line       :       ElementB, layout::
+TensorCxRSKx<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:485:Line       :     InterleavedK
+shmq-ultimate\b_interleave_search.txt:491:Line       : /// pipeline with interl
+eaved layout.
+shmq-ultimate\b_interleave_search.txt:497:Line       :   int InterleavedK
+shmq-ultimate\b_interleave_search.txt:503:Line       :   layout::TensorNCxHWx<I
+nterleavedK>,
+shmq-ultimate\b_interleave_search.txt:509:Line       :   layout::TensorCxRSKx<I
+nterleavedK>,
+shmq-ultimate\b_interleave_search.txt:516:             ayout::ColumnMajorInterl
+eaved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:522:Line       :       ElementB, layout::
+RowMajorInterleaved<InterleavedK>, 
+shmq-ultimate\b_interleave_search.txt:529:             ayout::ColumnMajorInterl
+eaved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:535:Line       :       ElementB, layout::
+RowMajorInterleaved<InterleavedK>, 
+shmq-ultimate\b_interleave_search.txt:541:Line       :   // layout which is use
+d by the interleaved GEMM shared memory th
+shmq-ultimate\b_interleave_search.txt:548:Line       :   // The Interleaved GEM
+M global memory layout is similar to the c
+shmq-ultimate\b_interleave_search.txt:555:Line       :         ElementA, layout
+::TensorNCxHWx<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:561:Line       :   // layout which is use
+d by the interleaved GEMM shared memory th
+shmq-ultimate\b_interleave_search.txt:568:Line       :   // The Interleaved GEM
+M global memory layout is similar to the c
+shmq-ultimate\b_interleave_search.txt:575:Line       :         ElementB, layout
+::TensorCxRSKx<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:581:Line       :   static int const kElem
+entsPerAccess = 4; //For interleaved layou
+shmq-ultimate\b_interleave_search.txt:588:Line       :         ElementB, layout
+::TensorCxRSKx<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:608:Line       :     InterleavedK
+shmq-ultimate\b_interleave_search.txt:614:Line       : /// pipeline with interl
+eaved layout.
+shmq-ultimate\b_interleave_search.txt:620:Line       :   int InterleavedK
+shmq-ultimate\b_interleave_search.txt:626:Line       :   layout::TensorNCxHWx<I
+nterleavedK>,
+shmq-ultimate\b_interleave_search.txt:632:Line       :   layout::TensorCxRSKx<I
+nterleavedK>,
+shmq-ultimate\b_interleave_search.txt:639:             ayout::ColumnMajorInterl
+eaved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:645:Line       :       ElementB, layout::
+RowMajorInterleaved<InterleavedK>, 
+shmq-ultimate\b_interleave_search.txt:652:             ayout::ColumnMajorInterl
+eaved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:658:Line       :       ElementB, layout::
+RowMajorInterleaved<InterleavedK>, 
+shmq-ultimate\b_interleave_search.txt:664:Line       :   // layout which is use
+d by the interleaved GEMM shared memory th
+shmq-ultimate\b_interleave_search.txt:671:Line       :   // The Interleaved GEM
+M global memory layout is similar to the c
+shmq-ultimate\b_interleave_search.txt:678:Line       :         ElementA, layout
+::TensorNCxHWx<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:684:Line       :   // layout which is use
+d by the interleaved GEMM shared memory th
+shmq-ultimate\b_interleave_search.txt:691:Line       :   // The Interleaved GEM
+M global memory layout is similar to the c
+shmq-ultimate\b_interleave_search.txt:698:Line       :         ElementB, layout
+::TensorCxRSKx<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:704:Line       :   static int const kElem
+entsPerAccess = 4; //For interleaved layou
+shmq-ultimate\b_interleave_search.txt:711:Line       :         ElementB, layout
+::TensorCxRSKx<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:731:Line       :     InterleavedK
+shmq-ultimate\b_interleave_search.txt:737:Line       : /// pipeline with interl
+eaved layout.
+shmq-ultimate\b_interleave_search.txt:743:Line       :   int InterleavedK
+shmq-ultimate\b_interleave_search.txt:749:Line       :   layout::TensorNCxHWx<I
+nterleavedK>,
+shmq-ultimate\b_interleave_search.txt:755:Line       :   layout::TensorCxRSKx<I
+nterleavedK>,
+shmq-ultimate\b_interleave_search.txt:762:             ayout::ColumnMajorInterl
+eaved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:768:Line       :       ElementB, layout::
+RowMajorInterleaved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:775:             ayout::ColumnMajorInterl
+eaved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:781:Line       :       ElementB, layout::
+RowMajorInterleaved<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:787:Line       :   // layout which is use
+d by the interleaved GEMM shared memory th
+shmq-ultimate\b_interleave_search.txt:794:Line       :   // The Interleaved GEM
+M global memory layout is similar to the c
+shmq-ultimate\b_interleave_search.txt:801:Line       :       ElementA, layout::
+TensorNCxHWx<InterleavedK>,
+shmq-ultimate\b_interleave_search.txt:807:Line       :   // layout which is use
+d by the interleaved GEMM shared memory th
+shmq-ultimate\b_interleave_search.txt:814:Line       :   // The Interleaved GEM
+M global memory layout is similar to the c
+shmq-ultimate\b_interleave_search.txt:821:Line       :       ElementB, layout::
+TensorCxRSKx<InterleavedK>,
+
+

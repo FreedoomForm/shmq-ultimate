@@ -1,0 +1,18 @@
+﻿# v51 — expanded INT4 decode cache contract result
+
+## T4 execution
+- IS_T4 True.
+- TESTS_RETURNCODE 0.
+- sm75_native_correctness: passed.
+- sm75_native_benchmarks: passed.
+- ull_model_qwen_quality: not_run.
+- 	erminal_decision: no_go.
+
+## Performance
+- 16 unchanged Qwen/Qwen2.5-0.5B scenarios against the same dense FP16 baseline.
+- Best GEMM-only p50 speedup: 1.4155704705x.
+- Best end-to-end p50 speedup: 1.2209821815x.
+- This is an end-to-end improvement over v45 best 1.1971x, but still far below the mandatory 2.6x target.
+
+## Decision
+Keep v51 as the current correctness-passing baseline because the rows=1 expanded-cache contract is now valid and the best end-to-end result improved. Continue the differential audit; do not claim acceptance.

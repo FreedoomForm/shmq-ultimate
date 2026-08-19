@@ -1,0 +1,18 @@
+﻿# v48 — warp-shuffle activation result
+
+## T4 execution
+- IS_T4 True.
+- TESTS_RETURNCODE 0.
+- sm75_native_correctness: passed after correcting the initial subgroup-width addressing bug.
+- sm75_native_benchmarks: passed.
+- ull_model_qwen_quality: not_run.
+- 	erminal_decision: no_go.
+
+## Performance
+- 16 unchanged Qwen/Qwen2.5-0.5B scenarios.
+- Best GEMM-only p50 speedup: 1.0860480052x.
+- Best end-to-end p50 speedup: 1.0529590x.
+- This regresses the current v45 baseline (1.6452x GEMM-only and 1.1971x end-to-end).
+
+## Decision
+Reject v48. The register shuffle is correctness-safe after the addressing fix but slower than v45. Restore v45 and continue audit.

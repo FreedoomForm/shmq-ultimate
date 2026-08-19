@@ -1,0 +1,18 @@
+﻿# v44 — one output channel per warp result
+
+## T4 execution
+- IS_T4 True.
+- TESTS_RETURNCODE 0.
+- sm75_native_correctness: passed with max_abs_error: 0.010498046875 in the first scenario.
+- sm75_native_benchmarks: passed.
+- ull_model_qwen_quality: not_run.
+- 	erminal_decision: no_go.
+
+## Performance
+- 16 scenarios on unchanged Qwen/Qwen2.5-0.5B gate.
+- Best GEMM-only p50 speedup: 1.3433970466x.
+- Best end-to-end p50 speedup: 1.1364583194x.
+- The hypothesis did not improve the v41 baseline (v41 best end-to-end was 1.1100000091x and best GEMM-only was 1.6323964196x); no 2.6x acceptance.
+
+## Decision
+Correctness passed, but the full-warp-per-channel mapping is rejected as a performance regression/neutral result. Restore the v41 baseline and continue differential audit.

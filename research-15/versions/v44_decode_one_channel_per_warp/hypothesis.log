@@ -1,0 +1,13 @@
+﻿# v44 — one output channel per warp
+
+## Differential audit finding
+The current decode mapping uses 4 eight-lane subwarps per warp. Every subwarp independently rereads the same activation vector, so four output channels in one warp duplicate global activation traffic. The original tiled GEMM design shares activation tiles across multiple output channels; this is a concrete execution-mapping mismatch.
+
+## Single hypothesis
+Use one full 32-lane warp per output channel (kDecodeChannelsPerWarp=1, retaining 8 warps per block). A full warp loads each activation element once across lanes and reduces one output channel, eliminating the current fourfold activation reread within each warp.
+
+## Controlled change
+Only kDecodeChannelsPerWarp changes from 4 to 1. Quantization, packed weights, output mapping, model, benchmark settings and precision assignments remain unchanged.
+
+## Falsification criteria
+Any correctness failure rejects v44. If correctness passes but T4 performance does not improve, restore baseline.

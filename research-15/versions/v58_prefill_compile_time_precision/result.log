@@ -1,0 +1,8 @@
+﻿# v58 result
+
+Kaggle output: output-1787023960, kernel version 79.
+Original-first finding: the original test uses separate INT4 and INT8 MmaCore paths; current v51 mixed prefill uses runtime precision ternaries in the inner loop. The hypothesis attempted compile-time macro expansion inside the same monolithic kernel.
+
+Result: Kaggle nvcc failed before execution. The log reports three_level_sm75.cu parser restart and expected-a-declaration errors around the generated source, followed by quantize_activation_sm75 undefined due parser recovery. No correctness or performance result exists.
+
+Decision: reject v58 as unvalidated compile failure and restore v51. Do not treat this as a performance result.

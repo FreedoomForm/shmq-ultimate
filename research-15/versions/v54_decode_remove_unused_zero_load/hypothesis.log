@@ -1,0 +1,10 @@
+﻿# v54 — remove stale INT4 zero load
+
+## Differential audit finding
+After v51 switched the rows=1 INT4 decode branch to the existing signed zero-centered expanded cache, the branch still executes the legacy zero_int4[channel * groups + group] global load. That value is no longer used in the expanded representation; original execution-ready layouts do not need the packed zero at decode time.
+
+## Single hypothesis
+Remove only the unused zero_int4 load from the expanded INT4 decode branch. Keep the ABI argument and all INT8/FP16 paths unchanged. This cannot change numerical computation because the loaded value is not consumed.
+
+## Falsification criteria
+Any correctness failure rejects v54. If correctness passes but speedup is not above v51, restore v51.

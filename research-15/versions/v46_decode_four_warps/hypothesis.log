@@ -1,0 +1,13 @@
+﻿# v46 — four decode warps occupancy hypothesis
+
+## Differential audit finding
+The current v45 decode launch uses 8 warps (256 threads) per block with 16-lane subwarps. The original CUTLASS family uses shape-specific threadblock resources rather than forcing a large fixed block. On T4, the fixed 8-warp decode block may limit resident blocks and latency hiding for the bandwidth-bound rows=1 path.
+
+## Single hypothesis
+Change only kDecodeWarps from 8 to 4 while preserving v45 kDecodeChannelsPerWarp=2. This halves threads/shared execution per decode block and tests whether higher resident-block occupancy improves T4 decode throughput.
+
+## Controlled change
+Only the decode warp count changes. The subwarp mapping, quantization, weights, model, benchmark settings and all arithmetic remain unchanged.
+
+## Falsification criteria
+Any correctness failure rejects v46. If correctness passes but speedup is not above v45, restore v45.

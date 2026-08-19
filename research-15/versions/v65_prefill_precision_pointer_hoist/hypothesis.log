@@ -1,0 +1,5 @@
+﻿# v65 prefill precision pointer hoist
+
+Original-first: original CUTLASS test instantiates separate MmaCore_INT4 and MmaCore_INT8 paths; current monolithic prefill selects precision repeatedly inside the hot loop.
+
+Single hypothesis: hoist same-typed INT4/INT8 weight, scale, and index pointers once per block, preserving arithmetic/layout/benchmark settings.

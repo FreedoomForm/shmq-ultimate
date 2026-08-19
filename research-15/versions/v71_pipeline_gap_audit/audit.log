@@ -1,0 +1,5 @@
+﻿# v71 audit-only
+
+Original-first finding: mq_mma_multistage.h maintains kStages, smem read/write stage indices, cp_async_fence and gmem_wait around a prologue and circular shared-memory pipeline. Original mix_mma_multistage.cuh instantiates both INT4 and INT8 MmaCore with the NumStages template.
+Current SM75 first prefill kernel has a single synchronous group_k loop with a full CTA barrier after every MMA. v64 already tested one barrier relaxation and failed prefill e2e; v68 tested one unroll directive and failed prefill e2e. A safe fix now requires a complete SM75-compatible staged loader, not another isolated pragma/barrier edit.
+Decision: audit-only, no code change, preserve v51.

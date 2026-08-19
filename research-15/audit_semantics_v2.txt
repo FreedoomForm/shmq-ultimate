@@ -1,0 +1,497 @@
+SEMANTIC AUDIT v2
+GENERATED=2026-08-18T12:05:27.2002047Z
+
+== SOURCE-BEARING VERSION SNAPSHOTS ==
+v32_shared_activation|sha=E6E4A7FD73567F63|file=three_level_sm75.before.cu
+  constexpr int kTile = 16;
+  constexpr int kGroupSize = 128;
+  constexpr int kPrefillWarps = 4;
+  constexpr int kPrefillChannels = kPrefillWarps * kTile;
+  constexpr int kReuseRows = 2 * kTile;
+  __global__ void quantize_activation_sm75_kernel(
+  __global__ void expand_int4_sm75_kernel(
+  __global__ void three_level_tensorcore_kernel(
+  const __half* scale_act, const int8_t* expanded_int4,
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, float> accumulator;
+  const bool full_rows = row_base + kTile <= rows;
+  const bool full_channels = channel_base + kTile <= n16;
+  wmma::fragment<wmma::matrix_a, kTile, kTile, kTile, __half,
+  wmma::fragment<wmma::matrix_b, kTile, kTile, kTile, __half,
+  __syncthreads();
+  wmma::load_matrix_sync(a, a_fp16, kTile);
+  if (full_channels) {
+  wmma::load_matrix_sync(
+  __syncwarp();
+  wmma::load_matrix_sync(b, b_fp16[warp], kTile);
+  wmma::mma_sync(accumulator, a, b, accumulator);
+  wmma::store_matrix_sync(accumulator_fp32[warp], accumulator, kTile,
+  const bool full_channels = channel_base + kTile <= partition_size;
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, int> accumulator;
+  wmma::fragment<wmma::matrix_a, kTile, kTile, kTile, signed char,
+  wmma::fragment<wmma::matrix_b, kTile, kTile, kTile, signed char,
+  if (precision == 8 && full_channels) {
+  } else if (precision == 4 && full_channels) {
+  expanded_int4 + channel_base * width + k_base), width);
+  ? expanded_int4[channel * width + k]
+  wmma::store_matrix_sync(accumulator_int[warp], accumulator, kTile,
+  __global__ void three_level_tensorcore_reuse_kernel(
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, float> acc;
+  wmma::load_matrix_sync(a, a_fp16[warp_row], kTile);
+  wmma::load_matrix_sync(b, b_fp16[warp_channel], kTile);
+  wmma::mma_sync(acc, a, b, acc);
+  wmma::store_matrix_sync(accumulator_fp32[warp], acc, kTile,
+  : expanded_int4[c * width + k];
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, int> acc;
+  wmma::load_matrix_sync(a, a_int8[warp_row], kTile);
+  wmma::load_matrix_sync(b, b_int8[warp_channel], kTile);
+  wmma::store_matrix_sync(accumulator_int[warp], acc, kTile,
+  __global__ void three_level_decode_kernel(
+  const at::Tensor& expanded_int4, const at::Tensor& scale_int4,
+  &expanded_int4, &scale_int4, &zero_int4, &indices_int4, &weight_int8,
+  "expanded_int4", "scale_int4", "zero_int4", "indices_int4",
+  check_cuda_contiguous(expanded_int4, "expanded_int4");
+  TORCH_CHECK(expanded_int4.scalar_type() == at::kChar,
+  "expanded_int4 must have dtype int8");
+  (expanded_int4.dim() == 2 && expanded_int4.size(0) == n4 &&
+  expanded_int4.size(1) == width),
+  "expanded_int4 must have shape [n4, K] for prefill");
+  const dim3 grid(channel_tiles, (rows + 15) / 16);
+  three_level_tensorcore_kernel<<<grid, kPrefillWarps * kWarpSize, 0, stream>>>(
+v33_fused_decode|sha=B8DF49C021FDE84D|file=three_level_sm75.before.cu
+  constexpr int kTile = 16;
+  constexpr int kGroupSize = 128;
+  constexpr int kPrefillWarps = 4;
+  constexpr int kPrefillChannels = kPrefillWarps * kTile;
+  constexpr int kReuseRows = 2 * kTile;
+  __global__ void quantize_activation_sm75_kernel(
+  __global__ void expand_int4_sm75_kernel(
+  __global__ void three_level_tensorcore_kernel(
+  const __half* scale_act, const int8_t* expanded_int4,
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, float> accumulator;
+  const bool full_rows = row_base + kTile <= rows;
+  const bool full_channels = channel_base + kTile <= n16;
+  wmma::fragment<wmma::matrix_a, kTile, kTile, kTile, __half,
+  wmma::fragment<wmma::matrix_b, kTile, kTile, kTile, __half,
+  __syncthreads();
+  wmma::load_matrix_sync(a, a_fp16, kTile);
+  if (full_channels) {
+  wmma::load_matrix_sync(
+  __syncwarp();
+  wmma::load_matrix_sync(b, b_fp16[warp], kTile);
+  wmma::mma_sync(accumulator, a, b, accumulator);
+  wmma::store_matrix_sync(accumulator_fp32[warp], accumulator, kTile,
+  const bool full_channels = channel_base + kTile <= partition_size;
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, int> accumulator;
+  wmma::fragment<wmma::matrix_a, kTile, kTile, kTile, signed char,
+  wmma::fragment<wmma::matrix_b, kTile, kTile, kTile, signed char,
+  if (precision == 8 && full_channels) {
+  } else if (precision == 4 && full_channels) {
+  expanded_int4 + channel_base * width + k_base), width);
+  ? expanded_int4[channel * width + k]
+  wmma::store_matrix_sync(accumulator_int[warp], accumulator, kTile,
+  __global__ void three_level_tensorcore_reuse_kernel(
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, float> acc;
+  wmma::load_matrix_sync(a, a_fp16[warp_row], kTile);
+  wmma::load_matrix_sync(b, b_fp16[warp_channel], kTile);
+  wmma::mma_sync(acc, a, b, acc);
+  wmma::store_matrix_sync(accumulator_fp32[warp], acc, kTile,
+  : expanded_int4[c * width + k];
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, int> acc;
+  wmma::load_matrix_sync(a, a_int8[warp_row], kTile);
+  wmma::load_matrix_sync(b, b_int8[warp_channel], kTile);
+  wmma::store_matrix_sync(accumulator_int[warp], acc, kTile,
+  __global__ void three_level_decode_kernel(
+  const at::Tensor& expanded_int4, const at::Tensor& scale_int4,
+  &expanded_int4, &scale_int4, &zero_int4, &indices_int4, &weight_int8,
+  "expanded_int4", "scale_int4", "zero_int4", "indices_int4",
+  check_cuda_contiguous(expanded_int4, "expanded_int4");
+  TORCH_CHECK(expanded_int4.scalar_type() == at::kChar,
+  "expanded_int4 must have dtype int8");
+  (expanded_int4.dim() == 2 && expanded_int4.size(0) == n4 &&
+  expanded_int4.size(1) == width),
+  "expanded_int4 must have shape [n4, K] for prefill");
+v34_startup_diagnostics|same_as=v33_fused_decode|sha=B8DF49C021FDE84D
+v35_bounded_preflight|same_as=v33_fused_decode|sha=B8DF49C021FDE84D
+v36_preflight_returncode|same_as=v33_fused_decode|sha=B8DF49C021FDE84D
+v37_gate_state|same_as=v33_fused_decode|sha=B8DF49C021FDE84D
+v38_revert_shared_input|same_as=v33_fused_decode|sha=B8DF49C021FDE84D
+v39_warp_local_staging|same_as=v32_shared_activation|sha=E6E4A7FD73567F63
+v40_decode_occupancy|sha=66B2FCAAC61B43B2|file=three_level_sm75.before.cu
+  constexpr int kTile = 16;
+  constexpr int kGroupSize = 128;
+  constexpr int kPrefillWarps = 4;
+  constexpr int kPrefillChannels = kPrefillWarps * kTile;
+  constexpr int kReuseRows = 2 * kTile;
+  __global__ void quantize_activation_sm75_kernel(
+  __global__ void expand_int4_sm75_kernel(
+  __global__ void three_level_tensorcore_kernel(
+  const __half* scale_act, const int8_t* expanded_int4,
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, float> accumulator;
+  const bool full_rows = row_base + kTile <= rows;
+  const bool full_channels = channel_base + kTile <= n16;
+  wmma::fragment<wmma::matrix_a, kTile, kTile, kTile, __half,
+  wmma::fragment<wmma::matrix_b, kTile, kTile, kTile, __half,
+  __syncthreads();
+  wmma::load_matrix_sync(a, a_fp16, kTile);
+  if (full_channels) {
+  wmma::load_matrix_sync(
+  __syncwarp();
+  wmma::load_matrix_sync(b, b_fp16[warp], kTile);
+  wmma::mma_sync(accumulator, a, b, accumulator);
+  wmma::store_matrix_sync(accumulator_fp32[warp], accumulator, kTile,
+  const bool full_channels = channel_base + kTile <= partition_size;
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, int> accumulator;
+  wmma::fragment<wmma::matrix_a, kTile, kTile, kTile, signed char,
+  wmma::fragment<wmma::matrix_b, kTile, kTile, kTile, signed char,
+  if (precision == 8 && full_channels) {
+  } else if (precision == 4 && full_channels) {
+  expanded_int4 + channel_base * width + k_base), width);
+  ? expanded_int4[channel * width + k]
+  wmma::store_matrix_sync(accumulator_int[warp], accumulator, kTile,
+  __global__ void three_level_tensorcore_reuse_kernel(
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, float> acc;
+  wmma::load_matrix_sync(a, a_fp16[warp_row], kTile);
+  wmma::load_matrix_sync(b, b_fp16[warp_channel], kTile);
+  wmma::mma_sync(acc, a, b, acc);
+  wmma::store_matrix_sync(accumulator_fp32[warp], acc, kTile,
+  : expanded_int4[c * width + k];
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, int> acc;
+  wmma::load_matrix_sync(a, a_int8[warp_row], kTile);
+  wmma::load_matrix_sync(b, b_int8[warp_channel], kTile);
+  wmma::store_matrix_sync(accumulator_int[warp], acc, kTile,
+  __global__ void three_level_decode_kernel(
+  const at::Tensor& expanded_int4, const at::Tensor& scale_int4,
+  &expanded_int4, &scale_int4, &zero_int4, &indices_int4, &weight_int8,
+  "expanded_int4", "scale_int4", "zero_int4", "indices_int4",
+  check_cuda_contiguous(expanded_int4, "expanded_int4");
+  TORCH_CHECK(expanded_int4.scalar_type() == at::kChar,
+  "expanded_int4 must have dtype int8");
+  (expanded_int4.dim() == 2 && expanded_int4.size(0) == n4 &&
+  expanded_int4.size(1) == width),
+  "expanded_int4 must have shape [n4, K] for prefill");
+  const dim3 grid(channel_tiles, (rows + 15) / 16);
+  three_level_tensorcore_kernel<<<grid, kPrefillWarps * kWarpSize, 0, stream>>>(
+v41_native_vllm_dispatch|same_as=v32_shared_activation|sha=E6E4A7FD73567F63
+v42_scale_act_even_stride|same_as=v32_shared_activation|sha=E6E4A7FD73567F63
+v43_decode_expanded_int4|same_as=v32_shared_activation|sha=E6E4A7FD73567F63
+v44_decode_one_channel_per_warp|same_as=v32_shared_activation|sha=E6E4A7FD73567F63
+v45_decode_two_channels_per_warp|same_as=v32_shared_activation|sha=E6E4A7FD73567F63
+v46_decode_four_warps|sha=1DF3C9A24856E508|file=three_level_sm75.before.cu
+  constexpr int kTile = 16;
+  constexpr int kGroupSize = 128;
+  constexpr int kPrefillWarps = 4;
+  constexpr int kPrefillChannels = kPrefillWarps * kTile;
+  constexpr int kReuseRows = 2 * kTile;
+  __global__ void quantize_activation_sm75_kernel(
+  __global__ void expand_int4_sm75_kernel(
+  __global__ void three_level_tensorcore_kernel(
+  const __half* scale_act, const int8_t* expanded_int4,
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, float> accumulator;
+  const bool full_rows = row_base + kTile <= rows;
+  const bool full_channels = channel_base + kTile <= n16;
+  wmma::fragment<wmma::matrix_a, kTile, kTile, kTile, __half,
+  wmma::fragment<wmma::matrix_b, kTile, kTile, kTile, __half,
+  __syncthreads();
+  wmma::load_matrix_sync(a, a_fp16, kTile);
+  if (full_channels) {
+  wmma::load_matrix_sync(
+  __syncwarp();
+  wmma::load_matrix_sync(b, b_fp16[warp], kTile);
+  wmma::mma_sync(accumulator, a, b, accumulator);
+  wmma::store_matrix_sync(accumulator_fp32[warp], accumulator, kTile,
+  const bool full_channels = channel_base + kTile <= partition_size;
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, int> accumulator;
+  wmma::fragment<wmma::matrix_a, kTile, kTile, kTile, signed char,
+  wmma::fragment<wmma::matrix_b, kTile, kTile, kTile, signed char,
+  if (precision == 8 && full_channels) {
+  } else if (precision == 4 && full_channels) {
+  expanded_int4 + channel_base * width + k_base), width);
+  ? expanded_int4[channel * width + k]
+  wmma::store_matrix_sync(accumulator_int[warp], accumulator, kTile,
+  __global__ void three_level_tensorcore_reuse_kernel(
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, float> acc;
+  wmma::load_matrix_sync(a, a_fp16[warp_row], kTile);
+  wmma::load_matrix_sync(b, b_fp16[warp_channel], kTile);
+  wmma::mma_sync(acc, a, b, acc);
+  wmma::store_matrix_sync(accumulator_fp32[warp], acc, kTile,
+  : expanded_int4[c * width + k];
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, int> acc;
+  wmma::load_matrix_sync(a, a_int8[warp_row], kTile);
+  wmma::load_matrix_sync(b, b_int8[warp_channel], kTile);
+  wmma::store_matrix_sync(accumulator_int[warp], acc, kTile,
+  __global__ void three_level_decode_kernel(
+  const at::Tensor& expanded_int4, const at::Tensor& scale_int4,
+  &expanded_int4, &scale_int4, &zero_int4, &indices_int4, &weight_int8,
+  "expanded_int4", "scale_int4", "zero_int4", "indices_int4",
+  check_cuda_contiguous(expanded_int4, "expanded_int4");
+  TORCH_CHECK(expanded_int4.scalar_type() == at::kChar,
+  "expanded_int4 must have dtype int8");
+  (expanded_int4.dim() == 2 && expanded_int4.size(0) == n4 &&
+  expanded_int4.size(1) == width),
+  "expanded_int4 must have shape [n4, K] for prefill");
+  const dim3 grid(channel_tiles, (rows + 15) / 16);
+  three_level_tensorcore_kernel<<<grid, kPrefillWarps * kWarpSize, 0, stream>>>(
+v47_decode_shared_activation|same_as=v46_decode_four_warps|sha=1DF3C9A24856E508
+v48_decode_shuffle_activation|same_as=v46_decode_four_warps|sha=1DF3C9A24856E508
+v49_decode_restrict_pointers|same_as=v46_decode_four_warps|sha=1DF3C9A24856E508
+v50_decode_vector_packed_pair|same_as=v46_decode_four_warps|sha=1DF3C9A24856E508
+v51_decode_expanded_cache_contract|same_as=v46_decode_four_warps|sha=1DF3C9A24856E508
+v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4|file=three_level_sm75.before.cu
+  constexpr int kTile = 16;
+  constexpr int kGroupSize = 128;
+  constexpr int kPrefillWarps = 4;
+  constexpr int kPrefillChannels = kPrefillWarps * kTile;
+  constexpr int kReuseRows = 2 * kTile;
+  __global__ void quantize_activation_sm75_kernel(
+  __global__ void expand_int4_sm75_kernel(
+  __global__ void three_level_tensorcore_kernel(
+  const __half* scale_act, const int8_t* expanded_int4,
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, float> accumulator;
+  const bool full_rows = row_base + kTile <= rows;
+  const bool full_channels = channel_base + kTile <= n16;
+  wmma::fragment<wmma::matrix_a, kTile, kTile, kTile, __half,
+  wmma::fragment<wmma::matrix_b, kTile, kTile, kTile, __half,
+  __syncthreads();
+  wmma::load_matrix_sync(a, a_fp16, kTile);
+  if (full_channels) {
+  wmma::load_matrix_sync(
+  __syncwarp();
+  wmma::load_matrix_sync(b, b_fp16[warp], kTile);
+  wmma::mma_sync(accumulator, a, b, accumulator);
+  wmma::store_matrix_sync(accumulator_fp32[warp], accumulator, kTile,
+  const bool full_channels = channel_base + kTile <= partition_size;
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, int> accumulator;
+  wmma::fragment<wmma::matrix_a, kTile, kTile, kTile, signed char,
+  wmma::fragment<wmma::matrix_b, kTile, kTile, kTile, signed char,
+  if (precision == 8 && full_channels) {
+  } else if (precision == 4 && full_channels) {
+  expanded_int4 + channel_base * width + k_base), width);
+  ? expanded_int4[channel * width + k]
+  wmma::store_matrix_sync(accumulator_int[warp], accumulator, kTile,
+  __global__ void three_level_tensorcore_reuse_kernel(
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, float> acc;
+  wmma::load_matrix_sync(a, a_fp16[warp_row], kTile);
+  wmma::load_matrix_sync(b, b_fp16[warp_channel], kTile);
+  wmma::mma_sync(acc, a, b, acc);
+  wmma::store_matrix_sync(accumulator_fp32[warp], acc, kTile,
+  : expanded_int4[c * width + k];
+  wmma::fragment<wmma::accumulator, kTile, kTile, kTile, int> acc;
+  wmma::load_matrix_sync(a, a_int8[warp_row], kTile);
+  wmma::load_matrix_sync(b, b_int8[warp_channel], kTile);
+  wmma::store_matrix_sync(accumulator_int[warp], acc, kTile,
+  __global__ void three_level_decode_kernel(
+  const int8_t* weights = expanded_int4 + channel * width;
+  const at::Tensor& expanded_int4, const at::Tensor& scale_int4,
+  &expanded_int4, &scale_int4, &zero_int4, &indices_int4, &weight_int8,
+  "expanded_int4", "scale_int4", "zero_int4", "indices_int4",
+  check_cuda_contiguous(expanded_int4, "expanded_int4");
+  TORCH_CHECK(expanded_int4.scalar_type() == at::kChar,
+  "expanded_int4 must have dtype int8");
+  (expanded_int4.dim() == 2 && expanded_int4.size(0) == n4 &&
+  expanded_int4.size(1) == width),
+  "expanded_int4 must have shape [n4, K] for prefill");
+v53_decode_launch_bounds|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v54_decode_remove_unused_zero_load|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v55_decode_ldg_expanded_int4|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v56_decode_precision_tiled_scoped|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v57_original_compiled_activation|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v58_prefill_compile_time_precision|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v59_padded_scale_act_stride|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v60_padded_scale_all_prefill_paths|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v61_padded_scale_decode_stride|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v62_padded_scale_atomic_all_kernels|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v63_cache_contiguous_abi|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v64_int_prefill_warp_barrier|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v65_prefill_precision_pointer_hoist|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v66_scoped_precision_pointer_hoist|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v68_int_prefill_k_unroll|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v70_prefill_reuse_dispatch|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v73_precision_plane|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v74_launch_bounds|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v75_int_pointer_hoist|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v76_int_global_a|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v77_full_tile_barrier|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v80_m_stratified_prefill|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v83_aligned_a_vectorize|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v84_tile64x32|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v85_compile_precision|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+v86_branch_hoist|same_as=v52_decode_precision_tiled_blocks|sha=9D8CE717D88B5FF4
+
+== CURRENT AND V51 PYTHON LAYER SIGNATURES ==
+C:\Users\User\Downloads\Multi-main\Multi-main\research-15\versions\v86_branch_hoist\sm75_backend.before.py|sha=C5AF28C4604F8FA1E2A12592634E692F7CDC4E1B669EC6A515DB3D151B89B057|lines=358
+  def load_sm75_backend(torch_module, build_directory: Optional[str | Path] = None) -> None:
+  def quantize_activation(x, torch_module, group_size: int = 128):
+  if rows == 0:
+  return (
+  return (quantized.to(torch_module.int8).reshape(rows, width),
+  def quantize_activation_native(x, torch_module, group_size: int = 128):
+  return (
+  return torch_module.ops.mixllm_sm75.quantize_activation(x.contiguous())
+  def quantized_reference_prequantized(
+  return output
+  def quantized_reference(module, x, torch_module):
+  return quantized_reference_prequantized(
+  def _validate_partition(module, x, torch_module):
+  def _expanded_int4_for_prefill(module, x, torch_module):
+  return module.weight_int8[:0]
+  return cached[1]
+  return expanded
+  def three_level_linear_prequantized(module, x, input_int8, scale_act, torch_module):
+  return torch_module.empty(
+  expanded_int4 = _expanded_int4_for_prefill(module, x, torch_module)
+  return torch_module.ops.mixllm_sm75._three_level_linear_v2_unchecked(
+  scale_act if scale_act.is_contiguous() else scale_act.contiguous(),
+  expanded_int4,
+  def _fp16_abi_placeholders(module, x, torch_module):
+  return cached[1], cached[2]
+  def three_level_linear(module, x, torch_module):
+  return torch_module.empty(
+  return three_level_linear_prequantized(
+  return three_level_linear_prequantized(
+  def benchmark_sm75_backend(
+  def measure(callable_):
+  return {"p50_ms": median(values), "p95_ms": values[p95_index]}
+  return {
+C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\external\MixLLM\mixllm\sm75_backend.py|sha=A1DFFEF3AA5F185BE8EA4AED8967C9AE677D640B68513FEA157E8586FA7FD230|lines=369
+  def load_sm75_backend(torch_module, build_directory: Optional[str | Path] = None) -> None:
+  def quantize_activation(x, torch_module, group_size: int = 128):
+  if rows == 0:
+  return (
+  return (quantized.to(torch_module.int8).reshape(rows, width),
+  def quantize_activation_native(x, torch_module, group_size: int = 128):
+  return (
+  return torch_module.ops.mixllm_sm75.quantize_activation(x.contiguous())
+  def quantized_reference_prequantized(
+  return output
+  def quantized_reference(module, x, torch_module):
+  return quantized_reference_prequantized(
+  def _validate_partition(module, x, torch_module):
+  def _expanded_int4_for_prefill(module, x, torch_module):
+  return module.weight_int8[:0]
+  return cached[1]
+  return expanded
+  def three_level_linear_prequantized(module, x, input_int8, scale_act, torch_module):
+  return torch_module.empty(
+  expanded_int4 = _expanded_int4_for_prefill(module, x, torch_module)
+  return torch_module.ops.mixllm_sm75._three_level_linear_v2_unchecked(
+  scale_act if scale_act.is_contiguous() else scale_act.contiguous(),
+  expanded_int4,
+  def _fp16_abi_placeholders(module, x, torch_module):
+  return cached[1], cached[2]
+  def three_level_linear(module, x, torch_module):
+  return torch_module.empty(
+  return three_level_linear_prequantized(
+  return three_level_linear_prequantized(
+  def benchmark_sm75_backend(
+  def measure(callable_):
+  return {"p50_ms": median(values), "p95_ms": values[p95_index]}
+  return {
+C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\external\MixLLM\mixllm\quantization\three_level.py|sha=B5E120A919365B14643CBF116BBF93050DE9C576473D4A62EAED043000696FBF|lines=451
+  LEVELS = (4, 8, 16)
+  @dataclass(frozen=True)
+  class ThreeLevelBudget:
+  def __post_init__(self) -> None:
+  def as_dict(self) -> Dict[int, int]:
+  return {4: self.bit4, 8: self.bit8, 16: self.bit16}
+  @dataclass(frozen=True)
+  class ThreeLevelAllocation:
+  def verify(self, out_features: int) -> None:
+  def to_json(self, path: str | Path) -> None:
+  def from_json(cls, path: str | Path) -> "ThreeLevelAllocation":
+  return allocation
+  def _rounded_counts(out_features: int, budget: ThreeLevelBudget,
+  return counts
+  def allocate_channels(losses: Mapping[int, torch.Tensor | Sequence[float]],
+  return result
+  def allocate_model_channels(
+  def selected_count(layer: str) -> int:
+  return len(chosen[layer][8]) + len(chosen[layer][16])
+  return result
+  def allocate_model_channels_auto(
+  LEVELS, key=lambda bit: (raw_percentages[bit] - percentages[bit], -bit),
+  return result, summary
+  @torch.no_grad()
+  def estimate_channel_losses(activation: torch.Tensor, weight: torch.Tensor,
+  return losses, awq_stat
+  def fake_linear(x: torch.Tensor, weight: torch.Tensor,
+  return output
+C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\external\MixLLM\mixllm\nn\modules\three_level_linear.py|sha=C6E5C9179E691AA0842F572230D8E36B9185A00A16E6F84D1E7555CE32B99772|lines=145
+  def _pack_uint4(codes: torch.Tensor) -> torch.Tensor:
+  return (values[..., 0::2] | (values[..., 1::2] << 4)).contiguous()
+  def _unpack_uint4(packed: torch.Tensor) -> torch.Tensor:
+  return output
+  class ThreeLevelLinear(nn.Module):
+  def __init__(self, in_features: int, out_features: int, group_size: int = 128,
+  def _apply(self, fn, recurse=True):
+  return super()._apply(fn, recurse)
+  def from_weight(cls, weight: torch.Tensor, allocation: ThreeLevelAllocation,
+  return layer
+  def dequantize_weight(self) -> torch.Tensor:
+  return output
+  def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
+  def forward(self, x: torch.Tensor) -> torch.Tensor:
+  return result.to(x.dtype)
+C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\external\MixLLM\mixllm\nn\modules\ops.py|sha=CCE30094EC2E1C766794E8A8F199BF2C62DD6D5818BDD2216B436520CEF9FADD|lines=136
+  def transpose(a):
+  return torch.ops.kernels_mixllm.transpose(a)
+  def quantize(a):
+  return torch.ops.kernels_mixllm.quantize(a)
+  def mixllm_gemm(a, scale_act, zero, scale_int8, scale_int4, indices_int8,
+  indices_int4, b_int8, b_int4):
+  return torch.ops.kernels_mixllm.gemm(a, scale_act, zero, scale_int8,
+  scale_int4, indices_int8, indices_int4,
+  def mixllm_three_level_gemm(a, scale_act, zero_int4, scale_int8,
+  scale_int4, indices_int8, indices_int4,
+  indices_fp16, b_int8, b_int4, b_fp16):
+  return output
+  @torch.library.register_fake("kernels_mixllm::quantize")
+  def quantize_abstract(a):
+  return (torch.empty((m, n), dtype=torch.int8, device="cuda:0"),
+  @torch.library.register_fake("kernels_mixllm::transpose")
+  def transpose_abstract(a):
+  return torch.empty((n, m), dtype=torch.float16, device="cuda:0")
+  @torch.library.register_fake("kernels_mixllm::gemm")
+  def mixllm_gemm_abstract(a, scale_act, zero, scale_int8, scale_int4,
+  indices_int8, indices_int4, b_int8, b_int4):
+  return c
+C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\external\MixLLM\mixllm\nn\modules\mixllm_config.py|sha=21171DBF503ABD85758CD0D705F61C0B498C6A6410945BF1AE6C1FED6249C829|lines=117
+  @dataclass
+  class MixLLMConfig(PushToHubMixin):
+  def from_dict(cls, quant_config: Dict = {}):
+  supported = {
+  if quant_config.precision_percentages is None and quant_config.ratio != 1.0:
+  if quant_config.precision_percentages is not None:
+  return quant_config
+  def to_dict(self):
+  return {
+  def to_transformers_dict(self):
+  return {
+  def from_transformers_dict(self, transformers_dict: Dict):
+  return {
+C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\external\MixLLM\mixllm\vllm_three_level.py|sha=FD39E812225DD8DD500A3501BCA450BBF1F6E842D1553A4F9C4553AB01FA5C81|lines=102
+  @dataclass(frozen=True)
+  class PrecisionPercentages:
+  def __post_init__(self) -> None:
+  @dataclass(frozen=True)
+  class VLLMThreeLevelConfig:
+  def from_quantization_config(cls, config: Dict) -> "VLLMThreeLevelConfig":
+  return cls(
+  def select_backend(self, capability: Tuple[int, int],
+  return RuntimeCapability(*capability, self.backend, sm75_available).select_backend()
+  def validate_partition_indices(indices: Dict[int, Iterable[int]], output_size: int) -> None:
+  def remap_partition_indices_for_tp(
+  return local
+  def restore_global_partition_indices(
+  return {
+
+== CURRENT NOTEBOOK MARKERS ==
+embedded_file_count|count=1
+source_sha256|count=3
+workspace_commit|count=1
+three_level_sm75.cu|count=4
+sm75_backend.py|count=4
+Qwen/Qwen2.5-0.5B|count=0
+compute_75|count=1
+rows=1|count=0
+rows=16|count=0
+rows=128|count=0

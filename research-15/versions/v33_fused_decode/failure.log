@@ -1,0 +1,7 @@
+DIAGNOSIS=v33 zero-byte Kaggle output 
+NOTEBOOK_MODEL_LOAD=not_found_in_decoded_cells 
+FULL_MODEL_GATES=explicitly_not_run 
+METADATA_MACHINE_SHAPE=NvidiaTeslaT4 
+UI_ACCELERATOR=GPU T4 x2 
+LIKELY_BLOCKER=early_cell_or_embedded_test_subprocess_before_artifact_write 
+REQUIRED_FIX=heartbeat_prints_and_subprocess_timeout_before_next_submit

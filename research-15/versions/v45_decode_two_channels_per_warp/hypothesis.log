@@ -1,0 +1,13 @@
+﻿# v45 — two output channels per warp
+
+## Differential audit finding
+The current decode mapping has four 8-lane subwarps per warp, while the full-warp-per-channel variant was correctness-safe but slower. The original tiled execution shares activation work across output channels; a 16-lane subwarp is the intermediate mapping that reduces duplicated activation loads without sacrificing all channel parallelism.
+
+## Single hypothesis
+Set kDecodeChannelsPerWarp=2 (kDecodeSubwarp=16) while retaining eight warps per block. This is a single mapping parameter change between the v41 baseline and rejected v44.
+
+## Controlled change
+Only the decode subwarp width changes. Quantization, packed weights, output mapping, model, benchmark settings and precision assignments remain unchanged.
+
+## Falsification criteria
+Any correctness failure rejects v45. If correctness passes but T4 speedup is not above the v41 baseline, restore baseline.

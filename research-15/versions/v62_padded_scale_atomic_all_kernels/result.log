@@ -1,0 +1,8 @@
+﻿# v62 result
+
+Kaggle output: output-1787025381, kernel version 83.
+Original-first finding: original ops.py quantize returns padded [K/128,M_even]. v62 corrected the v61 mistake by updating the decode signature and launch together, while applying scale_rows to both prefill kernels and decode scale loads.
+
+Correctness: sm75_native_correctness passed and embedded contract tests passed. Performance: mixed decode GEMM passed, but mixed decode end-to-end and mixed prefill end-to-end gates failed. The result is no_go and does not improve the v51 accepted baseline or approach the 2.6x target.
+
+Decision: reject v62 for performance and restore v51. Keep the ABI finding as a correctness fix candidate, but do not keep the slower padded path as baseline.

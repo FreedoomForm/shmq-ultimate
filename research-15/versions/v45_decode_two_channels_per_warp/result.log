@@ -1,0 +1,18 @@
+﻿# v45 — two output channels per warp result
+
+## T4 execution
+- IS_T4 True.
+- TESTS_RETURNCODE 0.
+- sm75_native_correctness: passed.
+- sm75_native_benchmarks: passed.
+- ull_model_qwen_quality: not_run.
+- 	erminal_decision: no_go.
+
+## Performance
+- 16 unchanged Qwen/Qwen2.5-0.5B scenarios against the same dense FP16 baseline.
+- Best GEMM-only p50 speedup: 1.6451612828x.
+- Best end-to-end p50 speedup: 1.1970839863x.
+- This improves v41 best end-to-end 1.1100000091x and GEMM-only 1.6323964196x, but remains below the mandatory 2.6x target.
+
+## Decision
+Keep v45 as the current correctness-passing performance baseline. Continue the required differential audit from this state; do not claim acceptance.

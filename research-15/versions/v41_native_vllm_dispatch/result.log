@@ -1,0 +1,22 @@
+﻿# v41 Kaggle result
+
+## Execution
+- Kaggle machine: T4; IS_T4 True.
+- TESTS_RETURNCODE 0.
+- sm75_native_correctness: passed.
+- sm75_native_benchmarks: passed.
+- ull_model_qwen_quality: not_run in this gate.
+
+## Performance
+- Baseline: 	orch_fp16_linear on the unchanged Qwen/Qwen2.5-0.5B gate settings.
+- Scenarios: 16.
+- End-to-end p50 speedup vs dense FP16: minimum 0.1414099435x, mean 0.5040056408x, maximum 1.1100000091x.
+- Best GEMM-only p50 speedup observed: 1.6323964196x.
+- Acceptance target: >= 2.6x; not achieved.
+
+## Decision
+- Kaggle gate: 	erminal_decision: no_go.
+- v41 validates that the native vLLM dispatch patch does not alter the direct native gate performance. It is an integration fix, not a performance improvement.
+
+## Integrity
+No model, input, benchmark setting, precision level, or computation was removed or weakened. The v41 kernel is the correctness-passing 8-warp x 4-channel-per-warp baseline.

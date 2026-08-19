@@ -1,0 +1,8 @@
+﻿# v59 result
+
+Kaggle output: output-1787024305, kernel version 80.
+Original-first finding: original_linear.py uses padded scale_act [K/128, M_even]. v59 implemented padding plus explicit prefill scale stride and sliced reference reconstruction, specifically addressing the earlier v42 incomplete padding attempt.
+
+Result: native correctness failed on Kaggle T4, so no performance result is admissible. The gate also reported decode/prefill performance failures as a consequence of the failed correctness gate. This hypothesis is rejected; no quality degradation or benchmark change was accepted.
+
+Decision: restore v51 from snapshot. The result demonstrates that the current ABI/test contract still expects the exact-row scale representation somewhere; the next audit must locate that remaining contract mismatch before any further padding attempt.

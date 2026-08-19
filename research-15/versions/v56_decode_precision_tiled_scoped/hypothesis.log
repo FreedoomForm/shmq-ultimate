@@ -1,0 +1,10 @@
+﻿# v56 — scoped precision-tiled decode mapping
+
+## Differential audit finding
+v52 static review showed that a broad replacement would contaminate prefill. The underlying audit remains concrete: v51 linear channel blocks can contain INT4, INT8 and FP16 lanes simultaneously, while original tiled execution keeps precision work separate. This version applies the same mapping only inside 	hree_level_decode_kernel using exact line-scoped edits.
+
+## Single hypothesis
+Map each decode block to one precision partition and use a shared local_channel index. Tail lanes mask against the partition count. This removes cross-precision warp branch divergence without changing arithmetic or data.
+
+## Falsification criteria
+Any correctness failure rejects v56. If correctness passes but speedup is not above v51, restore v51.

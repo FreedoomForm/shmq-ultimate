@@ -1,0 +1,5 @@
+MODEL_AUDIT=v32 
+NOTEBOOK_SEARCH=No Qwen/Qwen2.5-7B or Qwen3-8B identifier found in notebook, builder, embedded Python or gate JSON 
+RECORDED_QUALITY_MODEL=Qwen/Qwen2.5-0.5B in THREE_LEVEL_GATES.json 
+FULL_MODEL_GATES=not_run_or_not_embedded_in_current_operator-gate notebook 
+CONCLUSION=Long RUNNING state is not evidence of a 7B model; v32 remains invalid pending terminal status and config review

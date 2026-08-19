@@ -1,0 +1,7 @@
+﻿# v62 corrected atomic padded scale ABI
+
+Original-first finding: original ops.py quantize returns [K/128,M_even], and original linear.py passes it unchanged to the mixed GEMM. v61 exposed a concrete implementation mistake: the decode launch was changed but its signature was not. v62 updates the two prefill signatures and the decode signature together, and passes the actual scale stride to both launch families.
+
+Single hypothesis: once the decode consumer also uses scale_act[group * scale_rows], the original padded scale contract should become numerically correct for rows=1 without changing quantized values or benchmark settings.
+
+Falsification: native correctness must pass; if it passes, compare all gates to v51 and accept only a real improvement.

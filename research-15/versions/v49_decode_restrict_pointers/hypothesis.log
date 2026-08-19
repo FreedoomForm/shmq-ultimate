@@ -1,0 +1,10 @@
+﻿# v49 — restrict-qualified decode pointers
+
+## Differential audit finding
+Original CUTLASS uses typed tensor iterators with non-aliasing access assumptions. The current SM75 decode kernel exposes independent raw pointers without __restrict__, so nvcc must conservatively preserve possible aliasing in the hot DP4A loop.
+
+## Single hypothesis
+Add __restrict__ to all decode-kernel pointer parameters only. This changes compiler alias analysis, not data, precision, arithmetic, mapping, model or benchmark settings.
+
+## Falsification criteria
+Any correctness failure rejects v49. If correctness passes but speedup is not above v45, restore v45.

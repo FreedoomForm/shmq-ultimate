@@ -1,0 +1,8 @@
+﻿# v61 result
+
+Kaggle output: output-1787025046, kernel version 82.
+Original-first finding: original ops.py quantize returns padded scale_act [K/128,M_even]. The audit identified that decode scale loads also need a leading-dimension stride for padded M=1.
+
+Result: the submitted source failed nvcc before execution with three_level_sm75.cu(677): error: too many arguments in function call. The decode kernel signature was not updated consistently with the launch. No correctness or performance result exists.
+
+Decision: reject v61 as a compile failure and restore v51. The source-level audit remains valid, but the next implementation must update the decode declaration and call as one atomic edit.

@@ -1,0 +1,13 @@
+﻿# v48 — warp-shuffle activation reuse
+
+## Differential audit finding
+The v45 16-lane subwarp mapping shares the same activation stream conceptually, but each of the two subwarps still performs its own global int8 load. v47 proved that a dynamic shared-memory copy plus synchronization regresses. The original tiled GEMM reuses A values across output channels; a warp-level shuffle can reuse them without a shared-memory barrier.
+
+## Single hypothesis
+For INT4 and INT8 decode branches, only subwarp 0 loads each 4-byte activation vector from global memory; every lane then broadcasts the corresponding value with __shfl_sync to both 16-lane subwarps. Weight loads and DP4A accumulation remain per output channel.
+
+## Controlled change
+Only decode activation load/reuse changes. FP16, quantization, weights, output mapping, model and benchmark settings remain unchanged.
+
+## Falsification criteria
+Any correctness failure rejects v48. If correctness passes but speedup is not above v45, restore v45.

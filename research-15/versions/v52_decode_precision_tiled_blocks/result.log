@@ -1,0 +1,7 @@
+﻿# v52 — precision-tiled decode blocks result
+
+## Static audit outcome
+The intended mapping hypothesis was not submitted. A scripted global replacement changed prefill branch selectors and indices outside 	hree_level_decode_kernel, so static source inspection found contamination before any Kaggle measurement.
+
+## Decision
+Reject the unmeasured edit. No correctness or speedup result is claimed. Restore the v51 correctness-passing source and require a narrower function-scoped rewrite before revisiting this audit.

@@ -1,0 +1,7 @@
+﻿# v59 complete padded scale_act contract
+
+Original-first finding: original_linear.py allocates scale_act_padded with [K/128, M + M % 2], writes the transposed real rows into its prefix, and original CUTLASS consumes the padded leading dimension. Our v51 backend returns [K/128,M], while the C++ prefill indexes with rows as the stride; the earlier v42 attempt padded without updating this stride and failed correctness.
+
+Single hypothesis: pad scale_act to M_even in the backend, pass the actual scale stride into prefill, and preserve reference reconstruction by slicing real rows. Decode keeps its existing group-only scale access. This changes only the activation-scale storage contract and its explicit stride.
+
+Falsification: native correctness must pass; if not, restore v51. Performance is accepted only if it improves the corresponding v51 gate.

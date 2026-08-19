@@ -1,0 +1,8 @@
+﻿# v56 result
+
+Kaggle output: output-1787022986, source manifest identifies the submitted scoped decode rewrite.
+Original-first audit was recorded in research-15/differential_audit_v56_original_first.md before interpreting this result.
+
+Correctness: native correctness passed, but the production gate failed on mixed prefill end-to-end performance. The gate terminal_decision was no_go. The measured mixed decode GEMM and mixed decode end-to-end gates passed; mixed prefill end-to-end failed. The result therefore does not satisfy the one-hypothesis acceptance rule or the target.
+
+Decision: reject v56 and restore v51 from three_level_sm75.before.cu. No quality or benchmark setting was changed.

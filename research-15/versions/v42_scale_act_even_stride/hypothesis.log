@@ -1,0 +1,13 @@
+﻿# v42 — scale_act even-row stride hypothesis
+
+## Differential audit finding
+Original MixLLM activation quantization stores scales as [K/128, M_even], padding the row dimension to an even count. The current SM75 quantizer allocates [K/128, M]. The current kernel also assumes scale_act stride exactly rows and indexes scale_act[group * rows + r]. This is a concrete memory-layout mismatch, not a guessed tuning change.
+
+## Single hypothesis
+Padding scale_act rows to M_even and using the actual padded row stride in the SM75 kernel may improve half-load alignment/coalescing on T4 while preserving the same activation values for all real rows.
+
+## Controlled change
+Only activation-scale allocation/stride handling will change. input_int8 values, quantization formula, weight packing, model, benchmark settings, and precision assignments remain unchanged. The kernel will reject undersized scale tensors but accept padded scale_act with size(1) >= rows and use scale_act.size(1) as the row stride.
+
+## Falsification criteria
+Any correctness failure, changed outputs beyond the existing tolerance, or no performance improvement will reject the hypothesis and trigger restoration/next audit.

@@ -1,0 +1,1 @@
+Hypothesis: reuse each activation group from shared memory across all 32 output channels in the SM75 decode block, eliminating repeated global activation reads while preserving exact INT4/INT8/FP16 math. 

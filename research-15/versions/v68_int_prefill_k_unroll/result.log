@@ -1,0 +1,8 @@
+﻿# v68 result
+
+Kaggle output: output-1787029200, kernel version 87.
+Original-first finding: original multistage code uses compile-time stage/K iteration structure; v68 added one #pragma unroll before only the first SM75 INT prefill group_k loop.
+
+Correctness: passed. Mixed decode GEMM and mixed decode end-to-end passed. Mixed prefill end-to-end failed, so the user safety rule rejects the change even though one mode benefited. No all-gate speedup is claimed.
+
+Decision: reject v68 and restore v51.

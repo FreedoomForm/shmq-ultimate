@@ -1,0 +1,141 @@
+﻿diff --git "a/C:\\Users\\User\\Downloads\\Multi-main\\Multi-main\\research-15\\versions\\v86_branch_hoist\\three_level_sm75.before.cu" "b/C:\\Users\\User\\Downloads\\Multi-main\\Multi-main\\shmq-ultimate\\external\\MixLLM\\mixllm\\kernels\\three_level_sm75.cu"
+index 7cf8734..c2d5c97 100644
+--- "a/C:\\Users\\User\\Downloads\\Multi-main\\Multi-main\\research-15\\versions\\v86_branch_hoist\\three_level_sm75.before.cu"
++++ "b/C:\\Users\\User\\Downloads\\Multi-main\\Multi-main\\shmq-ultimate\\external\\MixLLM\\mixllm\\kernels\\three_level_sm75.cu"
+@@ -105,7 +105,7 @@ __global__ void three_level_tensorcore_kernel(
+   const int tiles4 = (n4 + kPrefillChannels - 1) / kPrefillChannels;
+   const int tiles8 = (n8 + kPrefillChannels - 1) / kPrefillChannels;
+   const int tile_id = blockIdx.x;
+-  const int row_base = blockIdx.y * kTile;
++  int row_base = blockIdx.y * kTile;
+   const int warp = threadIdx.x / kWarpSize;
+   const int lane = threadIdx.x % kWarpSize;
+   int precision;
+@@ -122,8 +122,8 @@ __global__ void three_level_tensorcore_kernel(
+                    warp * kTile;
+   }
+ 
+-  __shared__ __align__(16) int8_t a_int8[kTile * kTile];
+-  __shared__ __align__(16) int8_t b_int8[kPrefillWarps][kTile * kTile];
++  __shared__ __align__(16) int8_t a_int8[4][8 * kTile];
++  __shared__ __align__(16) int8_t b_int8[kPrefillWarps][32 * kTile];
+   __shared__ __align__(16) int accumulator_int[kPrefillWarps][kTile * kTile];
+   __shared__ __align__(16) __half a_fp16[kTile * kTile];
+   __shared__ __align__(16) __half b_fp16[kPrefillWarps][kTile * kTile];
+@@ -183,33 +183,40 @@ __global__ void three_level_tensorcore_kernel(
+     return;
+   }
+ 
++  row_base += (warp / 2) * 8;
++  channel_base = (tile_id - (precision == 4 ? 0 : tiles4)) * kPrefillChannels + (warp % 2) * 32;
+   float scaled_accumulators[kTile * kTile / kWarpSize] = {};
+   const int groups = width / kGroupSize;
+   const int partition_size = precision == 4 ? n4 : n8;
+-  const bool full_rows = row_base + kTile <= rows;
+-  const bool full_channels = channel_base + kTile <= partition_size;
++  const bool full_rows = row_base + 8 <= rows;
++  const bool full_channels = channel_base + 32 <= partition_size;
+   for (int group = 0; group < groups; ++group) {
+-    wmma::fragment<wmma::accumulator, kTile, kTile, kTile, int> accumulator;
++    wmma::fragment<wmma::accumulator, 8, 32, kTile, int> accumulator;
+     wmma::fill_fragment(accumulator, 0);
+     for (int group_k = 0; group_k < kGroupSize; group_k += kTile) {
+       const int k_base = group * kGroupSize + group_k;
+-      wmma::fragment<wmma::matrix_a, kTile, kTile, kTile, signed char,
++      wmma::fragment<wmma::matrix_a, 8, 32, kTile, signed char,
+                      wmma::row_major> a;
+-      wmma::fragment<wmma::matrix_b, kTile, kTile, kTile, signed char,
++      wmma::fragment<wmma::matrix_b, 8, 32, kTile, signed char,
+                      wmma::col_major> b;
+-      for (int linear = threadIdx.x; linear < kTile * kTile;
+-           linear += blockDim.x) {
+-        const int tile_row = linear / kTile;
+-        const int tile_col = linear % kTile;
+-        const int row = row_base + tile_row;
+-        a_int8[linear] = row < rows
+-            ? input_int8[row * width + k_base + tile_col]
+-            : int8_t{0};
+-      }
+-      __syncthreads();
+-      wmma::load_matrix_sync(
+-          a, reinterpret_cast<signed char*>(a_int8), kTile);
+-      if (precision == 8 && full_channels) {
++      if (full_rows) {
++        wmma::load_matrix_sync(
++            a, reinterpret_cast<const signed char*>(
++                   input_int8 + row_base * width + k_base), width);
++      } else {
++        for (int linear = (warp % 2) * kWarpSize + lane;
++             linear < 8 * kTile; linear += 2 * kWarpSize) {
++          const int tile_row = linear / kTile;
++          const int tile_col = linear % kTile;
++          const int row = row_base + tile_row;
++          a_int8[warp / 2][linear] = row < rows
++              ? input_int8[row * width + k_base + tile_col]
++              : int8_t{0};
++        }
++        __syncthreads();
++        wmma::load_matrix_sync(
++            a, reinterpret_cast<signed char*>(a_int8[warp / 2]), kTile);
++      }      if (precision == 8 && full_channels) {
+         wmma::load_matrix_sync(
+             b, reinterpret_cast<const signed char*>(
+                    weight_int8 + channel_base * width + k_base), width);
+@@ -218,19 +225,19 @@ __global__ void three_level_tensorcore_kernel(
+             b, reinterpret_cast<const signed char*>(
+                    expanded_int4 + channel_base * width + k_base), width);
+       } else {
+-        for (int linear = lane; linear < kTile * kTile;
++        for (int linear = lane; linear < 32 * kTile;
+              linear += kWarpSize) {
+-          const int tile_row = linear / kTile;
+-          const int tile_col = linear % kTile;
+-          const int channel = channel_base + tile_col;
++          const int channel_offset = linear / kTile;
++          const int k_offset = linear % kTile;
++          const int channel = channel_base + channel_offset;
+           int8_t weight = 0;
+           if (channel < partition_size) {
+-            const int k = k_base + tile_row;
++            const int k = k_base + k_offset;
+             weight = precision == 4
+                 ? expanded_int4[channel * width + k]
+                 : weight_int8[channel * width + k];
+           }
+-          b_int8[warp][tile_col * kTile + tile_row] = weight;
++          b_int8[warp][channel_offset * kTile + k_offset] = weight;
+         }
+         __syncwarp();
+         wmma::load_matrix_sync(
+@@ -239,13 +246,13 @@ __global__ void three_level_tensorcore_kernel(
+       wmma::mma_sync(accumulator, a, b, accumulator);
+       __syncthreads();
+     }
+-    wmma::store_matrix_sync(accumulator_int[warp], accumulator, kTile,
++    wmma::store_matrix_sync(accumulator_int[warp], accumulator, 32,
+                             wmma::mem_row_major);
+     __syncwarp();
+-    for (int linear = lane, item = 0; linear < kTile * kTile;
++    for (int linear = lane, item = 0; linear < 8 * 32;
+          linear += kWarpSize, ++item) {
+-      const int tile_row = linear / kTile;
+-      const int local_channel = channel_base + linear % kTile;
++      const int tile_row = linear / 32;
++      const int local_channel = channel_base + linear % 32;
+       if (row_base + tile_row < rows && local_channel < partition_size) {
+         const float activation_scale =
+             __half2float(scale_act[group * rows + row_base + tile_row]);
+@@ -258,10 +265,10 @@ __global__ void three_level_tensorcore_kernel(
+     }
+     __syncwarp();
+   }
+-  for (int linear = lane, item = 0; linear < kTile * kTile;
++  for (int linear = lane, item = 0; linear < 8 * 32;
+        linear += kWarpSize, ++item) {
+-    const int row = row_base + linear / kTile;
+-    const int local_channel = channel_base + linear % kTile;
++    const int row = row_base + linear / 32;
++    const int local_channel = channel_base + linear % 32;
+     if (row < rows && local_channel < partition_size) {
+       const int output_channel = precision == 4
+           ? indices_int4[local_channel] : indices_int8[local_channel];

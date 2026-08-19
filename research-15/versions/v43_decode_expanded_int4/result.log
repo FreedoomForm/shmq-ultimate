@@ -1,0 +1,14 @@
+﻿# v43 — expanded INT4 decode result
+
+## Audit and implementation
+The audit found that prefill uses the existing signed zero-centered expanded_int4 cache while decode unpacked packed nibbles on every call. The intended change redirected only the rows=1 INT4 decode branch to the expanded cache and preserved all other paths.
+
+## Attempt history
+Several compile-only corrections were required because the first scripted replacement touched other prefill/expand launch sites and left a stale packed-weight reconstruction block. Those issues were corrected and local notebook/hash/compileall checks passed.
+The final corrected T4 run compiled the extension but failed at runtime with cudaErrorIllegalAddress before producing a valid gate result. The likely fault is unsafe interaction between the existing expanded cache/rows=1 decode ABI and the new vectorized direct load; this iteration is rejected.
+
+## Decision
+- No correctness result is accepted for v43 because the gate did not complete.
+- No speedup result is accepted.
+- Restore the v41/v38 correctness-passing packed-nibble decode baseline before the next differential audit.
+

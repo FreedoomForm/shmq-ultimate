@@ -1,0 +1,13 @@
+﻿# v52 — precision-tiled decode blocks
+
+## Differential audit finding
+The monolithic v51 decode kernel maps one linear channel range per block and branches inside each warp on INT4/INT8/FP16 partition boundaries. Original MixLLM launches separate precision-specialized tiled work, so it does not serialize mixed precision branches within a warp.
+
+## Single hypothesis
+Keep one monolithic CUDA kernel but map whole blocks to one precision partition: INT4 tiles first, then INT8 tiles, then FP16 tiles. Valid lanes in a block therefore execute one precision branch, while partial tail blocks mask only out-of-range lanes. This removes cross-precision warp divergence without changing any arithmetic or data.
+
+## Controlled change
+Only decode block-to-partition mapping and launch block count change. v51 expanded INT4 cache, INT8/FP16 paths, quantization, output mapping, model and benchmark settings remain unchanged.
+
+## Falsification criteria
+Any correctness failure rejects v52. If correctness passes but speedup is not above v51, restore v51.

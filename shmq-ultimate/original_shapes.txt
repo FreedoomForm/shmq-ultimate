@@ -1,0 +1,46 @@
+﻿
+LineNumber Line                                                                
+---------- ----                                                                
+       299     typename MmaCore_,                                              
+       306     typename MmaCore_>                                              
+       307 struct Testbed <MmaCore_, false> {                                  
+       309   using MmaCore = MmaCore_;                                         
+       310   using ThreadblockShape = typename MmaCore::Shape;                 
+       311   using WarpShape = typename MmaCore::WarpShape;                    
+       312   using InstructionShape = typename MmaCore::InstructionShape;      
+       313   using ElementA = typename MmaCore::ElementA;                      
+       314   using LayoutA = typename MmaCore::LayoutA;                        
+       315   using ElementB = typename MmaCore::ElementB;                      
+       316   using LayoutB = typename MmaCore::LayoutB;                        
+       317   using ElementC = typename MmaCore::ElementC;                      
+       318   using LayoutC = typename MmaCore::LayoutC;                        
+       320   using ThreadMapA = typename MmaCore::IteratorThreadMapA;          
+       321   using ThreadMapB = typename MmaCore::IteratorThreadMapB;          
+       324   static int const Stages = MmaCore::kStages;                       
+       326       MmaCore::kCacheOpA;                                           
+       328       MmaCore::kCacheOpB;                                           
+       344       typename MmaCore::Shape, IteratorA, typename MmaCore::SmemI...
+       345       CacheOpA, IteratorB, typename MmaCore::SmemIteratorB, Cache...
+       346       LayoutC, typename MmaCore::MmaPolicy, Stages>;                
+       445     typename MmaCore_>                                              
+       446 struct Testbed <MmaCore_, true> {                                   
+       448   using MmaCore = MmaCore_;                                         
+       449   using ThreadblockShape = typename MmaCore::Shape;                 
+       450   using WarpShape = typename MmaCore::WarpShape;                    
+       451   using InstructionShape = typename MmaCore::InstructionShape;      
+       452   using ElementA = typename MmaCore::ElementA;                      
+       453   using LayoutA = typename MmaCore::LayoutA;                        
+       454   using ElementB = typename MmaCore::ElementB;                      
+       455   using LayoutB = typename MmaCore::LayoutB;                        
+       456   using ElementC = typename MmaCore::ElementC;                      
+       457   using LayoutC = typename MmaCore::LayoutC;                        
+       459   using ThreadMapA = typename MmaCore::IteratorThreadMapA;          
+       460   using ThreadMapB = typename MmaCore::IteratorThreadMapB;          
+       463   static int const Stages = MmaCore::kStages;                       
+       465       MmaCore::kCacheOpA;                                           
+       467       MmaCore::kCacheOpB;                                           
+       483       typename MmaCore::Shape, IteratorA, typename MmaCore::SmemI...
+       484       CacheOpA, IteratorB, typename MmaCore::SmemIteratorB, Cache...
+       485       LayoutC, typename MmaCore::MmaPolicy, Stages>;                
+
+

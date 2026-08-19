@@ -1,0 +1,17 @@
+ THREE_LEVEL_STATUS.md                     | 161 ++++++++++++++
+ mixllm/__init__.py                        |  42 ++--
+ mixllm/kernels/Makefile                   |   9 +-
+ mixllm/kernels/three_level_sm75.cu        | 195 +++++++++++++++++
+ mixllm/nn/modules/mixllm_config.py        |  73 ++++++-
+ mixllm/nn/modules/ops.py                  |  47 ++++-
+ mixllm/nn/modules/three_level_linear.py   | 135 ++++++++++++
+ mixllm/quantization/three_level.py        | 336 ++++++++++++++++++++++++++++++
+ mixllm/runtime_capability.py              |  55 +++++
+ mixllm/sm75_backend.py                    | 128 ++++++++++++
+ mixllm/test/test_runtime_capability.py    |  34 +++
+ mixllm/test/test_sm75_backend.py          | 115 ++++++++++
+ mixllm/test/test_three_level.py           | 172 +++++++++++++++
+ mixllm/test/test_vllm_three_level.py      |  50 +++++
+ mixllm/vllm_three_level.py                | 102 +++++++++
+ vllm_v0.9.0_patch/THREE_LEVEL_MANIFEST.md |  20 ++
+ 16 files changed, 1652 insertions(+), 22 deletions(-)

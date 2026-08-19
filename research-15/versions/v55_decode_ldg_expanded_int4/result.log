@@ -1,0 +1,16 @@
+﻿# v55 — __ldg expanded INT4 result
+
+## T4 execution
+- IS_T4 True.
+- TESTS_RETURNCODE 0.
+- sm75_native_correctness: passed.
+- sm75_native_benchmarks: passed.
+- 	erminal_decision: no_go.
+
+## Performance
+- Best GEMM-only p50 speedup: 1.3683012714x.
+- Best end-to-end p50 speedup: 1.1601949332x.
+- Below v51 best end-to-end 1.2209821815x and no progress toward 2.6x.
+
+## Decision
+Reject the __ldg expanded-INT4 load change and restore v51 baseline.

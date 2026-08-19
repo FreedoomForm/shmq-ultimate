@@ -1,0 +1,5 @@
+﻿# v67 audit-only
+
+Original: interleave_uint4_for_cutlass reorders K columns per 8 as [0,4,1,5,2,6,3,7]; original mixed test uses K=64 threadblock/warp tiles and InstructionShape<16,8,32>.
+Current: SM75 kernel stores expanded INT4 row-major and uses WMMA 16x16x16 fragments with direct k accesses.
+Decision: no code change. A naive interleave would alter dot-product pairing because our WMMA layout differs from the original CUTLASS iterator; a real fix requires a new SM75 instruction/layout implementation, not a safe one-line change. Baseline remains v51.

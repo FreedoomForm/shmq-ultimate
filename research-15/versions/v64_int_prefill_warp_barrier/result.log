@@ -1,0 +1,8 @@
+﻿# v64 result
+
+Kaggle output: output-1787027895, kernel version 85.
+Original-first finding: original multistage header uses stage-level pipeline state; the first SM75 INT prefill loop had a full CTA barrier after a warp-local MMA over warp-private shared slices. v64 changed only that one barrier to __syncwarp().
+
+Correctness: passed. Mixed decode GEMM and mixed decode end-to-end passed. Mixed prefill end-to-end failed. Under the explicit keep-only-if-safe rule, the change is not retained because another required mode failed; there is no admissible all-gate performance improvement.
+
+Decision: reject v64 and restore v51.

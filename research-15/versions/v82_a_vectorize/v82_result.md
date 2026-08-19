@@ -1,0 +1,1 @@
+v82 deep research proposed vectorized 4-byte activation A staging for full rows based on Turing coalescing evidence. The patch failed during remote line-based insertion; the before-snapshot restored the clean v51 source. No local or Kaggle measurement. Rejected as unmeasured.

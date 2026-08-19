@@ -1,0 +1,10 @@
+﻿# v55 — read-only cache load for expanded INT4 weights
+
+## Differential audit finding
+v51 changed the INT4 decode representation from packed bytes to a persistent signed expanded cache, but its hot 32-bit weight loads still use ordinary global loads. Original CUTLASS uses read-only tensor iterators/cache paths; the earlier v39 __ldg test covered the old packed representation, not this new expanded cache.
+
+## Single hypothesis
+Use __ldg for only the 32-bit expanded-INT4 weight load in the v51 INT4 decode branch. INT8, FP16, activation quantization, output mapping, model and benchmark settings remain unchanged.
+
+## Falsification criteria
+Any correctness failure rejects v55. If correctness passes but speedup is not above v51, restore v51.

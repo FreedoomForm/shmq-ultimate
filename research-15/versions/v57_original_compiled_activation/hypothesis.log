@@ -1,0 +1,7 @@
+﻿# v57 original-compiled activation quantization
+
+Original-first finding: original_linear.py uses @torch.compile on activation_quantization, computes groupwise abs amax divided by 127 on [M,K/128,128], rounds int8, and writes transposed scales. Our v51 uses a custom CUDA activation quantization op instead.
+
+Single hypothesis: use one compiled Python helper with the original arithmetic and scale layout while preserving the current SM75 ABI [K/128,M]. This changes only activation quantization implementation; weights, kernels, benchmark settings, and quality model remain unchanged.
+
+Falsification: native correctness must pass and activation/end-to-end p50 must improve versus v51; otherwise restore v51.

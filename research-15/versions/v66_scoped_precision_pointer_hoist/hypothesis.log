@@ -1,0 +1,5 @@
+﻿# v66 scoped precision pointer hoist
+
+Original-first finding: original CUTLASS uses separate MmaCore_INT4 and MmaCore_INT8 instantiations with InstructionShape<16,8,32>; current first monolithic prefill selects precision repeatedly inside one runtime branch. v65 was aborted because broad replacement touched FP16. v66 will edit only the exact first tensorcore kernel region before the reuse kernel.
+
+Single hypothesis: hoist same-typed INT4/INT8 weight, scale, and index pointers once per first prefill block, preserving arithmetic and all other kernels.

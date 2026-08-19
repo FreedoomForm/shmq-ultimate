@@ -1,0 +1,79 @@
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:158:    cutlass::HostTensor<ElementB_INT4, LayoutB> matrix_B_interleaved(matrix_B_int4.extent());
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:159:    cutlass::HostTensor<ElementB_INT4, LayoutB> matrix_B_interleaved_tmp(matrix_B_int4.extent());
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:188:          matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i+12,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:191:          matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i-4,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:194:          matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i+8,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:197:          matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i-8,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:200:          matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i+4,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:203:          matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i-12,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:206:          matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:208:        matrix_B_interleaved_tmp.at({i,j}) = matrix_B_interleaved.at({i,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:214:        matrix_B_interleaved.at({i+0,j}) = matrix_B_interleaved_tmp.at({i+0,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:215:        matrix_B_interleaved.at({i+1,j}) = matrix_B_interleaved_tmp.at({i+4,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:216:        matrix_B_interleaved.at({i+2,j}) = matrix_B_interleaved_tmp.at({i+1,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:217:        matrix_B_interleaved.at({i+3,j}) = matrix_B_interleaved_tmp.at({i+5,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:218:        matrix_B_interleaved.at({i+4,j}) = matrix_B_interleaved_tmp.at({i+2,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:219:        matrix_B_interleaved.at({i+5,j}) = matrix_B_interleaved_tmp.at({i+6,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:220:        matrix_B_interleaved.at({i+6,j}) = matrix_B_interleaved_tmp.at({i+3,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:221:        matrix_B_interleaved.at({i+7,j}) = matrix_B_interleaved_tmp.at({i+7,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:265:    matrix_B_interleaved.sync_device();
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:286:    mixllm_int4.run(grid_int4, block, matrix_A, matrix_B_interleaved, 
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage.cu:330:        mixllm_int4.run(grid_int4, block, matrix_A, matrix_B_interleaved, 
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:169:        cutlass::HostTensor<ElementB_INT4, LayoutB> matrix_B_interleaved(matrix_B_int4.extent());
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:170:        cutlass::HostTensor<ElementB_INT4, LayoutB> matrix_B_interleaved_tmp(matrix_B_int4.extent());
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:199:              matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i+12,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:202:              matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i-4,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:205:              matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i+8,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:208:              matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i-8,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:211:              matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i+4,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:214:              matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i-12,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:217:              matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:219:            matrix_B_interleaved_tmp.at({i,j}) = matrix_B_interleaved.at({i,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:225:            matrix_B_interleaved.at({i+0,j}) = matrix_B_interleaved_tmp.at({i+0,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:226:            matrix_B_interleaved.at({i+1,j}) = matrix_B_interleaved_tmp.at({i+4,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:227:            matrix_B_interleaved.at({i+2,j}) = matrix_B_interleaved_tmp.at({i+1,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:228:            matrix_B_interleaved.at({i+3,j}) = matrix_B_interleaved_tmp.at({i+5,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:229:            matrix_B_interleaved.at({i+4,j}) = matrix_B_interleaved_tmp.at({i+2,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:230:            matrix_B_interleaved.at({i+5,j}) = matrix_B_interleaved_tmp.at({i+6,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:231:            matrix_B_interleaved.at({i+6,j}) = matrix_B_interleaved_tmp.at({i+3,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:232:            matrix_B_interleaved.at({i+7,j}) = matrix_B_interleaved_tmp.at({i+7,j});
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:276:        matrix_B_interleaved.sync_device();
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:297:        mixllm_int4.run(grid_int4, block, matrix_A, matrix_B_interleaved, 
+mixllm\kernels\cutlass_extension\test\mix_mma_multistage_search.cu:342:            mixllm_int4.run(grid_int4, block, matrix_A, matrix_B_interleaved, 
+mixllm\kernels\cutlass_extension\test\mma_multistage_testbed.h:467:      cutlass::HostTensor<ElementB, LayoutB> &matrix_B_interleaved,
+mixllm\kernels\cutlass_extension\test\mma_multistage_testbed.h:476:    typename IteratorB::Params params_B(matrix_B_interleaved.layout());
+mixllm\kernels\cutlass_extension\test\mma_multistage_testbed.h:487:            matrix_B_interleaved.device_ref(), params_scale, matrix_scale.device_data(),
+mixllm\kernels\cutlass_extension\test\mma_multistage_testbed.h:631:      cutlass::HostTensor<ElementB, LayoutB> &matrix_B_interleaved,
+mixllm\kernels\cutlass_extension\test\mma_multistage_testbed.h:640:    typename IteratorB::Params params_B(matrix_B_interleaved.layout());
+mixllm\kernels\cutlass_extension\test\mma_multistage_testbed.h:651:            matrix_B_interleaved.device_ref(), params_scale, matrix_scale.device_data(),
+mixllm\kernels\kernels.cu:524:          torch::Tensor &matrix_B_interleaved) {
+mixllm\kernels\kernels.cu:539:      matrix_B_int8, matrix_B_interleaved);
+mixllm\kernels\kernels.cu:556:         "Tensor matrix_B_int8, Tensor matrix_B_interleaved) -> Tensor");
+mixllm\kernels\mix_mma_config.h:14:    matrix_B_int8, matrix_B_interleaved)
+mixllm\kernels\mix_mma_config.h:122:    matrix_B_int8, matrix_B_interleaved)
+mixllm\kernels\mma_multistage_testbed.h:405:      torch::Tensor &matrix_B_interleaved,
+mixllm\kernels\mma_multistage_testbed.h:429:            reinterpret_cast<ElementB*>(matrix_B_interleaved.data_ptr()),
+mixllm\kernels\mma_multistage_testbed.h:554:      torch::Tensor &matrix_B_interleaved,
+mixllm\kernels\mma_multistage_testbed.h:578:            reinterpret_cast<ElementB*>(matrix_B_interleaved.data_ptr()),
+mixllm\nn\modules\linear.py:122:        matrix_B_interleaved = matrix_B_int4.clone()
+mixllm\nn\modules\linear.py:142:        matrix_B_interleaved = matrix_B_int4[:, interleaved_index]
+mixllm\nn\modules\linear.py:143:        matrix_B_interleaved_tmp = matrix_B_interleaved.clone()
+mixllm\nn\modules\linear.py:155:        matrix_B_interleaved = matrix_B_interleaved_tmp[:, interleaved_index]
+mixllm\nn\modules\linear.py:157:        return self.pack_uint4_for_cutlass(matrix_B_interleaved)
+mixllm\test\test_kernel.py:36:    matrix_B_interleaved = matrix_B_int4.clone()
+mixllm\test\test_kernel.py:56:    matrix_B_interleaved = matrix_B_int4[:, interleaved_index]
+mixllm\test\test_kernel.py:57:    matrix_B_interleaved_tmp = matrix_B_interleaved.clone()
+mixllm\test\test_kernel.py:69:    matrix_B_interleaved = matrix_B_interleaved_tmp[:, interleaved_index]
+mixllm\test\test_kernel.py:71:    return pack_uint4_for_cutlass(matrix_B_interleaved)
+mixllm\test\test_kernel.py:121:    matrix_B_interleaved = interleave_uint4_for_cutlass(matrix_B_int4)
+mixllm\test\test_kernel.py:132:    print(f"shape of matrix_B_interleaved: {matrix_B_interleaved.shape}")
+mixllm\test\test_kernel.py:146:        matrix_B_int8, matrix_B_interleaved)
+mixllm\test\test_kernel.py:153:            matrix_B_int8, matrix_B_interleaved)
+mixllm\test\test_kernel_no_cudagraph.py:38:    matrix_B_interleaved = matrix_B_int4.clone()
+mixllm\test\test_kernel_no_cudagraph.py:58:    matrix_B_interleaved = matrix_B_int4[:, interleaved_index]
+mixllm\test\test_kernel_no_cudagraph.py:59:    matrix_B_interleaved_tmp = matrix_B_interleaved.clone()
+mixllm\test\test_kernel_no_cudagraph.py:71:    matrix_B_interleaved = matrix_B_interleaved_tmp[:, interleaved_index]
+mixllm\test\test_kernel_no_cudagraph.py:73:    return pack_uint4_for_cutlass(matrix_B_interleaved)
+mixllm\test\test_kernel_no_cudagraph.py:123:    matrix_B_interleaved = interleave_uint4_for_cutlass(matrix_B_int4)
+mixllm\test\test_kernel_no_cudagraph.py:147:        matrix_B_interleaved)
+mixllm\test\test_kernel_no_cudagraph.py:160:        matrix_B_interleaved)

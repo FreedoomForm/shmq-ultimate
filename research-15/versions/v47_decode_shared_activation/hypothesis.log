@@ -1,0 +1,13 @@
+﻿# v47 — decode shared activation staging
+
+## Differential audit finding
+The current v45 decode kernel assigns output channels to subwarps, so every subwarp in every block independently reads the same input_int8 vector from global memory. The original tiled MixLLM execution reuses activation tiles across multiple output channels. The v44 full-warp mapping showed that mapping alone is not enough; the remaining concrete mismatch is the absence of a shared activation tile in the rows=1 decode block.
+
+## Single hypothesis
+Stage the rows=1 input_int8 vector once per decode block in dynamic shared memory, synchronize, and make INT4/INT8 DP4A branches read the staged vector. FP16 remains unchanged. This reduces repeated global activation reads without removing any computation or changing precision.
+
+## Controlled change
+Only decode activation storage changes: add one shared int8 buffer of width bytes and pass width dynamic shared bytes at launch. Weight loads, quantization, output mapping, model and benchmark settings remain unchanged.
+
+## Falsification criteria
+Any correctness failure rejects v47. If correctness passes but speedup is not above v45, restore v45.

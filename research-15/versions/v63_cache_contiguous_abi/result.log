@@ -1,0 +1,8 @@
+﻿# v63 result
+
+Kaggle output: output-1787027406, kernel version 84.
+Original-first finding: original LinearMixLLM passes normalized packed buffers directly to the upstream operator; our wrapper rebuilt contiguous views on every call. v63 cached those 9 contiguous packed buffers by tensor identity/version.
+
+Correctness: passed. Mixed decode GEMM and mixed decode end-to-end passed. Mixed prefill end-to-end failed, so the all-gate acceptance criterion was not met. The cache improved the measured activation host path and decode behavior but cannot be accepted as the production baseline while prefill regresses/fails.
+
+Decision: reject v63 and restore v51. Record the partial evidence only; do not claim a speedup or target progress from a failed all-gate version.

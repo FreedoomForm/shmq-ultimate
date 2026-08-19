@@ -1,0 +1,141 @@
+﻿160:           const int tile_col = linear % kTile;
+161:           const int channel = channel_base + tile_col;
+162:           b_fp16[warp][tile_col * kTile + tile_row] = channel < n16
+163:               ? weight_fp16[channel * width + k_base + tile_row]
+164:               : __float2half(0.0f);
+165:         }
+166:         __syncwarp();
+167:         wmma::load_matrix_sync(b, b_fp16[warp], kTile);
+168:       }
+169:       wmma::mma_sync(accumulator, a, b, accumulator);
+170:       __syncthreads();
+171:     }
+172:     wmma::store_matrix_sync(accumulator_fp32[warp], accumulator, kTile,
+173:                             wmma::mem_row_major);
+174:     __syncwarp();
+175:     for (int linear = lane; linear < kTile * kTile; linear += kWarpSize) {
+176:       const int row = row_base + linear / kTile;
+177:       const int local_channel = channel_base + linear % kTile;
+178:       if (row < rows && local_channel < n16) {
+179:         output[row * output_width + indices_fp16[local_channel]] =
+180:             accumulator_fp32[warp][linear];
+181:       }
+182:     }
+183:     return;
+184:   }
+185: 
+186:   float scaled_accumulators[kTile * kTile / kWarpSize] = {};
+187:   const int groups = width / kGroupSize;
+188:   const int partition_size = precision == 4 ? n4 : n8;
+189:   const bool full_rows = row_base + kTile <= rows;
+190:   const bool full_channels = channel_base + kTile <= partition_size;
+191:   if (precision == 4 || precision == 8) {
+192:     for (int group = 0; group < groups; ++group) {
+193:       wmma::fragment<wmma::accumulator, kTile, kTile, kTile, int> accumulator;
+194:       wmma::fill_fragment(accumulator, 0);
+195:       for (int group_k = 0; group_k < kGroupSize; group_k += kTile) {
+196:         const int k_base = group * kGroupSize + group_k;
+197:         wmma::fragment<wmma::matrix_a, kTile, kTile, kTile, signed char,
+198:                        wmma::row_major> a;
+199:         wmma::fragment<wmma::matrix_b, kTile, kTile, kTile, signed char,
+200:                        wmma::col_major> b;
+201:         for (int linear = threadIdx.x; linear < kTile * kTile;
+202:              linear += blockDim.x) {
+203:           const int tile_row = linear / kTile;
+204:           const int tile_col = linear % kTile;
+205:           const int row = row_base + tile_row;
+206:           a_int8[linear] = row < rows
+207:               ? input_int8[row * width + k_base + tile_col]
+208:               : int8_t{0};
+209:         }
+210:         __syncthreads();
+211:         wmma::load_matrix_sync(
+212:             a, reinterpret_cast<signed char*>(a_int8), kTile);
+213:         if (precision == 8 && full_channels) {
+214:           wmma::load_matrix_sync(
+215:               b, reinterpret_cast<const signed char*>(
+216:                      weight_int8 + channel_base * width + k_base), width);
+217:         } else if (precision == 4 && full_channels) {
+218:           wmma::load_matrix_sync(
+219:               b, reinterpret_cast<const signed char*>(
+220:                      expanded_int4 + channel_base * width + k_base), width);
+221:         } else {
+222:           for (int linear = lane; linear < kTile * kTile;
+223:                linear += kWarpSize) {
+224:             const int tile_row = linear / kTile;
+225:             const int tile_col = linear % kTile;
+226:             const int channel = channel_base + tile_col;
+227:             int8_t weight = 0;
+228:             if (channel < partition_size) {
+229:               const int k = k_base + tile_row;
+230:               weight = precision == 4
+231:                   ? expanded_int4[channel * width + k]
+232:                   : weight_int8[channel * width + k];
+233:             }
+234:             b_int8[warp][tile_col * kTile + tile_row] = weight;
+235:           }
+236:           __syncwarp();
+237:           wmma::load_matrix_sync(
+238:               b, reinterpret_cast<signed char*>(b_int8[warp]), kTile);
+239:         }
+240:         wmma::mma_sync(accumulator, a, b, accumulator);
+241:         __syncthreads();
+242:       }
+243:       wmma::store_matrix_sync(accumulator_int[warp], accumulator, kTile,
+244:                               wmma::mem_row_major);
+245:       __syncwarp();
+246:       for (int linear = lane, item = 0; linear < kTile * kTile;
+247:            linear += kWarpSize, ++item) {
+248:         const int tile_row = linear / kTile;
+249:         const int local_channel = channel_base + linear % kTile;
+250:         if (row_base + tile_row < rows && local_channel < partition_size) {
+251:           const float activation_scale =
+252:               __half2float(scale_act[group * rows + row_base + tile_row]);
+253:           const __half weight_scale = precision == 4
+254:               ? scale_int4[local_channel * groups + group]
+255:               : scale_int8[local_channel * groups + group];
+256:           scaled_accumulators[item] +=
+257:               static_cast<float>(accumulator_int[warp][linear]) *
+258:               activation_scale * __half2float(weight_scale);
+259:         }
+260:       }
+261:     }
+262:   }  for (int linear = lane; linear < kTile * kTile;
+263:              linear += kWarpSize) {
+264:           const int tile_row = linear / kTile;
+265:           const int tile_col = linear % kTile;
+266:           const int channel = channel_base + tile_col;
+267:           int8_t weight = 0;
+268:           if (channel < partition_size) {
+269:             const int k = k_base + tile_row;
+270:             weight = precision == 4
+271:                 ? expanded_int4[channel * width + k]
+272:                 : weight_int8[channel * width + k];
+273:           }
+274:           b_int8[warp][tile_col * kTile + tile_row] = weight;
+275:         }
+276:         __syncwarp();
+277:         wmma::load_matrix_sync(
+278:             b, reinterpret_cast<signed char*>(b_int8[warp]), kTile);
+279:       }
+280:       wmma::mma_sync(accumulator, a, b, accumulator);
+281:       __syncthreads();
+282:     }
+283:     wmma::store_matrix_sync(accumulator_int[warp], accumulator, kTile,
+284:                             wmma::mem_row_major);
+285:     __syncwarp();
+286:     for (int linear = lane, item = 0; linear < kTile * kTile;
+287:          linear += kWarpSize, ++item) {
+288:       const int tile_row = linear / kTile;
+289:       const int local_channel = channel_base + linear % kTile;
+290:       if (row_base + tile_row < rows && local_channel < partition_size) {
+291:         const float activation_scale =
+292:             __half2float(scale_act[group * rows + row_base + tile_row]);
+293:         const __half weight_scale = precision == 4
+294:             ? scale_int4[local_channel * groups + group]
+295:             : scale_int8[local_channel * groups + group];
+296:         scaled_accumulators[item] += static_cast<float>(accumulator_int[warp][linear]) *
+297:                                      activation_scale * __half2float(weight_scale);
+298:       }
+299:     }
+300:     __syncwarp();

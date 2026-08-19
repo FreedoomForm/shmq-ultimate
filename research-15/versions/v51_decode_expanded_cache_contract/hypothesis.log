@@ -1,0 +1,13 @@
+﻿# v51 — expanded INT4 decode cache contract
+
+## Differential audit finding
+The original MixLLM separates packed storage from execution-ready signed layouts. The v43 attempt correctly identified the repeated decode unpack cost, but the current backend explicitly returns an empty weight_int8[:0] placeholder whenever x.shape[0] == 1 because the old decode kernel did not read expanded_int4; consuming that placeholder caused v43 cudaErrorIllegalAddress.
+
+## Single hypothesis
+Remove only the rows=1 early-return for _expanded_int4_for_prefill, use the existing cache expansion for decode rows=1, and make the decode INT4 branch read that signed expanded cache directly. This preserves the exact packed-to-signed conversion and all scales/zeros while eliminating repeated per-token nibble unpacking.
+
+## Controlled change
+Change the cache contract plus the INT4 decode weight source only. INT8, FP16, quantization arithmetic, output mapping, model and benchmark settings remain unchanged.
+
+## Falsification criteria
+Any correctness failure rejects v51. If correctness passes but speedup is not above v45, restore v45.

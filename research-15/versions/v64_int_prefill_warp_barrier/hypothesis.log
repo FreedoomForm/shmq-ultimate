@@ -1,0 +1,7 @@
+﻿# v64 first prefill INT barrier scope
+
+Original-first finding: original mq_mma_multistage.h uses stage-level async pipeline state and does not impose a full CTA barrier after every warp-local MMA step. Our first SM75 prefill INT loop writes/reads _int8[warp] and _int8[warp], which are warp-private shared-memory slices, then executes __syncthreads() after every MMA. That barrier is broader than the data dependency.
+
+Single hypothesis: replace only that post-MMA __syncthreads() in the first prefill INT4/INT8 path with __syncwarp(). The per-warp shared slices and WMMA fragments remain unchanged; no arithmetic, layout, benchmark, or precision changes.
+
+Falsification: native correctness must pass and prefill end-to-end must improve versus v51; otherwise restore v51.

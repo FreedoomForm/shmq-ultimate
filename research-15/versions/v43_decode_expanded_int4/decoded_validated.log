@@ -1,0 +1,386 @@
+﻿0.00s - Debugger warning: It seems that frozen modules are being used, which may
+
+0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+
+0.00s - to python to disable frozen modules.
+
+0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+
+0.00s - Debugger warning: It seems that frozen modules are being used, which may
+
+0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+
+0.00s - to python to disable frozen modules.
+
+0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+
+Python 3.12.13 (main, Mar  4 2026, 09:23:07) [GCC 11.4.0]
+
+STARTUP_HEARTBEAT
+
+PyTorch 2.10.0+cu128
+
+DEVICE_COUNT 2
+
+ACTIVE_DEVICE Tesla T4
+
+Embedded source SHA-256: 06d17102c077428353f44f7eca589515b87f50f00052d286436b990727779fc7
+
+
+
+..................
+
+----------------------------------------------------------------------
+
+Ran 18 tests in 0.186s
+
+
+
+OK
+
+
+
+[1/2] /usr/local/cuda/bin/nvcc --generate-dependencies-with-compile --dependency-output three_level_sm75.cuda.o.d -DTORCH_EXTENSION_NAME=mixllm_sm75_backend -DTORCH_API_INCLUDE_EXTENSION_H -isystem /usr/local/lib/python3.12/dist-packages/torch/include -isystem /usr/local/lib/python3.12/dist-packages/torch/include/torch/csrc/api/include -isystem /usr/local/cuda/include -isystem /usr/include/python3.12 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options '-fPIC' -O3 -lineinfo -gencode=arch=compute_75,code=sm_75 -std=c++17 -c /kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu -o three_level_sm75.cuda.o 
+
+FAILED: [code=1] three_level_sm75.cuda.o 
+
+/usr/local/cuda/bin/nvcc --generate-dependencies-with-compile --dependency-output three_level_sm75.cuda.o.d -DTORCH_EXTENSION_NAME=mixllm_sm75_backend -DTORCH_API_INCLUDE_EXTENSION_H -isystem /usr/local/lib/python3.12/dist-packages/torch/include -isystem /usr/local/lib/python3.12/dist-packages/torch/include/torch/csrc/api/include -isystem /usr/local/cuda/include -isystem /usr/include/python3.12 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options '-fPIC' -O3 -lineinfo -gencode=arch=compute_75,code=sm_75 -std=c++17 -c /kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu -o three_level_sm75.cuda.o 
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(135): warning #177-D: variable "full_rows" was declared but never referenced
+
+      const bool full_rows = row_base + kTile <= rows;
+
+                 ^
+
+
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(189): warning #177-D: variable "full_rows" was declared but never referenced
+
+    const bool full_rows = row_base + kTile <= rows;
+
+               ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(466): error: "packed_weights" has already been declared in the current scope
+
+          const int packed_weights =
+
+                    ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(467): error: identifier "w0" is undefined
+
+              (w0 & 0xff) | ((w1 & 0xff) << 8) |
+
+               ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(467): error: identifier "w1" is undefined
+
+              (w0 & 0xff) | ((w1 & 0xff) << 8) |
+
+                              ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(468): error: identifier "w2" is undefined
+
+              ((w2 & 0xff) << 16) | ((w3 & 0xff) << 24);
+
+                ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(468): error: identifier "w3" is undefined
+
+              ((w2 & 0xff) << 16) | ((w3 & 0xff) << 24);
+
+                                      ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(460): warning #177-D: variable "packed_weights" was declared but never referenced
+
+          const int packed_weights = *reinterpret_cast<const int*>(weights + k);
+
+                    ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(454): warning #177-D: variable "zero" was declared but never referenced
+
+        const int zero = static_cast<int>(zero_int4[channel * groups + group]);
+
+                  ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(276): warning #177-D: function "<unnamed>::three_level_tensorcore_reuse_kernel" was declared but never referenced
+
+            void three_level_tensorcore_reuse_kernel(
+
+                 ^
+
+
+
+5 errors detected in the compilation of "/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu".
+
+ninja: build stopped: subcommand failed.
+
+[1/2] /usr/local/cuda/bin/nvcc --generate-dependencies-with-compile --dependency-output three_level_sm75.cuda.o.d -DTORCH_EXTENSION_NAME=mixllm_sm75_backend -DTORCH_API_INCLUDE_EXTENSION_H -isystem /usr/local/lib/python3.12/dist-packages/torch/include -isystem /usr/local/lib/python3.12/dist-packages/torch/include/torch/csrc/api/include -isystem /usr/local/cuda/include -isystem /usr/include/python3.12 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options '-fPIC' -O3 -lineinfo -gencode=arch=compute_75,code=sm_75 -std=c++17 -c /kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu -o three_level_sm75.cuda.o 
+
+FAILED: [code=1] three_level_sm75.cuda.o 
+
+/usr/local/cuda/bin/nvcc --generate-dependencies-with-compile --dependency-output three_level_sm75.cuda.o.d -DTORCH_EXTENSION_NAME=mixllm_sm75_backend -DTORCH_API_INCLUDE_EXTENSION_H -isystem /usr/local/lib/python3.12/dist-packages/torch/include -isystem /usr/local/lib/python3.12/dist-packages/torch/include/torch/csrc/api/include -isystem /usr/local/cuda/include -isystem /usr/include/python3.12 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options '-fPIC' -O3 -lineinfo -gencode=arch=compute_75,code=sm_75 -std=c++17 -c /kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu -o three_level_sm75.cuda.o 
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(135): warning #177-D: variable "full_rows" was declared but never referenced
+
+      const bool full_rows = row_base + kTile <= rows;
+
+                 ^
+
+
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(189): warning #177-D: variable "full_rows" was declared but never referenced
+
+    const bool full_rows = row_base + kTile <= rows;
+
+               ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(466): error: "packed_weights" has already been declared in the current scope
+
+          const int packed_weights =
+
+                    ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(467): error: identifier "w0" is undefined
+
+              (w0 & 0xff) | ((w1 & 0xff) << 8) |
+
+               ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(467): error: identifier "w1" is undefined
+
+              (w0 & 0xff) | ((w1 & 0xff) << 8) |
+
+                              ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(468): error: identifier "w2" is undefined
+
+              ((w2 & 0xff) << 16) | ((w3 & 0xff) << 24);
+
+                ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(468): error: identifier "w3" is undefined
+
+              ((w2 & 0xff) << 16) | ((w3 & 0xff) << 24);
+
+                                      ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(460): warning #177-D: variable "packed_weights" was declared but never referenced
+
+          const int packed_weights = *reinterpret_cast<const int*>(weights + k);
+
+                    ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(454): warning #177-D: variable "zero" was declared but never referenced
+
+        const int zero = static_cast<int>(zero_int4[channel * groups + group]);
+
+                  ^
+
+
+
+/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu(276): warning #177-D: function "<unnamed>::three_level_tensorcore_reuse_kernel" was declared but never referenced
+
+            void three_level_tensorcore_reuse_kernel(
+
+                 ^
+
+
+
+5 errors detected in the compilation of "/kaggle/working/mixllm-3level/mixllm/kernels/three_level_sm75.cu".
+
+ninja: build stopped: subcommand failed.
+
+Traceback (most recent call last):
+
+  File "<string>", line 1, in <module>
+
+  File "/usr/local/lib/python3.12/dist-packages/papermill/execute.py", line 131, in execute_notebook
+
+    raise_for_execution_errors(nb, output_path)
+
+  File "/usr/local/lib/python3.12/dist-packages/papermill/execute.py", line 251, in raise_for_execution_errors
+
+    raise error
+
+papermill.exceptions.PapermillExecutionError: 
+
+---------------------------------------------------------------------------
+
+Exception encountered at "In [6]":
+
+---------------------------------------------------------------------------
+
+CalledProcessError                        Traceback (most recent call last)
+
+/usr/local/lib/python3.12/dist-packages/torch/utils/cpp_extension.py in _run_ninja_build(build_directory, verbose, error_prefix)
+
+   2692         stdout_fileno = 1
+
+-> 2693         subprocess.run(
+
+   2694             command,
+
+
+
+/usr/lib/python3.12/subprocess.py in run(input, capture_output, timeout, check, *popenargs, **kwargs)
+
+    570         if check and retcode:
+
+--> 571             raise CalledProcessError(retcode, process.args,
+
+    572                                      output=stdout, stderr=stderr)
+
+
+
+CalledProcessError: Command '['ninja', '-v']' returned non-zero exit status 1.
+
+
+
+The above exception was the direct cause of the following exception:
+
+
+
+RuntimeError                              Traceback (most recent call last)
+
+/tmp/ipykernel_23/2002635375.py in <cell line: 0>()
+
+      4     from mixllm.quantization.three_level import ThreeLevelAllocation, ThreeLevelBudget
+
+      5     from mixllm.sm75_backend import benchmark_sm75_backend, load_sm75_backend
+
+----> 6     load_sm75_backend(torch)
+
+      7     def make_case(n, width, counts, rows):
+
+      8         n4, n8, n16 = counts; assert n4 + n8 + n16 == n
+
+
+
+/kaggle/working/mixllm-3level/mixllm/sm75_backend.py in load_sm75_backend(torch_module, build_directory)
+
+     30         directory.mkdir(parents=True, exist_ok=True)
+
+     31         kwargs["build_directory"] = str(directory)
+
+---> 32     load(
+
+     33         name="mixllm_sm75_backend",
+
+     34         sources=[str(source)],
+
+
+
+/usr/local/lib/python3.12/dist-packages/torch/utils/cpp_extension.py in load(name, sources, extra_cflags, extra_cuda_cflags, extra_sycl_cflags, extra_ldflags, extra_include_paths, build_directory, verbose, with_cuda, with_sycl, is_python_module, is_standalone, keep_intermediates)
+
+   1765         ...     verbose=True)
+
+   1766     """
+
+-> 1767     return _jit_compile(
+
+   1768         name,
+
+   1769         [sources] if isinstance(sources, str) else sources,
+
+
+
+/usr/local/lib/python3.12/dist-packages/torch/utils/cpp_extension.py in _jit_compile(name, sources, extra_cflags, extra_cuda_cflags, extra_sycl_cflags, extra_ldflags, extra_include_paths, build_directory, verbose, with_cuda, with_sycl, is_python_module, is_standalone, keep_intermediates)
+
+   2205                         sources = list(hipified_sources)
+
+   2206 
+
+-> 2207                     _write_ninja_file_and_build_library(
+
+   2208                         name=name,
+
+   2209                         sources=sources,
+
+
+
+/usr/local/lib/python3.12/dist-packages/torch/utils/cpp_extension.py in _write_ninja_file_and_build_library(name, sources, extra_cflags, extra_cuda_cflags, extra_sycl_cflags, extra_ldflags, extra_include_paths, build_directory, verbose, with_cuda, with_sycl, is_standalone)
+
+   2360     if verbose:
+
+   2361         logger.info('Building extension module %s...', name)
+
+-> 2362     _run_ninja_build(
+
+   2363         build_directory,
+
+   2364         verbose,
+
+
+
+/usr/local/lib/python3.12/dist-packages/torch/utils/cpp_extension.py in _run_ninja_build(build_directory, verbose, error_prefix)
+
+   2708         if hasattr(error, 'output') and error.output:  # type: ignore[union-attr]
+
+   2709             message += f": {error.output.decode(*SUBPROCESS_DECODE_ARGS)}"  # type: ignore[union-attr]
+
+-> 2710         raise RuntimeError(message) from e
+
+   2711 
+
+   2712 
+
+
+
+RuntimeError: Error building extension 'mixllm_sm75_backend'
+
+
+
+/usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\|'
+
+  cells[i][c] = re.sub('\\\\\|', '|', cell)
+
+/usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\_'
+
+  text = re.sub(r'_', '\_', text) # Escape underscores in display text
+
+[NbConvertApp] Converting notebook __notebook__.ipynb to notebook
+
+[NbConvertApp] Writing 178221 bytes to __notebook__.ipynb
+
+[NbConvertApp] Converting notebook __notebook__.ipynb to html
+
+[NbConvertApp] Writing 630330 bytes to __results__.html
+

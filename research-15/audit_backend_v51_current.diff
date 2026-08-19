@@ -1,0 +1,44 @@
+﻿diff --git "a/C:\\Users\\User\\Downloads\\Multi-main\\Multi-main\\research-15\\versions\\v86_branch_hoist\\sm75_backend.before.py" "b/C:\\Users\\User\\Downloads\\Multi-main\\Multi-main\\shmq-ultimate\\external\\MixLLM\\mixllm\\sm75_backend.py"
+index 2b6389b..69a1228 100644
+--- "a/C:\\Users\\User\\Downloads\\Multi-main\\Multi-main\\research-15\\versions\\v86_branch_hoist\\sm75_backend.before.py"
++++ "b/C:\\Users\\User\\Downloads\\Multi-main\\Multi-main\\shmq-ultimate\\external\\MixLLM\\mixllm\\sm75_backend.py"
+@@ -29,17 +29,28 @@ def load_sm75_backend(torch_module, build_directory: Optional[str | Path] = None
+         directory = Path(build_directory)
+         directory.mkdir(parents=True, exist_ok=True)
+         kwargs["build_directory"] = str(directory)
+-    load(
+-        name="mixllm_sm75_backend",
+-        sources=[str(source)],
+-        extra_cuda_cflags=["-O3", "-lineinfo", "-gencode=arch=compute_75,code=sm_75"],
+-        extra_cflags=["-O3"],
+-        is_python_module=False,
+-        verbose=True,
+-        **kwargs,
+-    )
+-    _LOADED = True
+-
++    try:
++        load(
++          name="mixllm_sm75_backend",
++          sources=[str(source)],
++          extra_cuda_cflags=["-O3", "-lineinfo", "-gencode=arch=compute_75,code=sm_75"],
++          extra_cflags=["-O3"],
++          is_python_module=False,
++          verbose=True,
++          **kwargs,
++      )
++        _LOADED = True
++    except Exception:
++        import traceback
++        import subprocess
++        roots = [Path('/root/.cache/torch_extensions'), Path('/kaggle/working'), Path('/tmp')]
++        candidates = [p for root in roots if root.exists() for p in root.rglob('build.ninja')]
++        if candidates:
++            ninja_file = candidates[0]
++            diag = subprocess.run(['ninja', '-v'], cwd=str(ninja_file.parent), capture_output=True, text=True)
++            Path('/kaggle/working/sm75_ninja_diagnostic.txt').write_text(diag.stdout + '\n' + diag.stderr, encoding='utf-8')
++        Path('/kaggle/working/sm75_build_traceback.txt').write_text(traceback.format_exc(), encoding='utf-8')
++        raise
+ 
+ def quantize_activation(x, torch_module, group_size: int = 128):
+     """Reference symmetric per-row, per-group INT8 activation quantization."""

@@ -1,0 +1,7 @@
+﻿# v63 cached contiguous packed ABI
+
+Original-first finding: original LinearMixLLM passes its packed buffers directly into the upstream CUDA op after one .contiguous() normalization. Our SM75 wrapper rebuilds the 9-tensor packed tuple and evaluates a contiguous conversion generator on every forward call, in addition to validation. This is a concrete host-side difference visible in original_linear.py versus sm75_backend.py.
+
+Single hypothesis: cache the contiguous packed tensor tuple on the module, keyed by tensor identity/version, so unchanged inference forwards pass the same buffers without repeated tuple/conversion work. No kernel arithmetic, weights, model, inputs, or benchmark settings change; mutation invalidation remains enforced by the version key.
+
+Falsification: correctness must pass and end-to-end timing must improve versus v51; otherwise reject.

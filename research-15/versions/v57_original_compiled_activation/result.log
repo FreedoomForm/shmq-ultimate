@@ -1,0 +1,8 @@
+﻿# v57 result
+
+Kaggle output: output-1787023523, kernel version 78.
+Original-first finding: original_linear.py uses @torch.compile activation quantization with the same groupwise absmax/127 contract; v57 replaced only the native activation dispatch with a compiled helper.
+
+Correctness: sm75_native_correctness passed and embedded tests passed. Performance: mixed decode GEMM passed, but mixed decode end-to-end failed and mixed prefill end-to-end failed. The measured activation p50 was not an improvement; the compiled path added overhead in the gate. terminal_decision was no_go.
+
+Decision: reject v57 and restore v51. No quality model, computation, input, or benchmark setting was changed.

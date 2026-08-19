@@ -1,0 +1,8 @@
+﻿# v70 result
+
+Kaggle output: output-1787029663, kernel version 88.
+Original-first finding: original CUTLASS uses CTA tile reuse, and the current source contains an 8-warp reuse kernel. v70 routed all rows>1 prefill to that kernel with a 32-row grid.
+
+Correctness: passed. Mixed decode GEMM and decode end-to-end passed. Mixed prefill end-to-end failed; smoke rows=128 e2e was about 1.708 ms and the required prefill gate failed. No all-gate speedup is accepted.
+
+Decision: reject v70 and restore v51. The existing reuse kernel is not a drop-in replacement for the current prefill path under the tested ABI/layout.

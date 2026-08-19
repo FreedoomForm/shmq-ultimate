@@ -1,0 +1,6 @@
+DIFFERENTIAL_AUDIT original=MixLLM HEAD~1, ours=ee7a0d4
+1. Original CUTLASS gemm documents weight column-major and uses INT4 32-column plus INT8 8-column interleave before packing. Our SM75 custom kernel uses direct row-major channel storage and does not reuse that interleave.
+2. Original activation quantization uses int8 A with scale_act shape [K/128, M_even], external quantization, then native gemm. Our SM75 path also quantizes externally but custom kernel consumes unpadded [K/128, M] scale layout.
+3. Original mixed CUTLASS gemm returns column-oriented C for mixed int4/int8 and LinearMixLLM transposes it. Our SM75 kernel writes row-oriented [M,N] directly; correctness tests cover our own reference but this is an integration contract difference.
+4. Critical vLLM mismatch: custom 0002 patch apply reconstructs dense float32 weight and returns F.linear; it never calls the native SM75 _three_level_linear_v2 ABI. Therefore custom vLLM is not native three-level inference and must not be speed evidence.
+5. v40 occupancy submission is superseded and not accepted until this audit is used.

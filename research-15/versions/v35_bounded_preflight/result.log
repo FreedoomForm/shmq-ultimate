@@ -1,0 +1,6 @@
+v35 STATUS=NO_GO_NATIVE_BENCHMARK_NOT_RUN 
+HYPOTHESIS=bound_broad_embedded_unittest_discovery 
+RESULT=preflight_timeout_removed; notebook_reached_sm75_nvcc_build 
+QUALITY=not_run 
+TERMINAL_DECISION=no_go 
+REASON=production_requires_native_correctness_plus_mixed_decode_and_prefill_end_to_end_performance 

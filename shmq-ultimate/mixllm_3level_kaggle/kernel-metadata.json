@@ -1,11 +1,11 @@
 {
-  "id": "freedomform/mixllm-3-level-reference-gate",
-  "title": "MixLLM 3 Level Reference Gate",
+  "id": "freedomform/mixllm-3-level-real-t4-gate",
+  "title": "MixLLM 3 Level Real T4 Gate",
   "code_file": "mixllm_3level_gate.ipynb",
   "language": "python",
   "kernel_type": "notebook",
   "is_private": true,
   "enable_gpu": true,
-  "enable_internet": true,
+  "enable_internet": false,
   "machine_shape": "NvidiaTeslaT4"
 }

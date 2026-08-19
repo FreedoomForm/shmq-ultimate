@@ -1,0 +1,5 @@
+﻿# v72 audit-only
+
+Original-first finding: mq_mma_multistage.h declares minimum architecture Sm80 to support cp.async and uses cp_async/cp_async_fence/cp_async_wait. The original multistage implementation is therefore not a valid direct SM75/T4 implementation.
+
+Decision: no code change and no Kaggle run. Do not port the original SM80 pipeline blindly. Keep v51 until a genuinely SM75-compatible staged loader is designed and validated.

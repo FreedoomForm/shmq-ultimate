@@ -1,0 +1,18 @@
+﻿# v46 — four decode warps result
+
+## T4 execution
+- IS_T4 True.
+- TESTS_RETURNCODE 0.
+- sm75_native_correctness: passed.
+- sm75_native_benchmarks: passed.
+- ull_model_qwen_quality: not_run.
+- 	erminal_decision: no_go.
+
+## Performance
+- 16 unchanged Qwen/Qwen2.5-0.5B scenarios.
+- Best GEMM-only p50 speedup: 1.5966406982x.
+- Best end-to-end p50 speedup: 1.1973244410x.
+- Compared with v45, end-to-end is effectively unchanged and GEMM-only is lower than v45 1.6451612828x.
+
+## Decision
+Reject v46 as no meaningful improvement over v45. Restore v45 (kDecodeWarps=8, kDecodeChannelsPerWarp=2) and continue the differential audit.

@@ -1,0 +1,88 @@
+Comparing files RESEARCH-15\VERSIONS\V86_BRANCH_HOIST\three_level_sm75.before.cu and SHMQ-ULTIMATE\EXTERNAL\MIXLLM\MIXLLM\KERNELS\THREE_LEVEL_SM75.CU
+***** RESEARCH-15\VERSIONS\V86_BRANCH_HOIST\three_level_sm75.before.cu
+   13:  #include <mma.h>
+   14:  
+***** SHMQ-ULTIMATE\EXTERNAL\MIXLLM\MIXLLM\KERNELS\THREE_LEVEL_SM75.CU
+   13:  #include <mma.h>
+   14:  #include "sm75_cutlass_testbed.h"
+   15:  
+*****
+
+***** RESEARCH-15\VERSIONS\V86_BRANCH_HOIST\three_level_sm75.before.cu
+  571:  
+  572:  at::Tensor three_level_linear_v2_core(
+  573:      const at::Tensor& input_fp16, const at::Tensor& input_int8,
+***** SHMQ-ULTIMATE\EXTERNAL\MIXLLM\MIXLLM\KERNELS\THREE_LEVEL_SM75.CU
+  572:  
+  573:  void run_cutlass_int_partition(
+  574:      const at::Tensor& input_int8, const at::Tensor& scale_act,
+  575:      const at::Tensor& weight, const at::Tensor& scale,
+  576:      const at::Tensor& zero, const at::Tensor& indices,
+  577:      at::Tensor& output, int rows, int width, cudaStream_t stream) {
+  578:    if (indices.numel() == 0) {
+  579:      return;
+  580:    }
+  581:    auto matrix_A = input_int8;
+  582:    auto matrix_B = weight;
+  583:    auto matrix_scale_act = scale_act;
+  584:    // The project ABI stores weight metadata as [channels, groups], while
+  585:    // the upstream CUTLASS iterator consumes [groups, channels]. Convert the
+  586:    // layout explicitly; values and quantization semantics are unchanged.
+  587:    auto matrix_scale = scale.transpose(0, 1).contiguous();
+  588:    auto matrix_zero = zero.numel() ? zero.transpose(0, 1).contiguous() : zero;
+  589:    auto matrix_indices = indices;
+  590:    shmq_cutlass_sm75::Int8Runner::run(
+  591:        rows, static_cast<int>(indices.numel()), width,
+  592:        matrix_A, matrix_B, matrix_scale_act, matrix_scale,
+  593:        matrix_zero, matrix_indices, output, stream);
+  594:  }
+  595:  
+  596:  at::Tensor three_level_linear_v2_core(
+  597:  
+  598:      const at::Tensor& input_fp16, const at::Tensor& input_int8,
+*****
+
+***** RESEARCH-15\VERSIONS\V86_BRANCH_HOIST\three_level_sm75.before.cu
+  677:          output_width, n4, n8, n16);
+  678:    } else {
+***** SHMQ-ULTIMATE\EXTERNAL\MIXLLM\MIXLLM\KERNELS\THREE_LEVEL_SM75.CU
+  702:          output_width, n4, n8, n16);
+  703:      } else if (width % 64 == 0 && (n4 > 0 || n8 > 0)) {
+  704:      // Complete SM75 CUTLASS-style path for the integer prefill partitions.
+  705:      // INT4 consumes the same exact expanded signed-INT8 cache as v51.
+  706:      run_cutlass_int_partition(
+  707:          input_int8, scale_act, expanded_int4, scale_int4, zero_int4,
+  708:          indices_int4, output, rows, width, stream.stream());
+  709:      run_cutlass_int_partition(
+  710:          input_int8, scale_act, weight_int8, scale_int8, zero_int4,
+  711:          indices_int8, output, rows, width, stream.stream());
+  712:      if (n16 > 0) {
+  713:        const dim3 grid_fp16(
+  714:            (n16 + kPrefillChannels - 1) / kPrefillChannels,
+  715:            (rows + 15) / 16);
+  716:        three_level_tensorcore_kernel<<<grid_fp16, kPrefillWarps * kWarpSize, 0,
+  717:                                       stream>>>(
+  718:            reinterpret_cast<const __half*>(input_fp16.data_ptr<at::Half>()),
+  719:            input_int8.data_ptr<int8_t>(),
+  720:            reinterpret_cast<const __half*>(scale_act.data_ptr<at::Half>()),
+  721:            expanded_int4.data_ptr<int8_t>(),
+  722:            reinterpret_cast<const __half*>(scale_int4.data_ptr<at::Half>()),
+  723:            indices_int4.data_ptr<int32_t>(), weight_int8.data_ptr<int8_t>(),
+  724:            reinterpret_cast<const __half*>(scale_int8.data_ptr<at::Half>()),
+  725:            indices_int8.data_ptr<int32_t>(),
+  726:            reinterpret_cast<const __half*>(weight_fp16.data_ptr<at::Half>()),
+  727:            indices_fp16.data_ptr<int32_t>(), output.data_ptr<float>(), rows, width,
+  728:            output_width, 0, 0, n16);
+  729:      }
+  730:    } else {
+*****
+
+***** RESEARCH-15\VERSIONS\V86_BRANCH_HOIST\three_level_sm75.before.cu
+  684:      three_level_tensorcore_kernel<<<grid, kPrefillWarps * kWarpSize, 0, stream>>>(
+  685:        reinterpret_cast<const __half*>(input_fp16.data_ptr<at::Half>()),
+***** SHMQ-ULTIMATE\EXTERNAL\MIXLLM\MIXLLM\KERNELS\THREE_LEVEL_SM75.CU
+  736:      three_level_tensorcore_kernel<<<grid, kPrefillWarps * kWarpSize, 0, stream>>>(
+  737:  
+  738:        reinterpret_cast<const __half*>(input_fp16.data_ptr<at::Half>()),
+*****
+

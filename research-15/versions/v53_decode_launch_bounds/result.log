@@ -1,0 +1,16 @@
+﻿# v53 — decode launch bounds result
+
+## T4 execution
+- IS_T4 True.
+- TESTS_RETURNCODE 0.
+- sm75_native_correctness: passed.
+- sm75_native_benchmarks: passed.
+- 	erminal_decision: no_go.
+
+## Performance
+- Best GEMM-only p50 speedup: 1.4448871101x.
+- Best end-to-end p50 speedup: 1.2092905642x.
+- Below v51 best end-to-end 1.2209821815x and far below the 2.6x target.
+
+## Decision
+Reject launch-bounds-only change and restore v51 baseline.

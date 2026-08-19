@@ -1,0 +1,8 @@
+﻿# v66 result
+
+Kaggle output: output-1787028531, kernel version 86.
+Original-first finding: original CUTLASS uses separate INT4/INT8 MmaCore instantiations while the current first prefill kernel has runtime precision selection. The scoped pointer-hoist edit was restricted to the first kernel region.
+
+Result: Kaggle nvcc failed before execution at three_level_sm75.cu(223): error: expected a statement, with parser recovery warning at line 240. No correctness or performance result exists.
+
+Decision: reject v66 as a compile failure and restore v51. Do not retain the partial edit.

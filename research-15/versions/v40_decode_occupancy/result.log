@@ -1,0 +1,3 @@
+v40 STATUS=SUPERSEDED_BEFORE_ACCEPTANCE 
+REASON=mandatory_differential_audit_original_sm80_vs_our_sm75 
+RULE=do_not_use_v40_as_optimization_evidence_until_audit 

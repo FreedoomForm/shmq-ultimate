@@ -1,0 +1,615 @@
+﻿
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\kernels.cu
+LineNumber : 524
+Line       :           torch::Tensor &matrix_B_interleaved) {
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\kernels.cu
+LineNumber : 539
+Line       :       matrix_B_int8, matrix_B_interleaved);
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\kernels.cu
+LineNumber : 556
+Line       :          "Tensor matrix_B_int8, Tensor matrix_B_interleaved) -> Te
+             nsor");
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mix_mma_config.h
+LineNumber : 14
+Line       :     matrix_B_int8, matrix_B_interleaved)
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mix_mma_config.h
+LineNumber : 122
+Line       :     matrix_B_int8, matrix_B_interleaved)
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mix_mma_multistage.cuh
+LineNumber : 60
+Line       :                 torch::Tensor &matrix_B_interleaved) {
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mix_mma_multistage.cuh
+LineNumber : 65
+Line       :         matrix_B_int8, matrix_B_interleaved);
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mix_mma_multistage.cuh
+LineNumber : 78
+Line       :                 torch::Tensor &matrix_B_interleaved);
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mix_mma_multistage.cuh
+LineNumber : 156
+Line       :                     torch::Tensor &matrix_B_interleaved);
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mix_mma_multistage.cuh
+LineNumber : 172
+Line       :                     torch::Tensor &matrix_B_interleaved);
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mix_mma_multistage.cuh
+LineNumber : 188
+Line       :                    torch::Tensor &matrix_B_interleaved){
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mix_mma_multistage.cuh
+LineNumber : 229
+Line       :   assert(matrix_B_interleaved.size(0) == options.partial_n_int4 &&
+              matrix_B_interleaved.size(1) * 2 == k);
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mix_mma_multistage.cuh
+LineNumber : 246
+Line       :     mixllm_int4.run(grid_int4, block, options, matrix_A, matrix_B_
+             interleaved, 
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mix_mma_multistage.cuh
+LineNumber : 276
+Line       :                    torch::Tensor &matrix_B_interleaved){
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mix_mma_multistage.cuh
+LineNumber : 317
+Line       :   assert(matrix_B_interleaved.size(0) == options.partial_n_int4 &&
+              matrix_B_interleaved.size(1) * 2 == k);
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mix_mma_multistage.cuh
+LineNumber : 334
+Line       :     mixllm_int4.run(grid_int4, block, options, matrix_A, matrix_B_
+             interleaved, 
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mix_mma_multistage.cuh
+LineNumber : 363
+Line       :                    torch::Tensor &matrix_B_interleaved){
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mix_mma_multistage.cuh
+LineNumber : 456
+Line       :           matrix_B_int8, matrix_B_interleaved);
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mix_mma_multistage.cuh
+LineNumber : 519
+Line       :           matrix_B_int8, matrix_B_interleaved);
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mma_multistage_testbed.h
+LineNumber : 405
+Line       :       torch::Tensor &matrix_B_interleaved,
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mma_multistage_testbed.h
+LineNumber : 429
+Line       :             reinterpret_cast<ElementB*>(matrix_B_interleaved.data_
+             ptr()),
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mma_multistage_testbed.h
+LineNumber : 554
+Line       :       torch::Tensor &matrix_B_interleaved,
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\mma_multistage_testbed.h
+LineNumber : 578
+Line       :             reinterpret_cast<ElementB*>(matrix_B_interleaved.data_
+             ptr()),
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 158
+Line       :     cutlass::HostTensor<ElementB_INT4, LayoutB> matrix_B_interleav
+             ed(matrix_B_int4.extent());
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 159
+Line       :     cutlass::HostTensor<ElementB_INT4, LayoutB> matrix_B_interleav
+             ed_tmp(matrix_B_int4.extent());
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 188
+Line       :           matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i+12,
+             j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 191
+Line       :           matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i-4,j
+             });
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 194
+Line       :           matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i+8,j
+             });
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 197
+Line       :           matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i-8,j
+             });
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 200
+Line       :           matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i+4,j
+             });
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 203
+Line       :           matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i-12,
+             j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 206
+Line       :           matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i,j})
+             ;
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 208
+Line       :         matrix_B_interleaved_tmp.at({i,j}) = matrix_B_interleaved.
+             at({i,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 214
+Line       :         matrix_B_interleaved.at({i+0,j}) = matrix_B_interleaved_tm
+             p.at({i+0,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 215
+Line       :         matrix_B_interleaved.at({i+1,j}) = matrix_B_interleaved_tm
+             p.at({i+4,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 216
+Line       :         matrix_B_interleaved.at({i+2,j}) = matrix_B_interleaved_tm
+             p.at({i+1,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 217
+Line       :         matrix_B_interleaved.at({i+3,j}) = matrix_B_interleaved_tm
+             p.at({i+5,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 218
+Line       :         matrix_B_interleaved.at({i+4,j}) = matrix_B_interleaved_tm
+             p.at({i+2,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 219
+Line       :         matrix_B_interleaved.at({i+5,j}) = matrix_B_interleaved_tm
+             p.at({i+6,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 220
+Line       :         matrix_B_interleaved.at({i+6,j}) = matrix_B_interleaved_tm
+             p.at({i+3,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 221
+Line       :         matrix_B_interleaved.at({i+7,j}) = matrix_B_interleaved_tm
+             p.at({i+7,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 265
+Line       :     matrix_B_interleaved.sync_device();
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 286
+Line       :     mixllm_int4.run(grid_int4, block, matrix_A, matrix_B_interleav
+             ed, 
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             .cu
+LineNumber : 330
+Line       :         mixllm_int4.run(grid_int4, block, matrix_A, matrix_B_inter
+             leaved, 
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 169
+Line       :         cutlass::HostTensor<ElementB_INT4, LayoutB> matrix_B_inter
+             leaved(matrix_B_int4.extent());
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 170
+Line       :         cutlass::HostTensor<ElementB_INT4, LayoutB> matrix_B_inter
+             leaved_tmp(matrix_B_int4.extent());
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 199
+Line       :               matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i
+             +12,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 202
+Line       :               matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i
+             -4,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 205
+Line       :               matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i
+             +8,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 208
+Line       :               matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i
+             -8,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 211
+Line       :               matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i
+             +4,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 214
+Line       :               matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i
+             -12,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 217
+Line       :               matrix_B_interleaved.at({i,j}) = matrix_B_int4.at({i
+             ,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 219
+Line       :             matrix_B_interleaved_tmp.at({i,j}) = matrix_B_interlea
+             ved.at({i,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 225
+Line       :             matrix_B_interleaved.at({i+0,j}) = matrix_B_interleave
+             d_tmp.at({i+0,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 226
+Line       :             matrix_B_interleaved.at({i+1,j}) = matrix_B_interleave
+             d_tmp.at({i+4,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 227
+Line       :             matrix_B_interleaved.at({i+2,j}) = matrix_B_interleave
+             d_tmp.at({i+1,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 228
+Line       :             matrix_B_interleaved.at({i+3,j}) = matrix_B_interleave
+             d_tmp.at({i+5,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 229
+Line       :             matrix_B_interleaved.at({i+4,j}) = matrix_B_interleave
+             d_tmp.at({i+2,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 230
+Line       :             matrix_B_interleaved.at({i+5,j}) = matrix_B_interleave
+             d_tmp.at({i+6,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 231
+Line       :             matrix_B_interleaved.at({i+6,j}) = matrix_B_interleave
+             d_tmp.at({i+3,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 232
+Line       :             matrix_B_interleaved.at({i+7,j}) = matrix_B_interleave
+             d_tmp.at({i+7,j});
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 276
+Line       :         matrix_B_interleaved.sync_device();
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 297
+Line       :         mixllm_int4.run(grid_int4, block, matrix_A, matrix_B_inter
+             leaved, 
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mix_mma_multistage
+             _search.cu
+LineNumber : 342
+Line       :             mixllm_int4.run(grid_int4, block, matrix_A, matrix_B_i
+             nterleaved, 
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mma_multistage_tes
+             tbed.h
+LineNumber : 467
+Line       :       cutlass::HostTensor<ElementB, LayoutB> &matrix_B_interleaved
+             ,
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mma_multistage_tes
+             tbed.h
+LineNumber : 476
+Line       :     typename IteratorB::Params params_B(matrix_B_interleaved.layou
+             t());
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mma_multistage_tes
+             tbed.h
+LineNumber : 487
+Line       :             matrix_B_interleaved.device_ref(), params_scale, matri
+             x_scale.device_data(),
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mma_multistage_tes
+             tbed.h
+LineNumber : 631
+Line       :       cutlass::HostTensor<ElementB, LayoutB> &matrix_B_interleaved
+             ,
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mma_multistage_tes
+             tbed.h
+LineNumber : 640
+Line       :     typename IteratorB::Params params_B(matrix_B_interleaved.layou
+             t());
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\kernels\cutlass_extension\test\mma_multistage_tes
+             tbed.h
+LineNumber : 651
+Line       :             matrix_B_interleaved.device_ref(), params_scale, matri
+             x_scale.device_data(),
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\nn\modules\linear.py
+LineNumber : 122
+Line       :         matrix_B_interleaved = matrix_B_int4.clone()
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\nn\modules\linear.py
+LineNumber : 142
+Line       :         matrix_B_interleaved = matrix_B_int4[:, interleaved_index]
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\nn\modules\linear.py
+LineNumber : 143
+Line       :         matrix_B_interleaved_tmp = matrix_B_interleaved.clone()
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\nn\modules\linear.py
+LineNumber : 155
+Line       :         matrix_B_interleaved = matrix_B_interleaved_tmp[:, interle
+             aved_index]
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\nn\modules\linear.py
+LineNumber : 157
+Line       :         return self.pack_uint4_for_cutlass(matrix_B_interleaved)
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\nn\modules\__pycache__\linear.cpython-313.pyc
+LineNumber : 69
+Line       : matrix_B_int4�matrix_B_interleaved�interleaved_index�i�i_sub�
+             matrix_B_interleaved_tmps          r7   r.   �)LinearMixLLM.inter
+             leave_uint4_for_cutlassy   s�  � �,�2�2�4�����}�*�*
+             �1�-�.�A���F�E���z�e�a�i�!�(�(��R��0��!����
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\test_kernel.py
+LineNumber : 36
+Line       :     matrix_B_interleaved = matrix_B_int4.clone()
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\test_kernel.py
+LineNumber : 56
+Line       :     matrix_B_interleaved = matrix_B_int4[:, interleaved_index]
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\test_kernel.py
+LineNumber : 57
+Line       :     matrix_B_interleaved_tmp = matrix_B_interleaved.clone()
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\test_kernel.py
+LineNumber : 69
+Line       :     matrix_B_interleaved = matrix_B_interleaved_tmp[:, interleaved
+             _index]
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\test_kernel.py
+LineNumber : 71
+Line       :     return pack_uint4_for_cutlass(matrix_B_interleaved)
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\test_kernel.py
+LineNumber : 121
+Line       :     matrix_B_interleaved = interleave_uint4_for_cutlass(matrix_B_i
+             nt4)
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\test_kernel.py
+LineNumber : 132
+Line       :     print(f"shape of matrix_B_interleaved: {matrix_B_interleaved.s
+             hape}")
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\test_kernel.py
+LineNumber : 146
+Line       :         matrix_B_int8, matrix_B_interleaved)
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\test_kernel.py
+LineNumber : 153
+Line       :             matrix_B_int8, matrix_B_interleaved)
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\test_kernel_no_cudagraph.py
+LineNumber : 38
+Line       :     matrix_B_interleaved = matrix_B_int4.clone()
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\test_kernel_no_cudagraph.py
+LineNumber : 58
+Line       :     matrix_B_interleaved = matrix_B_int4[:, interleaved_index]
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\test_kernel_no_cudagraph.py
+LineNumber : 59
+Line       :     matrix_B_interleaved_tmp = matrix_B_interleaved.clone()
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\test_kernel_no_cudagraph.py
+LineNumber : 71
+Line       :     matrix_B_interleaved = matrix_B_interleaved_tmp[:, interleaved
+             _index]
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\test_kernel_no_cudagraph.py
+LineNumber : 73
+Line       :     return pack_uint4_for_cutlass(matrix_B_interleaved)
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\test_kernel_no_cudagraph.py
+LineNumber : 123
+Line       :     matrix_B_interleaved = interleave_uint4_for_cutlass(matrix_B_i
+             nt4)
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\test_kernel_no_cudagraph.py
+LineNumber : 147
+Line       :         matrix_B_interleaved)
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\test_kernel_no_cudagraph.py
+LineNumber : 160
+Line       :         matrix_B_interleaved)
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\__pycache__\test_kernel.cpython-313.pyc
+LineNumber : 36
+Line       : matrix_B_int4�matrix_B_interleaved�interleaved_index�i�i_sub�
+             matrix_B_interleaved_tmps         r   �interleave_uint4_for_cut
+             lassr2   #   s�  � �(�.�.�0����
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\__pycache__\test_kernel.cpython-313.pyc
+LineNumber : 44
+Line       :  ��� � ��#�� � ��Q��'�� � ��Q��'�� � ��Q
+             ��'�� � ��Q��'�� � ��Q��'�� � ��Q��'�� �
+              ��Q��'� !� 4�A�7H�4H�I��!�"6�7�7r   �__main__i���
+             �r   r   �   zcuda:0)�dtype�deviceg�������?r   r   r%   r
+                zshape of matrix_A: zshape of matrix_scale_act: zshape of ma
+             trix_zero: zshape of matrix_scale_int8: zshape of matrix_scale_i
+             nt4: zshape of matrix_indices_int8: zshape of matrix_indices_int
+             4: zshape of matrix_B_int8: zshape of matrix_B_int4: zshape of 
+             matrix_B_interleaved: z	latency =z%.2fzms,g    e��A�TFLOPsg���
+             Q��?g����Mb`?)�rtol�atolzPassed!g����MbP?zFailed!zPassed, wi
+             thin tolerance!)T�torch�mixllm�argparse�mixllm.nn.modules.util
+             sr   r   �ArgumentParser�parser�add_argument�int�float�
+
+Path       : C:\Users\User\Downloads\Multi-main\Multi-main\shmq-ultimate\extern
+             al\MixLLM\mixllm\test\__pycache__\test_kernel_no_cudagraph.cpython
+             -313.pyc
+LineNumber : 27
+Line       : matrix_B_int4�matrix_B_interleaved�interleaved_index�i�i_sub�
+             matrix_B_interleaved_tmps         r   �interleave_uint4_for_cut
+             lassr2   %   s�  � �(�.�.�0����
+
+
+

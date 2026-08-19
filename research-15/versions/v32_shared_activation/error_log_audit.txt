@@ -1,0 +1,6 @@
+V32_ERROR_LOG_AUDIT 
+FULL_V32_KAGGLE_LOG=not_available 
+LOCAL_V32_OUTPUT_DIRECTORY=not_found 
+LAST_REMOTE_STATUS=KernelWorkerStatus.CANCEL_ACKNOWLEDGED 
+AVAILABLE_EVIDENCE=local_validation.log,model_audit.txt,and prior output logs only 
+CONCLUSION=No traceback, compile error, or model-loading error can be attributed to v32 without the missing Kaggle artifact

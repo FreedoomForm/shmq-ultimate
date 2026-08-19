@@ -1,0 +1,5 @@
+﻿# v69 audit-only
+
+Original-first finding: original_linear.py receives column-oriented GEMM output and explicitly calls mixllm.nn.modules.ops.transpose for selected sizes or output.t().contiguous otherwise. Current SM75 writes row-oriented output directly at output[row * output_width + output_channel] for prefill and output[output_channel] for decode.
+
+Decision: current direct row-oriented store already removes the original transpose overhead; changing it toward the original column layout would add work rather than address the slowdown. No code change or measurement. v51 remains baseline.

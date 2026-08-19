@@ -1,0 +1,13 @@
+﻿diff --git "a/C:\\Users\\User\\Downloads\\Multi-main\\Multi-main\\research-15\\versions\\v51_decode_expanded_cache_contract\\sm75_backend.before.py" "b/C:\\Users\\User\\Downloads\\Multi-main\\Multi-main\\research-15\\versions\\v52_decode_precision_tiled_blocks\\sm75_backend.before.py"
+index fead09e..2b6389b 100644
+--- "a/C:\\Users\\User\\Downloads\\Multi-main\\Multi-main\\research-15\\versions\\v51_decode_expanded_cache_contract\\sm75_backend.before.py"
++++ "b/C:\\Users\\User\\Downloads\\Multi-main\\Multi-main\\research-15\\versions\\v52_decode_precision_tiled_blocks\\sm75_backend.before.py"
+@@ -138,7 +138,7 @@ def _validate_partition(module, x, torch_module):
+ 
+ def _expanded_int4_for_prefill(module, x, torch_module):
+     """Expand packed INT4 once per packed state/device for the SM75 prefill path."""
+-    if x.shape[0] == 1 or not module.indices_4.numel():
++    if not module.indices_4.numel():
+         # Decode does not read this argument. Empty INT4 prefill still needs the
+         # ABI-compatible [0, K] shape without allocating a separate tensor.
+         return module.weight_int8[:0]

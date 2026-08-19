@@ -1,0 +1,2 @@
+SCENARIO=qwen_qkv_mixed_4_8_16
+SCENARIO=smoke_mixed_4_8_16
