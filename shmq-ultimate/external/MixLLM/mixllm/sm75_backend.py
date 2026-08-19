@@ -36,19 +36,40 @@ def load_sm75_backend(torch_module, build_directory: Optional[str | Path] = None
             )
         import base64
         import io
+        import shutil
         import zipfile
 
-        extraction_root = source.parents[2].resolve()
-        with zipfile.ZipFile(
-            io.BytesIO(base64.b64decode(vendor_archive.read_bytes()))
-        ) as archive:
-            for member in archive.infolist():
-                target = (extraction_root / member.filename).resolve()
-                if target != extraction_root and extraction_root not in target.parents:
-                    raise RuntimeError(
-                        f"refusing unsafe CUTLASS archive member: {member.filename}"
-                    )
-            archive.extractall(extraction_root)
+        # The archive is a source bundle, not a safe project-root overlay: it also
+        # contains historical copies of sm75_cutlass_testbed.h and the custom
+        # cutlass_extension headers.  Extract into a private staging directory and
+        # copy only its vendor CUTLASS subtree, so current project sources remain
+        # authoritative.
+        staging_root = source.parent / ".cutlass_vendor_staging"
+        staged_vendor_root = staging_root / "mixllm" / "kernels" / "cutlass"
+        if staging_root.exists():
+            shutil.rmtree(staging_root)
+        staging_root.mkdir(parents=True, exist_ok=True)
+        try:
+            with zipfile.ZipFile(
+                io.BytesIO(base64.b64decode(vendor_archive.read_bytes()))
+            ) as archive:
+                for member in archive.infolist():
+                    target = (staging_root / member.filename).resolve()
+                    if target != staging_root and staging_root not in target.parents:
+                        raise RuntimeError(
+                            f"refusing unsafe CUTLASS archive member: {member.filename}"
+                        )
+                archive.extractall(staging_root)
+            if not staged_vendor_root.is_dir():
+                raise RuntimeError(
+                    "CUTLASS vendor archive did not provide its expected vendor subtree"
+                )
+            if vendor_root.exists():
+                shutil.rmtree(vendor_root)
+            shutil.copytree(staged_vendor_root, vendor_root)
+        finally:
+            if staging_root.exists():
+                shutil.rmtree(staging_root)
         if not vendor_header.exists():
             raise RuntimeError(
                 f"CUTLASS vendor archive did not provide {vendor_header}"

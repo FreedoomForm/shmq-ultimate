@@ -6,17 +6,18 @@ class V51AuditContractTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         package_root = Path(__file__).resolve().parents[1]
-        repo_candidates = [
-            package_root.parents[3],
-            Path.cwd(),
-        ]
-        repo_root = next(
-            candidate for candidate in repo_candidates
-            if (candidate / "scripts" / "build_mixllm_3level_kaggle.py").exists()
+        repo_candidates = [package_root.parents[3], Path.cwd()]
+        builder_path = next(
+            (
+                candidate / "scripts" / "build_mixllm_3level_kaggle.py"
+                for candidate in repo_candidates
+                if (candidate / "scripts" / "build_mixllm_3level_kaggle.py").exists()
+            ),
+            None,
         )
         cls.backend = (package_root / "sm75_backend.py").read_text(encoding="utf-8")
         cls.cuda = (package_root / "kernels" / "three_level_sm75.cu").read_text(encoding="utf-8")
-        cls.builder = (repo_root / "scripts" / "build_mixllm_3level_kaggle.py").read_text(encoding="utf-8")
+        cls.builder = builder_path.read_text(encoding="utf-8") if builder_path else ""
 
     def test_v51_decode_keeps_packed_int4_and_skips_expansion(self):
         self.assertIn("if x.shape[0] == 1 or not module.indices_4.numel():", self.backend)
@@ -32,6 +33,8 @@ class V51AuditContractTest(unittest.TestCase):
         self.assertNotIn("expanded_int4.data_ptr<int8_t>()", launch)
 
     def test_gate_executes_sm75_regressions_not_only_reference_tests(self):
+        if not self.builder:
+            self.skipTest("Kaggle embeds package sources, not the sandbox builder")
         self.assertIn("test_sm75_backend.py", self.builder)
         self.assertIn("test_sm75_source.py", self.builder)
         self.assertIn("test_vllm_three_level.py", self.builder)
@@ -43,8 +46,12 @@ class V51AuditContractTest(unittest.TestCase):
     def test_sm75_build_unpacks_embedded_cutlass_vendor(self):
         self.assertIn("cutlass_sm75_vendor.b64", self.backend)
         self.assertIn("base64.b64decode", self.backend)
+        self.assertIn("staging_root", self.backend)
+        self.assertIn("staged_vendor_root", self.backend)
+        self.assertIn("shutil.copytree(staged_vendor_root, vendor_root)", self.backend)
         self.assertIn("extra_include_paths", self.backend)
         self.assertIn("vendor_include / \"cutlass\" / \"array.h\"", self.backend)
+        self.assertNotIn("archive.extractall(extraction_root)", self.backend)
 
     def test_benchmark_exposes_runtime_memory_telemetry(self):
         self.assertIn("peak_cuda_memory", self.backend)
