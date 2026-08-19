@@ -203,8 +203,8 @@ if capability == (7, 5):
         Path('/kaggle/input/qwen2.5/transformers/0.5b/1'),
         Path('/kaggle/input/qwen2-5/transformers/0.5b/1'),
     ]
-    for config_path in sorted(Path('/kaggle/input').rglob('config.json')):
-        model_roots.append(config_path.parent)
+    # Never recursively scan the whole Kaggle input tree: model mounts are
+    # deterministic for this notebook and an unbounded scan can stall startup.
     discovered = []
     for candidate in model_roots:
         config_path = candidate / 'config.json'
