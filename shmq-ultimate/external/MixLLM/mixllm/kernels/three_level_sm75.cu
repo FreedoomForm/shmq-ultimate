@@ -548,12 +548,16 @@ void run_cutlass_int_partition(
     at::Tensor input_int8, at::Tensor scale_act,
     at::Tensor weight, at::Tensor scale,
     at::Tensor zero, at::Tensor indices,
-    at::Tensor& output, int rows, int width, cudaStream_t stream) {
+    at::Tensor& output, int rows, int width, cudaStream_t stream,
+    const at::Tensor* cached_scale = nullptr,
+    const at::Tensor* cached_zero = nullptr) {
   if (indices.numel() == 0) {
     return;
   }
-  auto matrix_scale = scale.transpose(0, 1).contiguous();
-  auto matrix_zero = zero.numel() ? zero.transpose(0, 1).contiguous() : zero;
+  auto matrix_scale = cached_scale ? *cached_scale : scale.transpose(0, 1).contiguous();
+  auto matrix_zero = cached_zero
+      ? *cached_zero
+      : (zero.numel() ? zero.transpose(0, 1).contiguous() : zero);
   auto allocation_stream = at::cuda::getStreamFromExternal(
       stream, input_int8.device().index());
   c10::cuda::CUDACachingAllocator::recordStream(
@@ -604,7 +608,10 @@ at::Tensor three_level_linear_v2_core(
     const at::Tensor& zero_int4,
     const at::Tensor& indices_int4, const at::Tensor& weight_int8,
     const at::Tensor& scale_int8, const at::Tensor& indices_int8,
-    const at::Tensor& weight_fp16, const at::Tensor& indices_fp16) {
+    const at::Tensor& weight_fp16, const at::Tensor& indices_fp16,
+    const at::Tensor& cached_scale_int4,
+    const at::Tensor& cached_zero_int4,
+    const at::Tensor& cached_scale_int8) {
   const at::Tensor* tensors[] = {&input_int8, &scale_act, &weight_int4,
       &expanded_int4, &scale_int4, &zero_int4, &indices_int4, &weight_int8,
       &scale_int8, &indices_int8, &weight_fp16, &indices_fp16};
@@ -627,6 +634,21 @@ at::Tensor three_level_linear_v2_core(
   check_cuda_contiguous(indices_fp16, "indices_fp16");
   for (int i = 0; i < 12; ++i) {
     check_same_device(input_fp16, *tensors[i], names[i]);
+  }
+  const bool has_cached_metadata = cached_scale_int4.defined() ||
+      cached_zero_int4.defined() || cached_scale_int8.defined();
+  TORCH_CHECK(
+      !has_cached_metadata ||
+          (cached_scale_int4.defined() && cached_zero_int4.defined() &&
+           cached_scale_int8.defined()),
+      "CUTLASS metadata cache must provide all three tensors");
+  if (has_cached_metadata) {
+    check_cuda_contiguous(cached_scale_int4, "cached_scale_int4");
+    check_cuda_contiguous(cached_zero_int4, "cached_zero_int4");
+    check_cuda_contiguous(cached_scale_int8, "cached_scale_int8");
+    check_same_device(input_fp16, cached_scale_int4, "cached_scale_int4");
+    check_same_device(input_fp16, cached_zero_int4, "cached_zero_int4");
+    check_same_device(input_fp16, cached_scale_int8, "cached_scale_int8");
   }
   TORCH_CHECK(input_fp16.dim() == 2 && input_fp16.scalar_type() == at::kHalf,
               "input_fp16 must be a float16 matrix");
@@ -679,6 +701,16 @@ at::Tensor three_level_linear_v2_core(
               "invalid INT4 metadata shape");
   TORCH_CHECK(scale_int8.size(0) == n8 && scale_int8.size(1) == groups,
               "invalid INT8 scale shape");
+  if (has_cached_metadata) {
+    TORCH_CHECK(cached_scale_int4.scalar_type() == at::kHalf &&
+                    cached_zero_int4.scalar_type() == at::kByte &&
+                    cached_scale_int8.scalar_type() == at::kHalf,
+                "invalid cached CUTLASS metadata dtype");
+    TORCH_CHECK(cached_scale_int4.sizes() == at::IntArrayRef({groups, n4}) &&
+                    cached_zero_int4.sizes() == at::IntArrayRef({groups, n4}) &&
+                    cached_scale_int8.sizes() == at::IntArrayRef({groups, n8}),
+                "invalid cached CUTLASS metadata shape");
+  }
 
   c10::cuda::CUDAGuard device_guard(input_fp16.device());
   auto output = at::empty({rows, output_width}, input_fp16.options().dtype(at::kFloat));
@@ -711,12 +743,16 @@ at::Tensor three_level_linear_v2_core(
     if (n4 > 0) {
       run_cutlass_int_partition(
           input_int8, scale_act, expanded_int4, scale_int4, zero_int4,
-          indices_int4, output, rows, width, stream.stream());
+          indices_int4, output, rows, width, stream.stream(),
+          has_cached_metadata ? &cached_scale_int4 : nullptr,
+          has_cached_metadata ? &cached_zero_int4 : nullptr);
     }
     if (n8 > 0) {
       run_cutlass_int_partition(
           input_int8, scale_act, weight_int8, scale_int8, zero_int4,
-          indices_int8, output, rows, width, stream.stream());
+          indices_int8, output, rows, width, stream.stream(),
+          has_cached_metadata ? &cached_scale_int8 : nullptr,
+          has_cached_metadata ? &cached_zero_int4 : nullptr);
     }
     if (n16 > 0) {
       const dim3 grid_fp16(
@@ -772,6 +808,20 @@ void validate_partition(const at::Tensor& indices_int4,
               "4/8/16 indices must form a complete output partition");
 }
 
+at::Tensor three_level_linear_v2_unchecked_cuda(
+    const at::Tensor& input_fp16, const at::Tensor& input_int8,
+    const at::Tensor& scale_act, const at::Tensor& weight_int4,
+    const at::Tensor& expanded_int4, const at::Tensor& scale_int4,
+    const at::Tensor& zero_int4,
+    const at::Tensor& indices_int4, const at::Tensor& weight_int8,
+    const at::Tensor& scale_int8, const at::Tensor& indices_int8,
+    const at::Tensor& weight_fp16, const at::Tensor& indices_fp16) {
+  return three_level_linear_v2_core(
+      input_fp16, input_int8, scale_act, weight_int4, expanded_int4, scale_int4,
+      zero_int4, indices_int4, weight_int8, scale_int8, indices_int8,
+      weight_fp16, indices_fp16, at::Tensor(), at::Tensor(), at::Tensor());
+}
+
 at::Tensor three_level_linear_v2_cuda(
     const at::Tensor& input_fp16, const at::Tensor& input_int8,
     const at::Tensor& scale_act, const at::Tensor& weight_int4,
@@ -784,7 +834,26 @@ at::Tensor three_level_linear_v2_cuda(
   return three_level_linear_v2_core(
       input_fp16, input_int8, scale_act, weight_int4, expanded_int4, scale_int4,
       zero_int4, indices_int4, weight_int8, scale_int8, indices_int8,
-      weight_fp16, indices_fp16);
+      weight_fp16, indices_fp16, at::Tensor(), at::Tensor(), at::Tensor());
+}
+
+at::Tensor three_level_linear_v3_cuda(
+    const at::Tensor& input_fp16, const at::Tensor& input_int8,
+    const at::Tensor& scale_act, const at::Tensor& weight_int4,
+    const at::Tensor& expanded_int4, const at::Tensor& scale_int4,
+    const at::Tensor& zero_int4,
+    const at::Tensor& indices_int4, const at::Tensor& weight_int8,
+    const at::Tensor& scale_int8, const at::Tensor& indices_int8,
+    const at::Tensor& weight_fp16, const at::Tensor& indices_fp16,
+    const at::Tensor& cached_scale_int4,
+    const at::Tensor& cached_zero_int4,
+    const at::Tensor& cached_scale_int8) {
+  validate_partition(indices_int4, indices_int8, indices_fp16);
+  return three_level_linear_v2_core(
+      input_fp16, input_int8, scale_act, weight_int4, expanded_int4, scale_int4,
+      zero_int4, indices_int4, weight_int8, scale_int8, indices_int8,
+      weight_fp16, indices_fp16, cached_scale_int4, cached_zero_int4,
+      cached_scale_int8);
 }
 
 at::Tensor three_level_linear_legacy_cuda(
@@ -821,7 +890,8 @@ at::Tensor three_level_linear_legacy_cuda(
   return three_level_linear_v2_core(
       input_fp16, std::get<0>(activation), std::get<1>(activation), weight_int4,
       expanded_int4, scale_int4, zero_int4, indices_int4, weight_int8,
-      scale_int8, indices_int8, weight_fp16, indices_fp16);
+      scale_int8, indices_int8, weight_fp16, indices_fp16,
+      at::Tensor(), at::Tensor(), at::Tensor());
 }
 
 }  // namespace
@@ -840,6 +910,13 @@ TORCH_LIBRARY(mixllm_sm75, m) {
         "Tensor zero_int4, Tensor indices_int4, Tensor weight_int8, "
         "Tensor scale_int8, Tensor indices_int8, Tensor weight_fp16, "
         "Tensor indices_fp16) -> Tensor");
+  m.def("three_level_linear_v3(Tensor input_fp16, Tensor input_int8, "
+        "Tensor scale_act, Tensor weight_int4, Tensor expanded_int4, "
+        "Tensor scale_int4, Tensor zero_int4, Tensor indices_int4, "
+        "Tensor weight_int8, Tensor scale_int8, Tensor indices_int8, "
+        "Tensor weight_fp16, Tensor indices_fp16, "
+        "Tensor cached_scale_int4, Tensor cached_zero_int4, "
+        "Tensor cached_scale_int8) -> Tensor");
   m.def("three_level_linear(Tensor input, Tensor weight_int4, Tensor scale_int4, "
         "Tensor zero_int4, Tensor indices_int4, Tensor weight_int8, "
         "Tensor scale_int8, Tensor indices_int8, Tensor weight_fp16, "
@@ -848,8 +925,9 @@ TORCH_LIBRARY(mixllm_sm75, m) {
 
 TORCH_LIBRARY_IMPL(mixllm_sm75, CUDA, m) {
   m.impl("quantize_activation", &quantize_activation_sm75);
-  m.impl("_three_level_linear_v2_unchecked", &three_level_linear_v2_core);
+  m.impl("_three_level_linear_v2_unchecked", &three_level_linear_v2_unchecked_cuda);
   m.impl("three_level_linear_v2", &three_level_linear_v2_cuda);
+  m.impl("three_level_linear_v3", &three_level_linear_v3_cuda);
   m.impl("three_level_linear", &three_level_linear_legacy_cuda);
 }
 

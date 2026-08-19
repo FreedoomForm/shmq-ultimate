@@ -57,7 +57,26 @@ class V51AuditContractTest(unittest.TestCase):
         self.assertIn("peak_cuda_memory", self.backend)
         self.assertIn("expanded_int4_bytes", self.backend)
         self.assertIn("activation_quantized_bytes", self.backend)
+        self.assertIn("prefill_metadata_bytes", self.backend)
         self.assertIn("output_bytes", self.backend)
+
+    def test_v189_metadata_cache_and_v3_operator_contract(self):
+        self.assertIn("_prefill_metadata_for_cutlass", self.backend)
+        self.assertIn("_sm75_prefill_metadata", self.backend)
+        self.assertIn("three_level_linear_v3", self.backend)
+        self.assertIn('m.def("three_level_linear_v3', self.cuda)
+        self.assertIn('m.impl("three_level_linear_v3"', self.cuda)
+        self.assertIn("cached_scale_int4", self.cuda)
+        self.assertIn("cached_zero_int4", self.cuda)
+        self.assertIn("cached_scale_int8", self.cuda)
+
+    def test_production_report_cannot_claim_go_without_model_quality(self):
+        if not self.builder:
+            self.skipTest("Kaggle embeds package sources, not the sandbox builder")
+        self.assertIn("operator_production", self.builder)
+        self.assertIn("model_vllm_production", self.builder)
+        self.assertIn("full_model_qwen_quality", self.builder)
+        self.assertIn("vllm_apply_path", self.builder)
 
 
 if __name__ == "__main__":

@@ -222,6 +222,40 @@ def _expanded_int4_for_prefill(module, x, torch_module):
     return expanded
 
 
+def _prefill_metadata_for_cutlass(module, x, torch_module):
+    """Cache CUTLASS's [groups, channels] prefill metadata layout.
+
+    Decode keeps the checkpoint [channels, groups] layout.  The cache is
+    invalidated by tensor identity/version/device/shape changes and must be
+    initialized before CUDA graph capture, just like the INT4 expansion cache.
+    """
+    if x.shape[0] < 32:
+        raise ValueError("CUTLASS prefill metadata is only used for rows >= 32")
+    signature = (
+        x.device,
+        id(module.scale_int4), int(module.scale_int4._version),
+        id(module.zero_int4), int(module.zero_int4._version),
+        id(module.scale_int8), int(module.scale_int8._version),
+        tuple(module.scale_int4.shape), tuple(module.zero_int4.shape),
+        tuple(module.scale_int8.shape),
+    )
+    cached = module._sm75_prefill_metadata
+    if cached is not None and cached[0] == signature:
+        return cached
+    if x.is_cuda and torch_module.cuda.is_current_stream_capturing():
+        raise RuntimeError(
+            "SM75 CUTLASS metadata cache must be initialized before CUDA graph capture"
+        )
+    cached = (
+        signature,
+        module.scale_int4.transpose(0, 1).contiguous(),
+        module.zero_int4.transpose(0, 1).contiguous(),
+        module.scale_int8.transpose(0, 1).contiguous(),
+    )
+    module._sm75_prefill_metadata = cached
+    return cached
+
+
 def three_level_linear_prequantized(module, x, input_int8, scale_act, torch_module):
     """Run the physical GEMM kernel with precomputed activation quantization."""
     if not _LOADED:
@@ -246,7 +280,7 @@ def three_level_linear_prequantized(module, x, input_int8, scale_act, torch_modu
             0, module.out_features, device=x.device, dtype=torch_module.float32,
         )
     expanded_int4 = _expanded_int4_for_prefill(module, x, torch_module)
-    return torch_module.ops.mixllm_sm75._three_level_linear_v2_unchecked(
+    arguments = (
         x if x.is_contiguous() else x.contiguous(),
         input_int8 if input_int8.is_contiguous() else input_int8.contiguous(),
         scale_act if scale_act.is_contiguous() else scale_act.contiguous(),
@@ -255,6 +289,13 @@ def three_level_linear_prequantized(module, x, input_int8, scale_act, torch_modu
         *(tensor if tensor.is_contiguous() else tensor.contiguous()
           for tensor in packed_tensors[1:]),
     )
+    if x.shape[0] >= 32 and (module.indices_4.numel() or module.indices_8.numel()):
+        metadata = _prefill_metadata_for_cutlass(module, x, torch_module)
+        native_v3 = getattr(torch_module.ops.mixllm_sm75,
+                            "three_level_linear_v3", None)
+        if native_v3 is not None:
+            return native_v3(*arguments, *metadata[1:])
+    return torch_module.ops.mixllm_sm75._three_level_linear_v2_unchecked(*arguments)
 
 
 def _fp16_abi_placeholders(module, x, torch_module):
@@ -384,6 +425,8 @@ def benchmark_sm75_backend(
         )
         expanded_cache = getattr(module, "_sm75_int4_expanded", None)
         expanded_tensor = expanded_cache[1] if expanded_cache is not None else None
+        metadata_cache = getattr(module, "_sm75_prefill_metadata", None)
+        metadata_tensors = metadata_cache[1:] if metadata_cache is not None else ()
         operator_reference = quantized_reference_prequantized(
             module, x, input_int8, scale_act, torch_module,
         )
@@ -448,6 +491,9 @@ def benchmark_sm75_backend(
                 "activation_scale_bytes": tensor_bytes(scale_act),
                 "expanded_int4_bytes": (
                     tensor_bytes(expanded_tensor) if expanded_tensor is not None else 0
+                ),
+                "prefill_metadata_bytes": sum(
+                    tensor_bytes(tensor) for tensor in metadata_tensors
                 ),
                 "output_bytes": tensor_bytes(actual),
                 "peak_cuda_memory": peak_memory,

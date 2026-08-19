@@ -187,6 +187,68 @@ fixed['layer'].verify(w.shape[0]); automatic['layer'].verify(w.shape[0])
 assert allocation_summary['achieved_average_bits'] <= 8.0 and torch.isfinite(awq_stat).all()
 report['gates'].update(model_gate_import='passed', fixed_allocator='passed', auto_allocator='passed')
 report['allocator_check'] = allocation_summary
+"""), cell("code", """quality = {
+    'status': 'unavailable_environment',
+    'model_id': 'Qwen/Qwen2.5-0.5B',
+    'backend': 'not_run',
+    'reason': 'requires the exact Kaggle Qwen2.5-0.5B model input',
+}
+if capability == (7, 5):
+    model_root = Path('/kaggle/input/qwen2.5/transformers/0.5b/1')
+    if model_root.exists():
+        try:
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+            from mixllm.model_gate import run_model_gate
+            tokenizer = AutoTokenizer.from_pretrained(str(model_root), local_files_only=True)
+            model = AutoModelForCausalLM.from_pretrained(
+                str(model_root), torch_dtype=torch.float16, local_files_only=True,
+            ).cuda()
+            calibration_ids = tokenizer(
+                'Mixed precision protects important channels.\\n'
+                'A reproducible benchmark separates quality from speed.',
+                return_tensors='pt', truncation=True, max_length=64,
+            ).input_ids
+            evaluation_ids = tokenizer(
+                'The model must preserve quality while using less memory.',
+                return_tensors='pt', truncation=True, max_length=64,
+            ).input_ids
+            result = run_model_gate(
+                'Qwen/Qwen2.5-0.5B', tokenizer, model,
+                calibration_ids, evaluation_ids, target_average_bits=8.0,
+                group_size=128, calibration_rows=64,
+                timing_warmup=2, timing_iterations=5,
+            )
+            result['quality_thresholds'] = {
+                'max_loss_delta': 0.05,
+                'max_last_token_logit_error': 5.0,
+            }
+            result['status'] = 'passed' if (
+                result['finite'] and result['deterministic'] and
+                result['loss_delta'] <= 0.05 and
+                result['max_last_token_logit_error'] <= 5.0 and
+                result['quantized_forward_ms'] is not None
+            ) else 'failed'
+            result['backend'] = 'native_capability_selected'
+            quality = result
+            del model
+            torch.cuda.empty_cache()
+        except ModuleNotFoundError as exc:
+            quality['reason'] = f'missing runtime dependency: {exc.name}'
+        except (OSError, RuntimeError) as exc:
+            quality['reason'] = repr(exc)
+            quality['status'] = 'failed' if isinstance(exc, RuntimeError) else 'unavailable_environment'
+        except Exception as exc:
+            quality.update(status='failed', reason=repr(exc))
+    else:
+        quality['reason'] = f'model input not mounted: {model_root}'
+else:
+    quality['reason'] = 'requires Tesla T4 / SM75'
+report['full_model_quality'] = quality
+report['gates']['full_model_qwen_quality'] = quality['status']
+report['gates']['full_model_qwen_throughput'] = (
+    'passed' if quality['status'] == 'passed' else quality['status']
+)
+report['claims']['full_model_qwen_quality_claimed'] = quality['status'] == 'passed'
 """), cell("code", """benchmarks = {'status': 'not_run', 'baseline': 'torch_fp16_linear', 'scenarios': {}}
 if capability == (7, 5):
     from mixllm.nn.modules.three_level_linear import ThreeLevelLinear
@@ -212,17 +274,39 @@ if benchmarks['status'] == 'measured':
     decode_e2e = all(s['end_to_end_p50_ratio_vs_dense'] <= 1.05 for s in mixed if s['rows'] == 1)
     prefill_e2e = all(s['end_to_end_p50_ratio_vs_dense'] <= 1.05 for s in mixed if s['rows'] > 1)
     gates.update(sm75_native_benchmarks='passed', sm75_native_correctness='passed' if correctness else 'failed', mixed_decode_gemm_performance='passed' if decode_gemm else 'failed', mixed_decode_end_to_end_performance='passed' if decode_e2e else 'failed', mixed_prefill_end_to_end_performance='passed' if prefill_e2e else 'failed')
-    production_ready = correctness and decode_e2e and prefill_e2e
+    operator_production = correctness and decode_e2e and prefill_e2e
+    model_vllm_production = (
+        operator_production and
+        gates.get('full_model_qwen_quality') == 'passed' and
+        gates.get('full_model_qwen_throughput') == 'passed' and
+        gates.get('vllm_apply_path') == 'passed'
+    )
+    production_ready = model_vllm_production
 else:
-    gates.update(sm75_native_benchmarks='not_run', sm75_native_correctness='not_run'); production_ready = False
+    gates.update(sm75_native_benchmarks='not_run', sm75_native_correctness='not_run'); operator_production = False; model_vllm_production = False; production_ready = False
+report['gates']['operator_production'] = 'passed' if operator_production else 'failed'
+report['gates']['model_vllm_production'] = 'passed' if model_vllm_production else 'failed'
 print('TESTS_RETURNCODE', tests.returncode, flush=True); print('TESTS_STDOUT_TAIL', tests.stdout[-2000:], flush=True); print('TESTS_STDERR_TAIL', tests.stderr[-2000:], flush=True); print('IS_T4', is_t4, flush=True); print('GATES_PRE_EXEC', gates, flush=True); print('BENCHMARKS_PRE_EXEC', benchmarks, flush=True); execution = bool(is_t4 and tests.returncode == 0 and gates.get('model_gate_import') == 'passed' and benchmarks['status'] == 'measured')
-report['gate_status'] = {'execution': 'passed' if execution else 'failed', 't4_production': 'passed' if production_ready else 'failed', 'terminal_decision': 'go' if production_ready else 'no_go', 'reason': 'all native correctness and mixed end-to-end gates passed' if production_ready else 'production requires native correctness plus mixed decode and prefill end-to-end performance'}
+report['gate_status'] = {'execution': 'passed' if execution else 'failed', 'operator_production': 'passed' if operator_production else 'failed', 'model_vllm_production': 'passed' if model_vllm_production else 'failed', 't4_production': 'passed' if production_ready else 'failed', 'terminal_decision': 'go' if production_ready else 'no_go', 'reason': 'all native gates, full Qwen quality/throughput, and vLLM apply execution passed' if production_ready else 'production requires native correctness, mixed decode/prefill performance, full Qwen quality/throughput, and patched vLLM execution'}
 (ARTIFACT_DIR / 'mixllm_3level_gate.json').write_text(json.dumps(report, indent=2, sort_keys=True))
 print(json.dumps(report['gate_status'], indent=2)); print('Full-model Qwen quality:', gates['full_model_qwen_quality'])
 assert execution, 'T4 gate did not execute completely; inspect artifact'""")]
     return {'cells': cells, 'metadata': {'kernelspec': {'display_name': 'Python 3', 'language': 'python', 'name': 'python3'}, 'language_info': {'name': 'python', 'version': '3.12'}}, 'nbformat': 4, 'nbformat_minor': 5}
 def metadata():
-    return {'id': 'freedomform/mixllm-3-level-real-t4-gate', 'title': 'MixLLM 3 Level Real T4 Gate', 'code_file': NOTEBOOK.name, 'language': 'python', 'kernel_type': 'notebook', 'is_private': True, 'enable_gpu': True, 'enable_internet': False, 'machine_shape': 'NvidiaTeslaT4'}
+    return {
+        'id': 'freedomform/mixllm-3-level-real-t4-gate',
+        'title': 'MixLLM 3 Level Real T4 Gate',
+        'code_file': NOTEBOOK.name,
+        'language': 'python',
+        'kernel_type': 'notebook',
+        'is_private': True,
+        'enable_gpu': True,
+        'enable_internet': False,
+        'machine_shape': 'NvidiaTeslaT4',
+        # Exact base model requested by the project; never substitute an
+        # instruction-tuned or differently sized Qwen checkpoint.
+        'model_sources': ['qwen-lm/qwen2.5/transformers/0.5b/1'],
+    }
 def build():
     sources = {n: (FORK / n).read_text(encoding='utf-8') for n in SOURCE_FILES}
     OUT.mkdir(parents=True, exist_ok=True); NOTEBOOK.write_text(json.dumps(build_notebook(sources, provenance(sources)), indent=1), encoding='utf-8'); METADATA.write_text(json.dumps(metadata(), indent=2), encoding='utf-8'); print(NOTEBOOK)

@@ -97,17 +97,17 @@ def pack_transformer_linears(model: nn.Module, allocations, group_size: int = 12
     return len(linears)
 
 
-def _timed_forward(model, input_ids, torch_module, warmup: int, iterations: int):
+def _timed_forward(model, input_ids, warmup: int, iterations: int):
     for _ in range(warmup):
         model(input_ids=input_ids, use_cache=False)
-    torch_module.cuda.synchronize()
-    start = torch_module.cuda.Event(enable_timing=True)
-    end = torch_module.cuda.Event(enable_timing=True)
+    torch.cuda.synchronize(input_ids.device)
+    start = torch.cuda.Event(enable_timing=True)
+    end = torch.cuda.Event(enable_timing=True)
     start.record()
     for _ in range(iterations):
         model(input_ids=input_ids, use_cache=False)
     end.record()
-    torch_module.cuda.synchronize()
+    torch.cuda.synchronize(input_ids.device)
     return float(start.elapsed_time(end)) / iterations
 
 
@@ -115,7 +115,9 @@ def _timed_forward(model, input_ids, torch_module, warmup: int, iterations: int)
 def run_model_gate(model_id: str, tokenizer, model, calibration_ids: torch.Tensor,
                    evaluation_ids: torch.Tensor, budget: ThreeLevelBudget | None = None,
                    target_average_bits: float | None = None,
-                   group_size: int = 128, calibration_rows: int = 64) -> Dict[str, object]:
+                   group_size: int = 128, calibration_rows: int = 64,
+                   timing_warmup: int = 2, timing_iterations: int = 5
+                   ) -> Dict[str, object]:
     """Quantize a loaded causal LM and return measured quality evidence."""
     if (budget is None) == (target_average_bits is None):
         raise ValueError("provide exactly one of budget or target_average_bits")
@@ -130,6 +132,10 @@ def run_model_gate(model_id: str, tokenizer, model, calibration_ids: torch.Tenso
         reference = model(input_ids=evaluation_ids, labels=evaluation_ids, use_cache=False)
         reference_loss = float(reference.loss.item())
         reference_logits = reference.logits[:, -1].float().cpu()
+        reference_forward_ms = (
+            _timed_forward(model, evaluation_ids, timing_warmup, timing_iterations)
+            if device.type == "cuda" else None
+        )
 
         started = time.perf_counter()
         losses = collect_layer_losses(model, calibration_ids, group_size, calibration_rows)
@@ -156,6 +162,10 @@ def run_model_gate(model_id: str, tokenizer, model, calibration_ids: torch.Tenso
             actual.logits,
             model(input_ids=evaluation_ids, use_cache=False).logits,
         )
+        quantized_forward_ms = (
+            _timed_forward(model, evaluation_ids, timing_warmup, timing_iterations)
+            if device.type == "cuda" else None
+        )
         counts = {bit: sum(len(item.indices[bit]) for item in allocations.values())
                   for bit in (4, 8, 16)}
         total = sum(counts.values())
@@ -176,8 +186,19 @@ def run_model_gate(model_id: str, tokenizer, model, calibration_ids: torch.Tenso
             "deterministic": bool(deterministic),
             "finite": bool(torch.isfinite(actual.logits).all().item()),
             "quantization_seconds": quantization_seconds,
-            "allocation_count": len(allocations),
+            "reference_forward_ms": reference_forward_ms,
+            "quantized_forward_ms": quantized_forward_ms,
+            "full_model_speedup_vs_reference": (
+                reference_forward_ms / max(quantized_forward_ms, 1e-9)
+                if reference_forward_ms is not None and quantized_forward_ms is not None
+                else None
+            ),
             "evaluation_tokens": int(evaluation_ids.numel()),
+            "quantized_tokens_per_second": (
+                (evaluation_ids.numel() / (quantized_forward_ms / 1000.0))
+                if quantized_forward_ms is not None else None
+            ),
+            "allocation_count": len(allocations),
             "peak_cuda_vram_bytes": (
                 int(torch.cuda.max_memory_allocated(device))
                 if device.type == "cuda" else None

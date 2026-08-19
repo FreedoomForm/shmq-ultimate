@@ -68,6 +68,20 @@ class SM75PythonDispatchTest(unittest.TestCase):
         third = sm75_backend._expanded_int4_for_prefill(module, x, torch)
         self.assertIsNot(first, third)
 
+    def test_prefill_cutlass_metadata_is_cached_and_invalidated(self):
+        module = self._module((2, 2, 0))
+        x = torch.empty(32, 128, dtype=torch.float16)
+
+        first = sm75_backend._prefill_metadata_for_cutlass(module, x, torch)
+        second = sm75_backend._prefill_metadata_for_cutlass(module, x, torch)
+        self.assertIs(first, second)
+        self.assertEqual(first[1].shape, (1, 2))
+        self.assertEqual(first[2].shape, (1, 2))
+        self.assertEqual(first[3].shape, (1, 2))
+        module.scale_int4[0, 0] += 1
+        third = sm75_backend._prefill_metadata_for_cutlass(module, x, torch)
+        self.assertIsNot(first, third)
+
     def test_decode_keeps_packed_int4_and_does_not_expand(self):
         module = self._module((2, 0, 0))
         placeholder = sm75_backend._expanded_int4_for_prefill(

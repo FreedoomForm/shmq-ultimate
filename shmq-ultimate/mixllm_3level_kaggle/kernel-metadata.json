@@ -7,5 +7,8 @@
   "is_private": true,
   "enable_gpu": true,
   "enable_internet": false,
-  "machine_shape": "NvidiaTeslaT4"
+  "machine_shape": "NvidiaTeslaT4",
+  "model_sources": [
+    "qwen-lm/qwen2.5/transformers/0.5b/1"
+  ]
 }
