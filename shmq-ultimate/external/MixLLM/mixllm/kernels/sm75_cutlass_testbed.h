@@ -114,7 +114,7 @@ __global__ void kernel(
   }
 }
 
-template <typename Core>
+template <typename Core, int Stages>
 struct Runner {
   using ThreadblockShape = typename Core::Shape;
   using Element = typename Core::ElementA;
@@ -138,7 +138,7 @@ struct Runner {
       typename Core::Shape, IteratorA, SmemIteratorA,
       cutlass::arch::CacheOperation::Global, IteratorB, SmemIteratorB,
       cutlass::arch::CacheOperation::Global, ElementC, LayoutC,
-      typename Core::MmaPolicy, 2>;
+      typename Core::MmaPolicy, Stages>;
 
   union SharedStorage {
     typename Mma::SharedStorage main_loop;
@@ -187,9 +187,9 @@ using Core = cutlass::gemm::threadblock::DefaultMmaCore<
     cutlass::gemm::GemmShape<32, 32, 64>,
     cutlass::gemm::GemmShape<8, 8, 16>,
     ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC,
-    cutlass::arch::OpClassTensorOp, 2, cutlass::arch::OpMultiplyAddSaturate>;
+    cutlass::arch::OpClassTensorOp, 3, cutlass::arch::OpMultiplyAddSaturate>;
 
 
-using Int8Runner = Runner<Core>;
+using Int8Runner = Runner<Core, 3>;
 
 }  // namespace shmq_cutlass_sm75
