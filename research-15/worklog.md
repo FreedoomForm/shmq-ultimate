@@ -747,3 +747,15 @@ v184 was submitted and executed through the connected computer. T4 hardware, nat
 ## v185 candidate — isolate vendor ZIP and make embedded audit path optional
 
 Changed vendor extraction to a private `.cutlass_vendor_staging` directory and copy only `mixllm/kernels/cutlass` into the vendor root, preserving the authoritative project `sm75_cutlass_testbed.h` and custom `cutlass_extension` sources. Added a cleanup `finally` and retained path-traversal checks. Updated the audit contract to skip builder-specific assertions when the Kaggle package has no builder, while preserving them locally. Local 21-test contract suite, Python compileall, notebook rebuild, freshness check, and diff check pass. v185 requires a fresh computer-network Kaggle run and is not accepted until all required gates pass.
+
+## v185 result — vendor isolation fixed contracts, prefill remains the sole blocker (NO-GO)
+
+v185 was rebuilt and submitted from the connected computer, then executed on Tesla T4 / SM75. The isolated vendor staging fix worked: `embedded_contract_tests=passed`, the T4 gate execution completed, native correctness passed, allocator/import checks passed, and both mixed decode gates passed. The production decision remains `no_go` solely because mixed prefill end-to-end performance failed; full-model Qwen quality and throughput remain `not_run`.
+
+Mixed QKV p50 speedups versus the identical FP16 baseline were 1.0438x decode E2E at rows=1, 0.2661x at rows=16, and 0.1539x at rows=128. Mixed QKV GEMM speedups were 1.3257x, 0.2623x, and 0.1511x at rows=1/16/128. Thus v185 is a valid, complete T4 measurement but not an accepted production baseline. Compared with v184, rows=128 prefill improved materially (0.0978x to 0.1539x) but remains far below the 1.05 ratio gate; rows=16 regressed (0.2876x to 0.2661x). Quantization remained about 0.029-0.031 ms, so it is not the dominant prefill bottleneck. No quality-reduction or benchmark-setting change was made.
+
+The v185 gate report, benchmark JSON, source manifest, and Kaggle log are preserved under `shmq-ultimate/mixllm_3level_kaggle/latest-output-v185-computer/`.
+
+## v186 hypothesis — eight-warp one-subtile SM75 prefill candidate
+
+Deep comparison with the original MixLLM showed that its advantage is a family of M/N/warp configurations rather than a fixed tile; the current direct WMMA path uses one fixed 16x64 channel CTA. Historical v70/v88/v150 measurements rejected the existing 8-warp 2x4 reuse kernel, and v158 rejected two 16x16 subtiles per warp because of register/shared-memory pressure. v186 therefore keeps one 16x16 WMMA subtile per warp, templates the stable kernel over the number of warps, and launches an explicit 8-warp/128-channel variant. It preserves the signed-INT8 arithmetic, FP16 partition, per-group scales, output indices, quantization, benchmark scenarios, and decode dispatch. Local 22 contract/runtime/vLLM tests, compileall, notebook rebuild, freshness, and diff checks pass. Kaggle T4 validation is required; the candidate is not accepted before all gates pass.
