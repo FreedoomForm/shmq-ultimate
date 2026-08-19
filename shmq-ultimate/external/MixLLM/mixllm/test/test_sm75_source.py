@@ -53,6 +53,11 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("_three_level_linear_v2_unchecked(*arguments)", self.backend)
         self.assertIn("_use_v188_mixed_prefill_path(module, x, torch_module)", self.backend)
 
+    def test_v196_timing_integrity_contract(self):
+        self.assertIn("timing_integrity_ratio", self.backend)
+        self.assertIn("timing_integrity", self.backend)
+        self.assertIn("timing_integrity", self.source)
+
     def test_v193_rejected_geometry_is_not_present(self):
         cutlass_compact = "".join(self.cutlass_testbed.split())
         self.assertIn("GemmShape<32,128,64>", cutlass_compact)

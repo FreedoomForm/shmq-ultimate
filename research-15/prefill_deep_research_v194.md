@@ -43,3 +43,14 @@ The first safe repair is not a new kernel geometry. It is to restore the measure
 [1]: https://docs.nvidia.com/cutlass/4.3.5/media/docs/cpp/efficient_gemm.html "NVIDIA CUTLASS Efficient GEMM in CUDA"
 [2]: https://docs.nvidia.com/cutlass/latest/media/docs/cpp/functionality.html "NVIDIA CUTLASS Functionality and SM75 TensorOp support"
 [3]: https://developer.nvidia.com/blog/nvidia-turing-architecture-in-depth/ "NVIDIA Turing Architecture In-Depth"
+
+
+## Follow-up finding after v194
+
+The v194 artifact reports `prefill_metadata_bytes=0` for mixed rows=128, proving that the v188-v2 adapter was selected and that the cached-v3 metadata allocation was not on the timed path. Its rows=128 mixed timing nevertheless remained `0.870432 ms`, close to v192 and far from the historical v188 `0.594176 ms`. Therefore the hypothesis “v3 metadata/ABI alone caused the regression” is falsified.
+
+The exact v188 and v194 Python lifecycle are otherwise materially similar: both validate the partition, reuse the expanded INT4 cache after the first call, quantize activations outside the prequantized GEMM measurement, and time with CUDA events after ten warmups and fifty iterations. The current CUDA source adds v3 support and cached-metadata validation, but v194's v2 path passes undefined cache tensors, so the new metadata transpose is not executed. This leaves two live explanations: a kernel/resource difference caused by the added v3-capable translation unit or host-core checks, and ordinary T4 fixed-power/DVFS variation. NVIDIA's current CUTLASS measurement guidance warns that clocks can oscillate for seconds, small GEMMs have more run-to-run variation, and stable comparisons require separated warmup/profiling loops plus frequency monitoring [1]. The existing benchmark settings must not be changed for the production gate, so a fair next experiment is an exact v188 replay under the same current Kaggle conditions, not another speculative geometry change.
+
+The next candidate is therefore a controlled historical replay: run the exact v188 source/notebook once more to establish whether its `0.276x` rows=128 result reproduces. If it does not, the prior v188 advantage was environmental noise and should not be restored. If it does, compare the compiled v188 and current v194 generated code/resource behavior before changing the kernel. No quality, model, or benchmark setting may be relaxed.
+
+[1]: https://docs.nvidia.com/cutlass/latest/media/docs/cpp/gemm_performance_measurement_methodology_guidelines.html "NVIDIA CUTLASS GEMM Performance Measurement Methodology Guidelines"

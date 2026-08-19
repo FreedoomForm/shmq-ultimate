@@ -794,6 +794,8 @@ at::Tensor three_level_linear_v2_core(
       indices_fp16.data_ptr<int32_t>(), output.data_ptr<float>(), rows, width,
       output_width, n4, n8, n16);
   }
+  // timing_integrity: surface asynchronous launch failures before the caller records
+  // a benchmark event instead of allowing a deferred CUDA error to corrupt timing.
   C10_CUDA_KERNEL_LAUNCH_CHECK();
   return output;
 }

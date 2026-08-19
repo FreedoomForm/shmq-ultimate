@@ -296,8 +296,9 @@ if benchmarks['status'] == 'measured':
     decode_gemm = all(s['gemm_p50_ratio_vs_dense'] <= 1.05 for s in mixed if s['rows'] == 1)
     decode_e2e = all(s['end_to_end_p50_ratio_vs_dense'] <= 1.05 for s in mixed if s['rows'] == 1)
     prefill_e2e = all(s['end_to_end_p50_ratio_vs_dense'] <= 1.05 for s in mixed if s['rows'] > 1)
-    gates.update(sm75_native_benchmarks='passed', sm75_native_correctness='passed' if correctness else 'failed', mixed_decode_gemm_performance='passed' if decode_gemm else 'failed', mixed_decode_end_to_end_performance='passed' if decode_e2e else 'failed', mixed_prefill_end_to_end_performance='passed' if prefill_e2e else 'failed')
-    operator_production = correctness and decode_e2e and prefill_e2e
+    timing_integrity = all(s.get('timing_integrity', False) for s in mixed)
+    gates.update(sm75_native_benchmarks='passed', sm75_native_correctness='passed' if correctness else 'failed', mixed_decode_gemm_performance='passed' if decode_gemm else 'failed', mixed_decode_end_to_end_performance='passed' if decode_e2e else 'failed', mixed_prefill_end_to_end_performance='passed' if prefill_e2e else 'failed', timing_integrity='passed' if timing_integrity else 'failed')
+    operator_production = correctness and decode_e2e and prefill_e2e and timing_integrity
     model_vllm_production = (
         operator_production and
         gates.get('full_model_qwen_quality') == 'passed' and
@@ -310,7 +311,7 @@ else:
 report['gates']['operator_production'] = 'passed' if operator_production else 'failed'
 report['gates']['model_vllm_production'] = 'passed' if model_vllm_production else 'failed'
 print('TESTS_RETURNCODE', tests.returncode, flush=True); print('TESTS_STDOUT_TAIL', tests.stdout[-2000:], flush=True); print('TESTS_STDERR_TAIL', tests.stderr[-2000:], flush=True); print('IS_T4', is_t4, flush=True); print('GATES_PRE_EXEC', gates, flush=True); print('BENCHMARKS_PRE_EXEC', benchmarks, flush=True); execution = bool(is_t4 and tests.returncode == 0 and gates.get('model_gate_import') == 'passed' and benchmarks['status'] == 'measured')
-report['gate_status'] = {'execution': 'passed' if execution else 'failed', 'operator_production': 'passed' if operator_production else 'failed', 'model_vllm_production': 'passed' if model_vllm_production else 'failed', 't4_production': 'passed' if production_ready else 'failed', 'terminal_decision': 'go' if production_ready else 'no_go', 'reason': 'all native gates, full Qwen quality/throughput, and vLLM apply execution passed' if production_ready else 'production requires native correctness, mixed decode/prefill performance, full Qwen quality/throughput, and patched vLLM execution'}
+report['gate_status'] = {'execution': 'passed' if execution else 'failed', 'operator_production': 'passed' if operator_production else 'failed', 'model_vllm_production': 'passed' if model_vllm_production else 'failed', 't4_production': 'passed' if production_ready else 'failed', 'terminal_decision': 'go' if production_ready else 'no_go', 'reason': 'gate evaluation complete'}
 (ARTIFACT_DIR / 'mixllm_3level_gate.json').write_text(json.dumps(report, indent=2, sort_keys=True))
 print(json.dumps(report['gate_status'], indent=2)); print('Full-model Qwen quality:', gates['full_model_qwen_quality'])
 assert execution, 'T4 gate did not execute completely; inspect artifact'""")]

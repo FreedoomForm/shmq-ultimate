@@ -461,6 +461,8 @@ def benchmark_sm75_backend(
         ))
         end_to_end = measure(lambda: three_level_linear(module, x, torch_module))
         dense = measure(lambda: torch_module.nn.functional.linear(x, dense_weight))
+        timing_integrity_ratio = gemm["p50_ms"] / max(end_to_end["p50_ms"], 1e-9)
+        timing_integrity = timing_integrity_ratio <= 1.10
         device = x.device
         peak_memory = {
             "quantization_peak_allocated_bytes": peak_allocated(
@@ -500,6 +502,8 @@ def benchmark_sm75_backend(
             "end_to_end_p50_speedup_vs_dense": (
                 dense["p50_ms"] / max(end_to_end["p50_ms"], 1e-9)
             ),
+            "timing_integrity_ratio": timing_integrity_ratio,
+            "timing_integrity": timing_integrity,
             "max_abs_error": max_error,
             "max_abs_error_vs_dense_fp16": dense_semantic_error,
             "memory": {
