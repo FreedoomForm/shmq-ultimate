@@ -65,6 +65,11 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("DefaultMmaCore<", self.cutlass_testbed)
         self.assertIn("OpMultiplyAddSaturate>;", self.cutlass_testbed)
 
+    def test_v198_supported_core_three_stage_pipeline_contract(self):
+        cutlass_compact = "".join(self.cutlass_testbed.split())
+        self.assertIn("OpClassTensorOp,2,cutlass::arch::OpMultiplyAddSaturate>", cutlass_compact)
+        self.assertIn("usingInt8Runner=Runner<Core,3>", cutlass_compact)
+
     def test_v193_rejected_geometry_is_not_present(self):
         cutlass_compact = "".join(self.cutlass_testbed.split())
         self.assertIn("GemmShape<32,128,64>", cutlass_compact)

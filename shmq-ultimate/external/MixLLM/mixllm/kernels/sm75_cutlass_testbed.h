@@ -187,7 +187,7 @@ using Core = cutlass::gemm::threadblock::DefaultMmaCore<
     cutlass::gemm::GemmShape<32, 32, 64>,
     cutlass::gemm::GemmShape<8, 8, 16>,
     ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC,
-    cutlass::arch::OpClassTensorOp, 3, cutlass::arch::OpMultiplyAddSaturate>;
+    cutlass::arch::OpClassTensorOp, 2, cutlass::arch::OpMultiplyAddSaturate>;
 
 
 using Int8Runner = Runner<Core, 3>;
