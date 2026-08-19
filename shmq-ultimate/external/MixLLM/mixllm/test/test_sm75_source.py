@@ -39,13 +39,20 @@ class SM75SourceContractTest(unittest.TestCase):
         cutlass_compact = "".join(self.cutlass_testbed.split())
         pipeline_compact = "".join(self.cutlass_pipeline.split())
         self.assertIn("DefaultMmaCore<", cutlass_compact)
-        self.assertIn("GemmShape<8,8,16>", cutlass_compact)
+        self.assertIn("GemmShape<16,8,32>", cutlass_compact)
         self.assertIn("MQMmaPipelinedSm75", cutlass_compact)
-        self.assertIn("GemmShape<32,128,64>", cutlass_compact)
-        self.assertIn("typenameCore::MmaPolicy,2>", cutlass_compact)
+        self.assertIn("GemmShape<64,128,64>", cutlass_compact)
+        self.assertIn("typenameCore::MmaPolicy,5>", cutlass_compact)
         self.assertIn("sync_copy", pipeline_compact)
         self.assertIn("usingArchTag=arch::Sm75", pipeline_compact)
         self.assertNotIn("cp_async", pipeline_compact)
+
+    def test_v193_large_m_geometry_matches_original_stage_contract(self):
+        cutlass_compact = "".join(self.cutlass_testbed.split())
+        self.assertIn("GemmShape<64,128,64>", cutlass_compact)
+        self.assertIn("GemmShape<64,32,64>", cutlass_compact)
+        self.assertIn("GemmShape<16,8,32>", cutlass_compact)
+        self.assertIn("typenameCore::MmaPolicy,5>", cutlass_compact)
 
     def test_v188_cutlass_prefill_dispatch_contract(self):
         text = self.source

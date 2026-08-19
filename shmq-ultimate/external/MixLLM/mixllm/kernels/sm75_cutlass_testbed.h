@@ -138,7 +138,7 @@ struct Runner {
       typename Core::Shape, IteratorA, SmemIteratorA,
       cutlass::arch::CacheOperation::Global, IteratorB, SmemIteratorB,
       cutlass::arch::CacheOperation::Global, ElementC, LayoutC,
-      typename Core::MmaPolicy, 2>;
+      typename Core::MmaPolicy, 5>;
 
   union SharedStorage {
     typename Mma::SharedStorage main_loop;
@@ -183,11 +183,11 @@ struct Runner {
 };
 
 using Core = cutlass::gemm::threadblock::DefaultMmaCore<
-    cutlass::gemm::GemmShape<32, 128, 64>,
-    cutlass::gemm::GemmShape<32, 32, 64>,
-    cutlass::gemm::GemmShape<8, 8, 16>,
+    cutlass::gemm::GemmShape<64, 128, 64>,
+    cutlass::gemm::GemmShape<64, 32, 64>,
+    cutlass::gemm::GemmShape<16, 8, 32>,
     ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC,
-    cutlass::arch::OpClassTensorOp, 2, cutlass::arch::OpMultiplyAddSaturate>;
+    cutlass::arch::OpClassTensorOp, 5, cutlass::arch::OpMultiplyAddSaturate>;
 
 
 using Int8Runner = Runner<Core>;
