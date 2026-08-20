@@ -1,0 +1,7 @@
+# v259 deep research: valid N=128 native INT4 pair geometry
+
+The official MixLLM configuration catalog includes N=128 families, while SHMQ's native SM75 pair kernel currently uses a 4-warp, 32x64 tile with each warp covering 16 output channels. Historical v244 was not a valid N=128 experiment: it launched eight warps for a 64-channel grid tile, so only the first four warps had in-range channels and the remaining four warps performed no useful output work. Its negative result therefore does not rule out a properly mapped N=128 pair.
+
+A legal, bounded SM75 candidate is an 8-warp, 32x128 pair tile. Each warp owns 16 output channels; the eight warps cover all 128 channels exactly once. The row dimension remains 32 with four 8-row MMA subtiles, so row sums and accumulator fragments must use an explicit `kPairRowTiles=4` rather than conflating row tiles with warp count. Shared memory increases only for the packed B panel from 64x16 to 128x16 bytes, while A low/high staging and the two native u4 MMAs retain the existing arithmetic and zero-point correction identity. Grid X changes to ceil(channels/128), block size to 256 threads, and output mapping remains the exact indices/scatter ABI.
+
+This is a geometry-only native INT4 experiment, not a quality or benchmark change. It will be kept only if correctness, timing integrity, both mixed performance gates, and all required gate conditions pass. Mixed dispatch will be enabled only for this candidate behind the existing overlap seam; rows<32 and FP16/INT8 arithmetic remain unchanged.

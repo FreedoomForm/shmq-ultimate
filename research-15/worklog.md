@@ -1296,3 +1296,21 @@ Post-fix local validation is clean: full suite `85 passed, 6 skipped`; native IN
 The final v258 kernel version 255 compiled successfully, but the embedded SM75 CUDA correctness suite stopped with 19 failures because `torch.testing.assert_close` treats dtype mismatch as an assertion failure: the operator now correctly returns FP16 while the reference helper remains FP32. This is a test-contract mismatch, not a numerical or kernel-correctness failure. The repair changes the three CUDA reference comparisons to compare the reference converted to `actual.dtype`/`captured.dtype`, preserving the existing `rtol=2e-2` and `atol=2e-2` values. CPU/reference paths remain unchanged. No benchmark settings or quality checks are weakened.
 
 Post-repair local validation: full suite `85 passed, 6 skipped`; native INT4 proof passed; `git diff --check` passed. Kernel version 255 is rejected as a test-contract-only failure with no performance gate result. The corrected notebook must be rebuilt and submitted after commit.
+
+
+## v258 final Kaggle result — FP16 output ABI improves rows=128 but remains no-go
+
+The corrected v258 source compiled successfully on T4. Source identity matched exactly: expected and observed JIT digest `371d95287f06f273`. Embedded tests returned code 0, the SM75 native correctness gate passed, and the INT4 mixed-stride probe returned `[128.0, 128.0, 128.0, 128.0]`.
+
+For Qwen/Qwen2.5-0.5B-shaped mixed QKV `{INT4: 2400, INT8: 896, FP16: 288}`, end-to-end speedups versus the unchanged dense FP16 baseline were `0.750x` at rows=1, `0.284x` at rows=16, and `0.373x` at rows=128. Rows=128 measured GEMM `0.680304 ms`, end-to-end `0.439696 ms`, and dense FP16 `0.163872 ms`; its timing-integrity ratio was `1.547214`, so the measurement failed the integrity gate. The v258 rows=128 E2E result improved materially over v257's `0.230x`, supporting the upstream-output-dtype hypothesis, but remains slower than FP16 and far below the `2.6x` target.
+
+Gate result: `t4_hardware=passed`, `embedded_contract_tests=passed`, `sm75_native_correctness=passed`, `mixed_decode_gemm_performance=passed`, `mixed_decode_end_to_end_performance=failed`, `mixed_prefill_end_to_end_performance=failed`, `timing_integrity=failed`, `terminal_decision=no_go`. Full-model Qwen quality/throughput and vLLM production remained explicitly unavailable in the Kaggle environment. v258 is rejected and will not be treated as a new baseline.
+
+
+## v259 — research-backed 8-warp 32x128 native INT4 pair (local validation complete)
+
+Deep research found that the rejected v244 “wider” pair was not a valid N=128 experiment: it launched eight warps for a 64-channel grid tile, leaving half the warps without useful output work. The official MixLLM configuration family includes N=128, so v259 implements a correctly mapped 8-warp, 32x128 native pair tile. Each warp owns a unique 16-channel slice; four independent 8-row tiles remain explicit through `kPairRowTiles=4`; packed B shared storage is `[128,16]`; grid X is ceil(channels/128); and the launch uses 256 threads. The row-sum shared array is guarded so extra channel warps cannot write outside the four valid row tiles. Arithmetic, zero-point correction, FP16 output ABI, partition indices, and model workload are unchanged.
+
+The mixed large-M overlap selector now uses the native pair only when INT4 exists (`n4 > 0`), while the pure-INT4 fast branch remains unchanged. The tuning ABI is 259. Source contracts require the exact 8-warp geometry, row-tile separation, 128-channel tile, 256-thread launch, and mixed selector.
+
+Local validation: focused/source/backend tests `38 passed, 6 skipped`; full suite `85 passed, 6 skipped`; native INT4 reference proof passed; `git diff --check` passed. No v259 Kaggle run has been made yet.
