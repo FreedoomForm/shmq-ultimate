@@ -1029,3 +1029,6 @@ NVIDIA PTX and the vendored CUTLASS SM75 header confirm the legal dense `m8n8k32
 
 ## v231 probe — native SM75 INT4 instruction seam
 After comparing the original MixLLM operator and the vendored SM75 headers again, added a compile-only probe for the legal `m8n8k32` `u4*u4` and `s4*u4` instruction specializations. The probe is embedded through the testbed and notebook builder but is not dispatched at runtime. Local source contracts (15 tests), CPU native-INT4 reference proof, Python compilation, and diff checks passed. This prepares one Kaggle T4 compile validation before attempting the full fused pair; no performance claim is made and production dispatch remains the v228 fallback.
+
+## v223 Kaggle compile probe — SM75 INT4 forms compile on T4
+Kaggle v223 ran on Tesla T4 / SM75 and compiled the embedded extension with `/usr/local/cuda/bin/nvcc -gencode=arch=compute_75,code=sm_75`. The new `mq_mma_sm75_int4_pair.h` probe was embedded and compiled through `sm75_cutlass_testbed.h`; link succeeded, embedded contracts passed, native correctness passed, and the existing v228 performance report remained unchanged because runtime dispatch was not modified. This validates Kaggle as the compile environment for the next real fused-pair implementation. No performance claim is made for v223.
