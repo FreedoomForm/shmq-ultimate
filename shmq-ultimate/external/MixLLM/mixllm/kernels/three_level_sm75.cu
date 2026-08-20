@@ -1365,7 +1365,7 @@ at::Tensor three_level_linear_v2_core(
         has_cached_metadata ? &cached_scale_int4 : nullptr,
         has_cached_metadata ? &cached_zero_int4 : nullptr,
         has_cached_metadata ? &cached_scale_int8 : nullptr,
-        n4 > 0);
+        false);
     if (n16 > 0) {
       const dim3 grid_fp16(
           (n16 + kPrefillChannels - 1) / kPrefillChannels,

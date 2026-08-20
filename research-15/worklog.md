@@ -1222,3 +1222,11 @@ The v254 notebook was successfully pushed as Kaggle kernel version 249 after the
 Compilation and functional checks passed: T4 hardware, embedded contracts, SM75 native benchmarks, native correctness, mixed-stride probe (`[128.0, 128.0, 128.0, 128.0]`), and timing integrity. The new M=128,N=64 tuner candidate compiled and executed, but the required performance gates still failed. On Qwen/Qwen2.5-0.5B mixed 4/8/16, end-to-end speedup versus the identical dense FP16 baseline was 0.768x at rows=1, 0.283x at rows=16, and 0.090x at rows=128; rows=128 end-to-end ratio was 11.148x. `terminal_decision` was `no_go`. The M=128,N=64 candidate is rejected as a production baseline; it improved rows=128 relative to v253's 0.077x but remains far from the 2.6x target and does not pass the gates.
 
 No benchmark settings, model, computation, or quality checks were changed. Next iteration must begin with deep source research focused on the original MixLLM's direct interleaved INT4 dataflow versus SHMQ's expanded signed-INT8 prefill cache and hot-path overhead, with no Kaggle run during repairs.
+
+## v255 — restore staged CUTLASS dispatch for mixed large-M (local validation complete)
+
+Deep research against the official Microsoft MixLLM repository found that upstream prepares direct interleaved packed `uint4` weights, launches INT4 and INT8 on persistent auxiliary streams, and searches broad shape/config families. In SHMQ, the current source comments said the native SM75 pair kernel was reserved for pure INT4, but the mixed large-M caller still passed `use_fused_int4 = n4 > 0`, routing mixed INT4 through the rejected native pair path. This contradicted both the documented v241/v253 rollback and the intended staged CUTLASS overlap.
+
+v255 changes only that dispatch selector to `false` for the mixed large-M branch and adds a source contract requiring the false selector while retaining the native pair only for pure INT4. No arithmetic, model, benchmark, layout ABI, quality, or gate threshold changed. Deep-research note: research-15/v255_deep_research_original_vs_sm75.md.
+
+Local validation passed: focused source/backend tests 38 passed with 6 CUDA-only skips; full suite 85 passed with 6 CUDA-only skips; native INT4 CPU proof passed; git diff check passed. Kaggle has not been run for v255.
