@@ -13,6 +13,7 @@
 #include "cutlass/transform/threadblock/predicated_tile_access_iterator.h"
 #include "cutlass/transform/threadblock/regular_tile_access_iterator_tensor_op.h"
 #include "cutlass_extension/mq_mma_pipelined_sm75.h"
+#include "cutlass_extension/mq_mma_sm75_int4_pair.h"
 
 namespace shmq_cutlass_sm75 {
 

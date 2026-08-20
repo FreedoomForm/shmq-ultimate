@@ -87,6 +87,16 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertEqual(cutlass_text.count("indices[partition_channel]"), 1)
         self.assertNotIn("ptr_C[global_row * ldc + indices[partition_channel]]", cutlass_text)
 
+    def test_v231_fused_int4_pair_probe_contract(self):
+        probe = (Path(__file__).parents[1] / "kernels" / "cutlass_extension" / "mq_mma_sm75_int4_pair.h").read_text(encoding="utf-8")
+        self.assertIn("using LowMma", probe)
+        self.assertIn("using HighMma", probe)
+        self.assertIn("cutlass::uint4b_t, LayoutA", probe)
+        self.assertIn("cutlass::int4b_t, LayoutA", probe)
+        self.assertIn("GemmShape<8, 8, 32>", probe)
+        self.assertIn("struct InstructionPair", probe)
+        self.assertIn("mq_mma_sm75_int4_pair.h", self.cutlass_testbed)
+
     def test_v226_legal_sm75_candidate_tuner_contract(self):
         source_compact = "".join(self.source.split())
         cutlass_compact = "".join(self.cutlass_testbed.split())
