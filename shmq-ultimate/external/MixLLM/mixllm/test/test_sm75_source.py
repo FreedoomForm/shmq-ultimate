@@ -136,7 +136,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("use_fused_int4", source_compact)
         self.assertIn("n4>0&&n8==0&&n16==0&&!has_cached_metadata", source_compact)
         self.assertIn("n4>0&&n8==0&&n16==0&&!has_cached_metadata", source_compact)
-        self.assertIn("has_cached_metadata?&cached_scale_int8:nullptr,false)", source_compact)
+        self.assertIn("has_cached_metadata?&cached_scale_int8:nullptr,n4>0)", source_compact)
         self.assertIn("low_mma(low_accum,low_a,weights,low_accum)", source_compact)
         self.assertIn("high_mma(high_accum,high_a,weights,high_accum)", source_compact)
         self.assertIn("16*high_accum[row_tile][register_index]-correction", source_compact)

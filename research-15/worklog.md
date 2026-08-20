@@ -1141,3 +1141,6 @@ Deep research compared the rejected v242 small pair tile with upstream MixLLM's 
 Repair: the native pair kernel now uses eight warps and a 64-channel CTA tile. Each warp still owns eight channels and iterates the same four 8-row subtiles, preserving the SM75 8x8x32 low/high MMA pair, exact zero correction, scales, output indices, and FP32 ABI. The grid is widened to 64 channels per block and the launch uses 256 threads. The v241 CUTLASS overlap remains the fallback; no mixed production switch is enabled until the T4 result proves this wider candidate.
 
 Local validation: source contracts passed (19 tests), full MixLLM suite passed (85 tests, 6 CUDA-only skips), and the v230 native INT4 CPU proof passed. Kaggle has not been run for v244.
+
+### v244 dispatch addendum
+After the wider 8-warp/64-channel kernel passed the local source suite and full repository tests, the mixed rows>=32 overlap call was switched from `false` to `n4 > 0`, so the candidate is now actually exercised for mixed INT4 while INT8/FP16 stream overlap and the v241 fallback structure remain unchanged. The native CPU proof still passes. This is the final v244 tree to submit; no Kaggle run has been made from the earlier unenabled intermediate tree.
