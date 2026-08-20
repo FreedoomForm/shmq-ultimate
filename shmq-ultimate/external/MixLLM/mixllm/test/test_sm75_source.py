@@ -109,8 +109,8 @@ class SM75SourceContractTest(unittest.TestCase):
 
     def test_v235_direct_sm75_accumulator_mapping_contract(self):
         source_compact = "".join(self.source.split())
-        self.assertIn("floatpartial[kPairWarps][2]", source_compact)
-        self.assertIn("for(introw_tile=0;row_tile<kPairWarps;++row_tile)", source_compact)
+        self.assertIn("floatpartial[kPairRowTiles][2]", source_compact)
+        self.assertIn("for(introw_tile=0;row_tile<kPairRowTiles;++row_tile)", source_compact)
         self.assertIn("wmma::load_matrix_sync(a_low_u4,&a_low_packed[row_tile*8][0]", source_compact)
         self.assertIn("constintlocal_row=row_tile*8+(lane>>2)", source_compact)
         self.assertIn("constintlocal_channel_base=(lane&3)*2", source_compact)
@@ -120,9 +120,12 @@ class SM75SourceContractTest(unittest.TestCase):
 
     def test_v238_complete_fused_warp_tile_contract(self):
         source_compact = "".join(self.source.split())
-        self.assertIn("constexprintkPairWarps=4", source_compact)
-        self.assertIn("floatpartial[kPairWarps][2]", source_compact)
+        self.assertIn("constexprintkPairWarps=8", source_compact)
+        self.assertIn("constexprintkPairChannels=64", source_compact)
+        self.assertIn("constexprintkPairRowTiles=4", source_compact)
+        self.assertIn("floatpartial[kPairRowTiles][2]", source_compact)
         self.assertIn("wmma::load_matrix_sync(b_u4,&b_packed[warp*8][0]", source_compact)
+        self.assertIn("sm75_int4_pair_gemm_kernel<<<grid,256,0,stream>>>", source_compact)
         self.assertEqual(source_compact.count("channel_base+warp*8+local_channel_base+register_index"), 2)
         self.assertIn("output[row*output_width+indices_int4[channel]]=partial[row_tile][register_index]", source_compact)
 

@@ -903,9 +903,10 @@ __global__ void sm75_int4_pair_gemm_kernel(
     float* output, int rows, int width, int channels, int output_width) {
 #if __CUDA_ARCH__ >= 750
   namespace precision = wmma::experimental::precision;
-  constexpr int kPairWarps = 4;
+  constexpr int kPairWarps = 8;
   constexpr int kPairRows = 32;
-  constexpr int kPairChannels = 32;
+  constexpr int kPairChannels = 64;
+  constexpr int kPairRowTiles = 4;
   constexpr int kPairK = 32;
   constexpr int kPairBytes = kPairK / 2;
   __shared__ __align__(16) uint8_t a_low_packed[kPairRows][kPairBytes];
@@ -922,8 +923,8 @@ __global__ void sm75_int4_pair_gemm_kernel(
   // PTX m8n8k32 accumulator mapping: each lane owns two adjacent columns
   // in one row, with row = lane >> 2 and col = (lane & 3) * 2 + r.
   // Each warp owns one 8-column channel tile and iterates all four 8-row
-  // subtiles so the 4-warp block covers the complete 32x32 output tile.
-  float partial[kPairWarps][2] = {};
+  // subtiles so the 8-warp block covers a complete 32x64 output tile.
+  float partial[kPairRowTiles][2] = {};
 
   for (int group = 0; group < groups; ++group) {
     if (lane < 8) {
@@ -939,14 +940,14 @@ __global__ void sm75_int4_pair_gemm_kernel(
     }
     __syncthreads();
 
-    PairProbeLowMma::FragmentC low_accum[kPairWarps];
-    PairProbeHighMma::FragmentC high_accum[kPairWarps];
-    for (int row_tile = 0; row_tile < kPairWarps; ++row_tile) {
+    PairProbeLowMma::FragmentC low_accum[kPairRowTiles];
+    PairProbeHighMma::FragmentC high_accum[kPairRowTiles];
+    for (int row_tile = 0; row_tile < kPairRowTiles; ++row_tile) {
       low_accum[row_tile].clear();
       high_accum[row_tile].clear();
     }
 
-    for (int row_tile = 0; row_tile < kPairWarps; ++row_tile) {
+    for (int row_tile = 0; row_tile < kPairRowTiles; ++row_tile) {
       for (int chunk = 0; chunk < kGroupSize / kPairK; ++chunk) {
         const int k_base = group * kGroupSize + chunk * kPairK;
         for (int item = threadIdx.x; item < kPairRows * kPairBytes;
@@ -1025,7 +1026,7 @@ __global__ void sm75_int4_pair_gemm_kernel(
   }
 
   const int local_channel_base = (lane & 3) * 2;
-  for (int row_tile = 0; row_tile < kPairWarps; ++row_tile) {
+  for (int row_tile = 0; row_tile < kPairRowTiles; ++row_tile) {
     const int row = row_base + row_tile * 8 + (lane >> 2);
     for (int register_index = 0; register_index < 2; ++register_index) {
       const int channel = channel_base + warp * 8 + local_channel_base + register_index;
@@ -1054,8 +1055,8 @@ void run_int4_pair_partition(
   record_tensor_stream(output, stream);
   const int channels = static_cast<int>(indices_int4.numel());
   const int output_width = static_cast<int>(output.size(1));
-  const dim3 grid((channels + 31) / 32, (rows + 31) / 32);
-  sm75_int4_pair_gemm_kernel<<<grid, 128, 0, stream>>>(
+  const dim3 grid((channels + 63) / 64, (rows + 31) / 32);
+  sm75_int4_pair_gemm_kernel<<<grid, 256, 0, stream>>>(
       input_int8.data_ptr<int8_t>(), weight_int4.data_ptr<uint8_t>(),
       reinterpret_cast<const __half*>(scale_act.data_ptr<at::Half>()),
       reinterpret_cast<const __half*>(scale_int4.data_ptr<at::Half>()),

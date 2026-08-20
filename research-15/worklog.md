@@ -1133,3 +1133,11 @@ Local validation: full repository MixLLM suite passed (86 tests, 6 CUDA-only ski
 Kaggle server version 240 (v242) compiled and passed the mixed-stride probe, embedded contracts, SM75 native correctness, mixed decode GEMM, and timing integrity. It failed both end-to-end gates. On Qwen mixed QKV `{4: 2400, 8: 896, 16: 288}`, rows=1 was 1.23x dense, rows=16 was 3.52x, and rows=128 was 16.62x end-to-end. The v241 measured path was approximately 1.28x, 3.55x, and 3.24x respectively. The v242 production switch is therefore rejected and is not retained.
 
 Deep research found the cause is architectural: the native pair kernel is a correctness-proven 32x32 small-tile path where each warp owns 8 channels and iterates four row subtiles. At Qwen K=3584, mixed large-M work repeatedly reloads small A/B panels and serializes row subtiles, unlike upstream MixLLM's shape-tuned staged CUTLASS threadblock dataflow. The fused kernel remains retained only for the pure-INT4 candidate and diagnostic probes. Mixed rows>=32 is restored to `use_fused_int4=false`, the last measured v241 behavior.
+
+## v244 — Wider 8-warp/64-channel native INT4 pair tile (local validation complete)
+
+Deep research compared the rejected v242 small pair tile with upstream MixLLM's wider N tile families. Upstream searches N=64/128/256 families and its large-M fallback uses a 64x128 threadblock, whereas the native pair candidate exposed only a 32-channel CTA tile. v242 proved that the 32-channel pair geometry is correct but catastrophically slow for mixed large-M Qwen prefill.
+
+Repair: the native pair kernel now uses eight warps and a 64-channel CTA tile. Each warp still owns eight channels and iterates the same four 8-row subtiles, preserving the SM75 8x8x32 low/high MMA pair, exact zero correction, scales, output indices, and FP32 ABI. The grid is widened to 64 channels per block and the launch uses 256 threads. The v241 CUTLASS overlap remains the fallback; no mixed production switch is enabled until the T4 result proves this wider candidate.
+
+Local validation: source contracts passed (19 tests), full MixLLM suite passed (85 tests, 6 CUDA-only skips), and the v230 native INT4 CPU proof passed. Kaggle has not been run for v244.
