@@ -1258,3 +1258,11 @@ The run did not modify model, quality, or benchmark settings. The next iteration
 Deep research after v256's Kaggle runtime error confirmed the M=128,N=128 candidate required 16 warps/512 threads and exceeded T4 launch resources. The official MixLLM configuration table includes a broad 64x64 family. v257 removes M=128,N=128 completely and adds only `GemmShape<64,64,64>` with `WarpShape<32,32,64>`, instruction `<8,8,16>`, stage 2, as cache ABI 257. Existing N=128, N=64, and M=128,N=64 candidates remain. The v255 staged mixed dispatch and timing gate remain unchanged.
 
 Local validation passed: focused source/backend tests 38 passed with 6 CUDA-only skips; full suite 85 passed with 6 CUDA-only skips; native INT4 proof passed; diff check passed. Kaggle has not been run for v257.
+
+## v257 — Kaggle T4 result (kernel version 252)
+
+The resource-safe M=64,N=64 candidate compiled, ran, and matched the committed source digest `ae99341c95b0a079`. Functional checks passed, including native correctness, mixed-stride probe, and test return code 0. The required performance gates still failed and timing integrity failed at Qwen mixed rows=16.
+
+Qwen mixed 4/8/16 end-to-end speedups were 0.811x at rows=1, 0.303x at rows=16, and 0.230x at rows=128. Rows=128 timing integrity was valid (`0.9825`), but its end-to-end ratio was 4.347x; rows=16 had ratio `1.2334`, above the 1.10 integrity limit. `terminal_decision` was `no_go`. v257 is rejected and cannot replace the accepted baseline.
+
+The M=128,N=128 resource failure was fixed, but M=64,N=64 did not improve the target path. Next iteration must begin with deep research into the direct packed INT4 dataflow and/or the staged stream/timing seam; no Kaggle run will occur during repairs.
