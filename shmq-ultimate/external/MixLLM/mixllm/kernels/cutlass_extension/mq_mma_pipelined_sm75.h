@@ -420,11 +420,12 @@ public:
       typename IteratorScaleAct::AccessType const* gmem_scale_act_ptr = iterator_scale_act.get();
       typename IteratorZero::AccessType const* gmem_zero_ptr = iterator_zero.get();
 
-      static_assert(Shape::kK == 64);
-      // The threadblock K tile is 64 while quantization metadata covers 128
-      // elements. Both pipeline stages must therefore receive the same metadata
-      // for the two 64-element halves of one quantization group. Advance the
-      // global metadata iterator only after the second half.
+      static_assert(Shape::kK == 64 || Shape::kK == 128);
+      // Quantization metadata covers 128 input elements.  The validated v200
+      // runner uses two K=64 halves per group; the guarded K=128 experiment
+      // consumes one complete group per threadblock tile.  Keep the K=64
+      // behavior byte-for-byte in effect and advance the global metadata by
+      // one row only after the complete logical group has been consumed.
       if (iterator_scale.valid()) {
         *smem_scale_ptr = *gmem_scale_ptr;
       }
@@ -436,12 +437,19 @@ public:
           *smem_zero_ptr = *gmem_zero_ptr;
         }
       }
-      if (iterator_scale.row_groupsize64_ & 0x1) {
+      if constexpr (Shape::kK == 64) {
+        if (iterator_scale.row_groupsize64_ & 0x1) {
+          iterator_scale.add_tile_offset({1, 0});
+          iterator_scale_act.add_tile_offset({1, 0});
+          iterator_zero.add_tile_offset({1, 0});
+        }
+        iterator_scale.row_groupsize64_++;
+      } else {
         iterator_scale.add_tile_offset({1, 0});
         iterator_scale_act.add_tile_offset({1, 0});
         iterator_zero.add_tile_offset({1, 0});
+        iterator_scale.row_groupsize64_ += 2;
       }
-      iterator_scale.row_groupsize64_++;
       smem_iterator_scale.add_tile_offset({1, 0});
       smem_iterator_scale_act.add_tile_offset({1, 0});
       smem_iterator_zero.add_tile_offset({1, 0});
