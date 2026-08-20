@@ -31,10 +31,11 @@ SOURCE_FILES = (
 def git(args, cwd):
     return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
 def git_dirty(cwd, ignored=()):
+    repo_root = Path(git(["rev-parse", "--show-toplevel"], cwd)).resolve()
     ignored = {path.resolve() for path in ignored}
     for line in git(["status", "--porcelain"], cwd).splitlines():
         relative = line[3:].split(" -> ")[-1]
-        if (cwd / relative).resolve() not in ignored:
+        if (repo_root / relative).resolve() not in ignored:
             return True
     return False
 def provenance(sources):
