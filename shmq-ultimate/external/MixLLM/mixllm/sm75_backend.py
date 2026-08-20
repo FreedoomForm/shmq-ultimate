@@ -227,21 +227,15 @@ def _prefill_metadata_for_cutlass(module, x, torch_module):
 
 
 def _use_v188_mixed_prefill_path(module, x, torch_module):
-    """Use the measured v188 ABI only for the large mixed Qwen prefill shape.
+    """Disable the stale v188 mixed adapter after the cached-v3 retest.
 
-    Python partition validation still runs before this helper is reached.  The
-    v2 unchecked CUDA entry point is retained as a performance adapter because
-    the v188 Kaggle result was faster than the cached-v3 path for this exact
-    mixed large-M scenario.  Pure precision cases stay on the v3 path so this
-    restoration changes only the measured regression surface.
+    The function remains as an explicit dispatch seam and compatibility marker,
+    but current mixed rows>=32 calls use the prepared CUTLASS metadata path.
+    Keeping the old v2 entry point below preserves the ABI fallback for shapes
+    that do not satisfy the cached-v3 dispatch conditions.
     """
-    del torch_module
-    return (
-        x.shape[0] >= 32
-        and module.indices_4.numel() > 0
-        and module.indices_8.numel() > 0
-        and module.indices_16.numel() > 0
-    )
+    del module, x, torch_module
+    return False
 
 
 def three_level_linear_prequantized(module, x, input_int8, scale_act, torch_module):

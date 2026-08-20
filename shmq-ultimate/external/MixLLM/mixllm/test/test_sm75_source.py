@@ -54,6 +54,12 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("_three_level_linear_v2_unchecked(*arguments)", self.backend)
         self.assertIn("_use_v188_mixed_prefill_path(module, x, torch_module)", self.backend)
 
+    def test_v261_mixed_prefill_uses_cached_metadata_dispatch(self):
+        selector = self.backend[self.backend.index("def _use_v188_mixed_prefill_path"):]
+        self.assertIn("return False", selector)
+        self.assertIn("_prefill_metadata_for_cutlass(module, x, torch_module)", self.backend)
+        self.assertIn("native_v3(*arguments, *metadata[1:])", self.backend)
+
     def test_v196_timing_integrity_contract(self):
         self.assertIn("timing_integrity_ratio", self.backend)
         self.assertIn("timing_integrity", self.backend)
