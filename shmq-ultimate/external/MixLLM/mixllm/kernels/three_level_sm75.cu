@@ -772,7 +772,6 @@ __global__ void sm75_int4_pair_wmma_load_probe_kernel(int* output) {
 #if __CUDA_ARCH__ >= 750
   namespace precision = wmma::experimental::precision;
   __shared__ __align__(16) uint8_t a_packed[8 * 16];
-  __shared__ __align__(16) uint8_t a_high_packed[8 * 16];
   __shared__ __align__(16) uint8_t b_packed[8 * 16];
   __shared__ __align__(16) int accumulator[8 * 8];
   const int lane = threadIdx.x;
@@ -781,7 +780,6 @@ __global__ void sm75_int4_pair_wmma_load_probe_kernel(int* output) {
     const int byte = item % 16;
     const int value = row + 1;
     a_packed[item] = static_cast<uint8_t>(value | (value << 4));
-    a_high_packed[item] = 0;
     const int column = row;
     const int weight = column + 1;
     b_packed[item] = static_cast<uint8_t>(weight | (weight << 4));
@@ -789,19 +787,13 @@ __global__ void sm75_int4_pair_wmma_load_probe_kernel(int* output) {
   __syncwarp();
   wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::u4,
                  wmma::row_major> a_low;
-  wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::s4,
-                 wmma::row_major> a_high;
   wmma::fragment<wmma::matrix_b, 8, 8, 32, precision::u4,
                  wmma::col_major> weights;
   wmma::fragment<wmma::accumulator, 8, 8, 32, int> low_accum;
-  wmma::fragment<wmma::accumulator, 8, 8, 32, int> high_accum;
   wmma::load_matrix_sync(a_low, a_packed, 32);
-  wmma::load_matrix_sync(a_high, a_high_packed, 32);
   wmma::load_matrix_sync(weights, b_packed, 32);
   wmma::fill_fragment(low_accum, 0);
-  wmma::fill_fragment(high_accum, 0);
   wmma::mma_sync(low_accum, a_low, weights, low_accum);
-  wmma::mma_sync(high_accum, a_high, weights, high_accum);
   wmma::store_matrix_sync(accumulator, low_accum, 8, wmma::mem_row_major);
   __syncwarp();
   for (int item = lane; item < 8 * 8; item += kWarpSize) {

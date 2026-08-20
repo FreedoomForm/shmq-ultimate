@@ -1041,3 +1041,6 @@ Kaggle v224 compiled the two native MMA forms but failed before execution becaus
 
 ## v226 probe — packed row/column WMMA layout
 After v225 confirmed both raw SM75 MMA instructions execute, v226 adds a second probe using packed row-major A and column-major B shared-memory tiles. It asserts the exact 8x8 result `32*(row+1)*(column+1)` from `u4*u4` WMMA, while also executing the `s4*u4` high path. Runtime dispatch remains probe-only. Local 81-test suite, CPU proof, Python checks, and diff checks pass. Kaggle validation pending.
+
+## v227 diagnosis — WMMA signed/unsigned mixed overload is unavailable
+Kaggle v226 failed at nvcc line 804: CUDA’s WMMA API exposes `m8n8k32` `u4*u4` and `s4*s4`, but no `s4*u4` overload. The earlier CUTLASS `arch::Mma` probe still compiles and executes the mixed signed/unsigned path; the WMMA packed-load probe is therefore narrowed to the legal `u4*u4` load/arithmetic, while the separate CUTLASS probe continues to execute `s4*u4`. Duplicate declarations introduced while narrowing the probe were removed. No production dispatch is changed.
