@@ -127,7 +127,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("constexprintkPairNSubtiles=2", source_compact)
         self.assertIn("wmma::load_matrix_sync(b_u4,&b_packed[warp*16+n_tile*8][0]", source_compact)
         self.assertEqual(source_compact.count("channel_base+warp*16+n_tile*8+local_channel_base+register_index"), 2)
-        self.assertIn("output[row*output_width+indices_int4[channel]]=partial[row_tile][n_tile][register_index]", source_compact)
+        self.assertIn("output[row*output_width+indices_int4[channel]]=__float2half_rn(partial[row_tile][n_tile][register_index])", source_compact)
         self.assertEqual(source_compact.count("a_low_packed[row][pair]=low0|(low1<<4)"), 1)
         self.assertEqual(source_compact.count("b_packed[local_channel][pair]=channel<channels?weight_int4[source]:0"), 1)
 
@@ -154,7 +154,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("usingInt8RunnerM64N64=Runner<CoreM64N64,2>", cutlass_compact)
         self.assertIn("kM128N64=2", source_compact)
         self.assertIn("kM64N64=3", source_compact)
-        self.assertIn("kCutlassTuningAbi=257", source_compact)
+        self.assertIn("kCutlassTuningAbi=258", source_compact)
         self.assertNotIn("GemmShape<128,128,64>", cutlass_compact)
         self.assertNotIn("kM128N128", source_compact)
         self.assertIn("kM128N64", source_compact)

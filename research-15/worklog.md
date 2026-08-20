@@ -1266,3 +1266,12 @@ The resource-safe M=64,N=64 candidate compiled, ran, and matched the committed s
 Qwen mixed 4/8/16 end-to-end speedups were 0.811x at rows=1, 0.303x at rows=16, and 0.230x at rows=128. Rows=128 timing integrity was valid (`0.9825`), but its end-to-end ratio was 4.347x; rows=16 had ratio `1.2334`, above the 1.10 integrity limit. `terminal_decision` was `no_go`. v257 is rejected and cannot replace the accepted baseline.
 
 The M=128,N=128 resource failure was fixed, but M=64,N=64 did not improve the target path. Next iteration must begin with deep research into the direct packed INT4 dataflow and/or the staged stream/timing seam; no Kaggle run will occur during repairs.
+
+
+## v258 — upstream-compatible FP16 output buffer (local validation complete)
+
+Deep research compared the official MixLLM launcher and tests with the active SHMQ SM75 path. The official launcher allocates `matrix_C_computed` as FP16 and its correctness checks compare against an FP32 reference only after casting to half. SHMQ instead allocated FP32 output in `three_level_linear_v2_core`, wrote four-byte values from every direct-WMMA, native pair, decode, and staged CUTLASS path, then cast the complete tensor back to FP16 in `ThreeLevelLinear.forward()`. This doubled output storage/bandwidth and added a separate conversion despite the model-visible result already being FP16. The v258 change makes all production SM75 kernels write `__half` with explicit `__float2half_rn`, changes the staged CUTLASS runner to accept `__half*`, allocates the public CUDA result as FP16, and converts only the mixed-stride diagnostic probe back to float for its existing probe contract. CPU reference behavior and empty CPU-input dtype contracts remain unchanged. The tuning ABI is bumped from 257 to 258.
+
+The research also confirmed that simply switching back to cached-v3 metadata is not admissible: v220/v189 cached metadata was numerically correct but regressed mixed rows=128 performance and failed timing integrity. Therefore v258 changes only the output ABI and cache invalidation, not the rejected metadata path, arithmetic, partitioning, model, or benchmark settings.
+
+Local validation after the final ABI bump: focused/source/backend tests pass; full suite `85 passed, 6 skipped`; native INT4 reference proof passes; `git diff --check` passes. No Kaggle run has been made for v258 yet.

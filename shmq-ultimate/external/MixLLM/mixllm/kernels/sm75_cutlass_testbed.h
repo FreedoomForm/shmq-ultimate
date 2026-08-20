@@ -43,7 +43,7 @@ __global__ void kernel(
     typename Mma::ElementScale const* ptr_scale_act,
     typename Mma::IteratorZero::Params params_zero,
     typename Mma::ElementZero const* ptr_zero,
-    float* ptr_C, typename LayoutC::Stride::Index ldc,
+    __half* ptr_C, typename LayoutC::Stride::Index ldc,
     ElementC const* indices) {
   extern __shared__ int shared_base[];
   SharedStorage* shared = reinterpret_cast<SharedStorage*>(shared_base);
@@ -124,7 +124,7 @@ __global__ void kernel(
           if (global_row < problem_size.m() &&
               index_fragment[fragment_index] >= 0) {
             ptr_C[global_row * ldc + index_fragment[fragment_index]] =
-                (*converted)[index];
+                __float2half_rn((*converted)[index]);
           }
         }
       }
@@ -196,7 +196,7 @@ struct Runner {
         reinterpret_cast<typename Mma::ElementScale const*>(matrix_scale_act.data_ptr<at::Half>()),
         params_zero,
         reinterpret_cast<typename Mma::ElementZero const*>(matrix_zero.data_ptr<uint8_t>()),
-        matrix_C.data_ptr<float>(), matrix_C.stride(0), matrix_indices.data_ptr<int32_t>());
+        matrix_C.data_ptr<at::Half>(), matrix_C.stride(0), matrix_indices.data_ptr<int32_t>());
   }
 };
 

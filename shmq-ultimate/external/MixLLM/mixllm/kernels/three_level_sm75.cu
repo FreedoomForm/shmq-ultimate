@@ -74,7 +74,7 @@ enum class CutlassConfig : int {
   kM64N64 = 3,
 };
 
-constexpr int kCutlassTuningAbi = 257;
+constexpr int kCutlassTuningAbi = 258;
 constexpr int kCutlassTuningWarmup = 2;
 constexpr int kCutlassTuningIterations = 4;
 std::mutex g_cutlass_tuning_mutex;
@@ -315,7 +315,7 @@ __global__ void three_level_tensorcore_kernel(
     const __half* scale_int4,
     const int32_t* indices_int4, const int8_t* weight_int8,
     const __half* scale_int8, const int32_t* indices_int8,
-    const __half* weight_fp16, const int32_t* indices_fp16, float* output,
+    const __half* weight_fp16, const int32_t* indices_fp16, __half* output,
     int rows, int width, int output_width, int n4, int n8, int n16) {
 #if __CUDA_ARCH__ >= 750
   constexpr int prefill_channels = PrefillWarps * kTile;
@@ -482,7 +482,7 @@ __global__ void three_level_tensorcore_kernel(
     if (row < rows && local_channel < partition_size) {
       const int output_channel = precision == 4
           ? indices_int4[local_channel] : indices_int8[local_channel];
-      output[row * output_width + output_channel] = scaled_accumulators[item];
+        output[row * output_width + output_channel] = __float2half_rn(scaled_accumulators[item]);
     }
   }
 #endif
@@ -496,7 +496,7 @@ __global__ void three_level_tensorcore_reuse_kernel(
     const __half* scale_int4,
     const int32_t* indices_int4, const int8_t* weight_int8,
     const __half* scale_int8, const int32_t* indices_int8,
-    const __half* weight_fp16, const int32_t* indices_fp16, float* output,
+    const __half* weight_fp16, const int32_t* indices_fp16, __half* output,
     int rows, int width, int output_width, int n4, int n8, int n16) {
 #if __CUDA_ARCH__ >= 750
   const int warp = threadIdx.x / kWarpSize;
@@ -570,7 +570,7 @@ __global__ void three_level_tensorcore_reuse_kernel(
       const int c = channel_base + linear % kTile;
       if (r < rows && c < partition_size)
         output[r * output_width + indices_fp16[c]] =
-            accumulator_fp32[warp][linear];
+            __float2half_rn(accumulator_fp32[warp][linear]);
     }
     return;
   }
@@ -631,7 +631,7 @@ __global__ void three_level_tensorcore_reuse_kernel(
     const int r = row_base + linear / kTile;
     const int c = channel_base + linear % kTile;
     if (r < rows && c < partition_size)
-      output[r * output_width + (precision == 4 ? indices_int4[c] : indices_int8[c])] = scaled[linear / kWarpSize];
+        output[r * output_width + (precision == 4 ? indices_int4[c] : indices_int8[c])] = __float2half_rn(scaled[linear / kWarpSize]);
   }
 #endif
 }
@@ -646,7 +646,7 @@ __global__ void three_level_decode_kernel(
     const __half* scale_int4, const uint8_t* zero_int4,
     const int32_t* indices_int4, const int8_t* weight_int8,
     const __half* scale_int8, const int32_t* indices_int8,
-    const __half* weight_fp16, const int32_t* indices_fp16, float* output,
+    const __half* weight_fp16, const int32_t* indices_fp16, __half* output,
     int width, int output_width, int n4, int n8, int n16) {
 #if __CUDA_ARCH__ >= 750
   const int lane = threadIdx.x & (kWarpSize - 1);
@@ -741,7 +741,7 @@ __global__ void three_level_decode_kernel(
     }
   }
   if (sublane == 0) {
-    output[output_channel] = result;
+    output[output_channel] = __float2half_rn(result);
   }
 #endif
 }
@@ -883,11 +883,11 @@ at::Tensor sm75_int4_pair_mixed_stride_probe_cuda(const at::Tensor& device_tenso
   auto scale_int4 = at::ones({channels, 1}, options.dtype(at::kHalf));
   auto zero_int4 = at::zeros({channels, 1}, options.dtype(at::kByte));
   auto indices_int4 = at::arange(channels, options.dtype(at::kInt));
-  auto output = at::full({rows, output_width}, -999.0, options.dtype(at::kFloat));
+  auto output = at::full({rows, output_width}, -999.0, options.dtype(at::kHalf));
   run_int4_pair_partition(
       input_int8, scale_act, weight_int4, scale_int4, zero_int4,
       indices_int4, output, rows, width, at::cuda::getCurrentCUDAStream());
-  return output;
+  return output.to(at::kFloat);
 }
 
 at::Tensor sm75_int4_pair_fused_probe_cuda(const at::Tensor& device_tensor) {
@@ -914,7 +914,7 @@ __global__ void sm75_int4_pair_gemm_kernel(
     const int8_t* input_int8, const uint8_t* weight_int4,
     const __half* scale_act, const __half* scale_int4,
     const uint8_t* zero_int4, const int32_t* indices_int4,
-    float* output, int rows, int width, int channels, int output_width) {
+    __half* output, int rows, int width, int channels, int output_width) {
 #if __CUDA_ARCH__ >= 750
   namespace precision = wmma::experimental::precision;
   constexpr int kPairWarps = 4;
@@ -1059,8 +1059,8 @@ __global__ void sm75_int4_pair_gemm_kernel(
         const int channel = channel_base + warp * 16 + n_tile * 8 +
                             local_channel_base + register_index;
         if (row < rows && channel < channels) {
-          output[row * output_width + indices_int4[channel]] =
-              partial[row_tile][n_tile][register_index];
+              output[row * output_width + indices_int4[channel]] =
+              __float2half_rn(partial[row_tile][n_tile][register_index]);
         }
       }
     }
@@ -1091,7 +1091,7 @@ void run_int4_pair_partition(
       reinterpret_cast<const __half*>(scale_act.data_ptr<at::Half>()),
       reinterpret_cast<const __half*>(scale_int4.data_ptr<at::Half>()),
       zero_int4.data_ptr<uint8_t>(), indices_int4.data_ptr<int32_t>(),
-      output.data_ptr<float>(), rows, width, channels, output_width);
+      output.data_ptr<at::Half>(), rows, width, channels, output_width);
   C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 
@@ -1328,7 +1328,7 @@ at::Tensor three_level_linear_v2_core(
   }
 
   c10::cuda::CUDAGuard device_guard(input_fp16.device());
-  auto output = at::empty({rows, output_width}, input_fp16.options().dtype(at::kFloat));
+  auto output = at::empty({rows, output_width}, input_fp16.options().dtype(at::kHalf));
   if (rows == 0) {
     return output;
   }
@@ -1348,7 +1348,7 @@ at::Tensor three_level_linear_v2_core(
         reinterpret_cast<const __half*>(scale_int8.data_ptr<at::Half>()),
         indices_int8.data_ptr<int32_t>(),
         reinterpret_cast<const __half*>(weight_fp16.data_ptr<at::Half>()),
-        indices_fp16.data_ptr<int32_t>(), output.data_ptr<float>(), width,
+        indices_fp16.data_ptr<int32_t>(), output.data_ptr<at::Half>(), width,
         output_width, n4, n8, n16);
   } else if (rows >= 32 && n4 > 0 && n8 == 0 && n16 == 0 && !has_cached_metadata) {
     // v229 candidate: pure INT4 uses one packed-B fused pair; mixed,
@@ -1389,7 +1389,7 @@ at::Tensor three_level_linear_v2_core(
         reinterpret_cast<const __half*>(scale_int8.data_ptr<at::Half>()),
         indices_int8.data_ptr<int32_t>(),
         reinterpret_cast<const __half*>(weight_fp16.data_ptr<at::Half>()),
-        indices_fp16.data_ptr<int32_t>(), output.data_ptr<float>(), rows, width,
+        indices_fp16.data_ptr<int32_t>(), output.data_ptr<at::Half>(), rows, width,
         output_width, 0, 0, n16);
     }
     finish_integer_prefill_overlap(
