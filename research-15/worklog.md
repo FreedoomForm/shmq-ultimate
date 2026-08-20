@@ -1032,3 +1032,6 @@ After comparing the original MixLLM operator and the vendored SM75 headers again
 
 ## v223 Kaggle compile probe — SM75 INT4 forms compile on T4
 Kaggle v223 ran on Tesla T4 / SM75 and compiled the embedded extension with `/usr/local/cuda/bin/nvcc -gencode=arch=compute_75,code=sm_75`. The new `mq_mma_sm75_int4_pair.h` probe was embedded and compiled through `sm75_cutlass_testbed.h`; link succeeded, embedded contracts passed, native correctness passed, and the existing v228 performance report remained unchanged because runtime dispatch was not modified. This validates Kaggle as the compile environment for the next real fused-pair implementation. No performance claim is made for v223.
+
+## v224 probe — execute native SM75 `u4*u4` and `s4*u4`
+The v223 compile-only probe succeeded, so v224 adds a standalone CUDA/Torch probe that executes both legal `m8n8k32` instruction specializations with zero fragments and asserts a zero result on T4. It remains outside production dispatch; the goal is to validate runtime instruction execution before implementing the full staged pair. Full local discovery passes 81 tests with 6 CUDA-only skips, the CPU reference proof passes, and Python/diff checks pass. Kaggle run pending.

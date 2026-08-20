@@ -291,6 +291,10 @@ if capability == (7, 5):
     from mixllm.quantization.three_level import ThreeLevelAllocation, ThreeLevelBudget
     from mixllm.sm75_backend import benchmark_sm75_backend, load_sm75_backend
     load_sm75_backend(torch)
+    pair_probe = torch.ops.mixllm_sm75.sm75_int4_pair_instruction_probe()
+    assert tuple(pair_probe.shape) == (2,), pair_probe.shape
+    assert torch.equal(pair_probe, torch.zeros_like(pair_probe)), pair_probe
+    print('SM75_INT4_PAIR_INSTRUCTION_PROBE_PASS', pair_probe.tolist(), flush=True)
     def make_case(n, width, counts, rows):
         n4, n8, n16 = counts; assert n4 + n8 + n16 == n
         alloc = ThreeLevelAllocation(indices={4: tuple(range(n4)), 8: tuple(range(n4, n4+n8)), 16: tuple(range(n4+n8, n))}, scores={b: (0.0,) * n for b in (4, 8, 16)}, budget=ThreeLevelBudget(*(100*c/n for c in counts)))

@@ -732,6 +732,41 @@ __global__ void three_level_decode_kernel(
 #endif
 }
 
+using PairProbeLowMma = shmq_cutlass_sm75::int4_pair_probe::LowMma;
+using PairProbeHighMma = shmq_cutlass_sm75::int4_pair_probe::HighMma;
+
+__global__ void sm75_int4_pair_instruction_probe_kernel(int* output) {
+#if __CUDA_ARCH__ >= 750
+  PairProbeLowMma::FragmentA low_a;
+  PairProbeHighMma::FragmentA high_a;
+  PairProbeLowMma::FragmentB weights;
+  PairProbeLowMma::FragmentC low_accum;
+  PairProbeHighMma::FragmentC high_accum;
+  low_a.clear();
+  high_a.clear();
+  weights.clear();
+  low_accum.clear();
+  high_accum.clear();
+  PairProbeLowMma low_mma;
+  PairProbeHighMma high_mma;
+  low_mma(low_accum, low_a, weights, low_accum);
+  high_mma(high_accum, high_a, weights, high_accum);
+  if (threadIdx.x == 0) {
+    output[0] = low_accum[0];
+    output[1] = high_accum[0];
+  }
+#endif
+}
+
+at::Tensor sm75_int4_pair_instruction_probe_cuda() {
+  auto output = at::zeros({2}, at::TensorOptions().device(at::kCUDA).dtype(at::kInt));
+  auto stream = at::cuda::getCurrentCUDAStream();
+  sm75_int4_pair_instruction_probe_kernel<<<1, kWarpSize, 0, stream>>>(
+      output.data_ptr<int>());
+  C10_CUDA_KERNEL_LAUNCH_CHECK();
+  return output;
+}
+
 void check_cuda_contiguous(const at::Tensor& tensor, const char* name) {
   TORCH_CHECK(tensor.is_cuda(), name, " must be a CUDA tensor");
   TORCH_CHECK(tensor.is_contiguous(), name, " must be contiguous");
@@ -1158,6 +1193,7 @@ at::Tensor three_level_linear_legacy_cuda(
 
 TORCH_LIBRARY(mixllm_sm75, m) {
   m.def("quantize_activation(Tensor input) -> (Tensor, Tensor)");
+  m.def("sm75_int4_pair_instruction_probe() -> Tensor");
   m.def("_three_level_linear_v2_unchecked(Tensor input_fp16, Tensor input_int8, "
         "Tensor scale_act, Tensor weight_int4, Tensor expanded_int4, "
         "Tensor scale_int4, "
@@ -1192,6 +1228,7 @@ TORCH_LIBRARY(mixllm_sm75, m) {
 
 TORCH_LIBRARY_IMPL(mixllm_sm75, CUDA, m) {
   m.impl("quantize_activation", &quantize_activation_sm75);
+  m.impl("sm75_int4_pair_instruction_probe", &sm75_int4_pair_instruction_probe_cuda);
   m.impl("_three_level_linear_v2_unchecked", &three_level_linear_v2_unchecked_cuda);
   m.impl("three_level_linear_v2", &three_level_linear_v2_cuda);
   m.impl("_three_level_linear_v3_unchecked", &three_level_linear_v3_unchecked_cuda);
