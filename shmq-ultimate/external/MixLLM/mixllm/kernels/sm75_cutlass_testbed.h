@@ -193,15 +193,4 @@ using Core = cutlass::gemm::threadblock::DefaultMmaCore<
 
 using Int8Runner = Runner<Core, 2>;
 
-// Upstream MixLLM's equivalent K=64/128-channel fallback uses five stages.
-// Keep it as a separate matching core/pipeline pair for the large-M experiment.
-using CoreStage5 = cutlass::gemm::threadblock::DefaultMmaCore<
-    cutlass::gemm::GemmShape<32, 128, 64>,
-    cutlass::gemm::GemmShape<32, 32, 64>,
-    cutlass::gemm::GemmShape<8, 8, 16>,
-    ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC,
-    cutlass::arch::OpClassTensorOp, 5, cutlass::arch::OpMultiplyAddSaturate>;
-
-using Int8RunnerStage5 = Runner<CoreStage5, 5>;
-
 }  // namespace shmq_cutlass_sm75

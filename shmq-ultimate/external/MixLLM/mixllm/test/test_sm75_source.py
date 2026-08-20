@@ -70,16 +70,6 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("OpClassTensorOp,2,cutlass::arch::OpMultiplyAddSaturate>", cutlass_compact)
         self.assertIn("usingInt8Runner=Runner<Core,2>", cutlass_compact)
 
-    def test_v222_stage5_large_m_experiment_contract(self):
-        source_compact = "".join(self.source.split())
-        cutlass_compact = "".join(self.cutlass_testbed.split())
-        self.assertIn("usingCoreStage5=cutlass::gemm::threadblock::DefaultMmaCore<", cutlass_compact)
-        self.assertIn("OpClassTensorOp,5,cutlass::arch::OpMultiplyAddSaturate>", cutlass_compact)
-        self.assertIn("usingInt8RunnerStage5=Runner<CoreStage5,5>", cutlass_compact)
-        self.assertIn("if(rows>=128)", source_compact)
-        self.assertIn("Int8RunnerStage5::run", source_compact)
-        self.assertIn("Int8Runner::run", source_compact)
-
     def test_v200_integer_prefill_overlap_contract(self):
         source_compact = "".join(self.source.split())
         cutlass_compact = "".join(self.cutlass_testbed.split())
