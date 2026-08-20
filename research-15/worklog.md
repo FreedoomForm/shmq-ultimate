@@ -1119,3 +1119,11 @@ Local notebook build and `--check` passed with 30 embedded files. This diagnosti
 Kaggle version 238 diagnostic output proved the remaining defect exactly: `-999.0` count 1792, `128.0` count 256, 768 mismatches, beginning at every row and column 8. The correction/scaling path already used `warp * 8`, but the final output scatter omitted it, causing all four warps to write into columns 0–7. v241 adds `warp * 8` to the final scatter and requires both channel expressions by source contract.
 
 Local verification: 79 repository tests passed, 6 CUDA-only tests skipped, 3 subtests passed, and the native INT4 CPU proof passed. v241 is ready for one Kaggle T4 mixed-stride validation.
+
+## v242 — Enable T4-native fused INT4 inside mixed prefill overlap (local validation complete)
+
+Deep research compared the completed v241 Kaggle run with upstream `mix_mma_multistage.cuh`. v241 passed the mixed-stride probe, native correctness, mixed decode GEMM, and timing-integrity gates, but failed mixed decode/prefill end-to-end performance. Qwen mixed QKV `{4: 2400, 8: 896, 16: 288}` measured approximately 1.28x dense at rows=1, 3.55x at rows=16, and 3.24x at rows=128. Upstream retains persistent INT4/INT8 auxiliary streams and staged overlap, while SHMQ's mixed rows>=32 path was still sending INT4 through expanded signed-INT8 CUTLASS.
+
+Repair: keep the upstream-style two auxiliary streams, INT8 CUTLASS branch, FP16 caller-stream branch, exact channel/index ABI, and all existing fallbacks, but pass `n4 > 0` as `use_fused_int4` for the rows>=32 mixed path so the T4-validated packed native INT4 pair kernel handles the INT4 branch. Cached metadata remains accepted by the ABI but is not needed by the fused INT4 branch. No weights, activations, quality checks, benchmark settings, or model selection changed.
+
+Local validation: full repository MixLLM suite passed (86 tests, 6 CUDA-only skips), the v230 native INT4 reference proof passed, and the added v242 source contract passed. Kaggle has not yet been run for v242; the candidate must be committed, notebook rebuilt, and submitted exactly once only after final local review.

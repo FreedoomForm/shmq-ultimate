@@ -1326,10 +1326,13 @@ at::Tensor three_level_linear_v2_core(
         input_int8, scale_act, weight_int4, scale_int4, zero_int4,
         indices_int4, output, rows, width, stream.stream());
   } else if (rows >= 32 && (n4 > 0 || n8 > 0)) {
-    // The original MixLLM relies on iterator-based, staged Tensor Core GEMMs
-    // for larger M. The helper is deliberately selected only for rows>=32:
-    // the SM75 16x128 CUTLASS geometry is not a valid portable small-M core,
-    // and rows==16 remains on the validated direct-WMMA control path.
+    // Preserve upstream MixLLM's staged INT4/INT8 overlap, but use the
+    // T4-validated native packed INT4 pair kernel for the INT4 stream. The
+    // CUTLASS-expanded INT4 fallback remains available inside the helper for
+    // callers that explicitly pass use_fused_int4=false.
+    // The helper is deliberately selected only for rows>=32: the SM75
+    // 16x128 CUTLASS geometry is not a valid portable small-M core, and
+    // rows==16 remains on the validated direct-WMMA control path.
     auto& integer_streams = integer_prefill_streams(input_fp16.device().index());
     begin_integer_prefill_overlap(
         input_int8, scale_act, weight_int4, expanded_int4, scale_int4,
@@ -1338,7 +1341,7 @@ at::Tensor three_level_linear_v2_core(
         has_cached_metadata ? &cached_scale_int4 : nullptr,
         has_cached_metadata ? &cached_zero_int4 : nullptr,
         has_cached_metadata ? &cached_scale_int8 : nullptr,
-        false);
+        n4 > 0);
     if (n16 > 0) {
       const dim3 grid_fp16(
           (n16 + kPrefillChannels - 1) / kPrefillChannels,
