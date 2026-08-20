@@ -421,11 +421,10 @@ public:
       typename IteratorZero::AccessType const* gmem_zero_ptr = iterator_zero.get();
 
       static_assert(Shape::kK == 64 || Shape::kK == 128);
-      // Quantization metadata covers 128 input elements.  The validated v200
-      // runner uses two K=64 halves per group; the guarded K=128 experiment
-      // consumes one complete group per threadblock tile.  Keep the K=64
-      // behavior byte-for-byte in effect and advance the global metadata by
-      // one row only after the complete logical group has been consumed.
+      // Quantization metadata covers 128 input elements. K=64 consumes a
+      // group in two halves; K=128 consumes one complete group per tile.
+      // Preserve the validated K=64 behavior and advance the global metadata
+      // exactly once per logical group in either geometry.
       if (iterator_scale.valid()) {
         *smem_scale_ptr = *gmem_scale_ptr;
       }

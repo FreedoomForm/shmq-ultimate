@@ -193,7 +193,7 @@ using Core = cutlass::gemm::threadblock::DefaultMmaCore<
 
 using Int8Runner = Runner<Core, 2>;
 
-// Isolated K-tile experiment.  The caller still launches INT4 and INT8
+// Isolated K-tile experiment. The caller still launches INT4 and INT8
 // independently on the v200 auxiliary streams; this changes only the
 // per-partition mainloop tile for sufficiently large channel counts.
 using KWideCore = cutlass::gemm::threadblock::DefaultMmaCore<

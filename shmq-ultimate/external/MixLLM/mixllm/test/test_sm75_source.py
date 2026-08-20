@@ -79,6 +79,17 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("OpClassTensorOp,2,cutlass::arch::OpMultiplyAddSaturate>", cutlass_compact)
         self.assertIn("usingInt8Runner=Runner<Core,2>", cutlass_compact)
 
+    def test_v214_guarded_k128_contract(self):
+        pipeline_compact = "".join(self.cutlass_pipeline.split())
+        cutlass_compact = "".join(self.cutlass_testbed.split())
+        source_compact = "".join(self.source.split())
+        self.assertIn("static_assert(Shape::kK==64||Shape::kK==128)", pipeline_compact)
+        self.assertIn("ifconstexpr(Shape::kK==64)", pipeline_compact)
+        self.assertIn("row_groupsize64_+=2", pipeline_compact)
+        self.assertIn("usingKWideInt8Runner=Runner<KWideCore,2>", cutlass_compact)
+        self.assertIn("KWideInt8Runner::run", source_compact)
+        self.assertIn("rows>=32&&channels>=128", source_compact)
+
     def test_v200_integer_prefill_overlap_contract(self):
         source_compact = "".join(self.source.split())
         cutlass_compact = "".join(self.cutlass_testbed.split())
@@ -88,8 +99,9 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("cudaStreamWaitEvent(streams.int4,streams.fork,0)", source_compact)
         self.assertIn("cudaStreamWaitEvent(streams.int8,streams.fork,0)", source_compact)
         self.assertIn("usingInt8Runner=Runner<Core,2>", cutlass_compact)
-        self.assertNotIn("WideInt8Runner", source_compact)
-        self.assertNotIn("WideCore", cutlass_compact)
+        self.assertIn("KWideInt8Runner::run", source_compact)
+        self.assertNotIn("combined_int8", source_compact)
+        self.assertNotIn("three_level_linear_cublas", source_compact)
 
     def test_v193_rejected_geometry_is_not_present(self):
         cutlass_compact = "".join(self.cutlass_testbed.split())
