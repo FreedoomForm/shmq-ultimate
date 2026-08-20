@@ -229,7 +229,7 @@ class SM75BackendTest(unittest.TestCase):
 
         actual = three_level_linear(module, x, torch)
         expected = quantized_reference(module, x, torch)
-        torch.testing.assert_close(actual, expected, rtol=2e-2, atol=2e-2)
+        torch.testing.assert_close(actual, expected.to(actual.dtype), rtol=2e-2, atol=2e-2)
         self.assertTrue(torch.isfinite(actual).all())
 
     def test_native_activation_quantizer_matches_reference(self):
@@ -294,7 +294,7 @@ class SM75BackendTest(unittest.TestCase):
         consumer.wait_event(ready)
         actual = three_level_linear(module, x, torch)
         expected = quantized_reference(module, x, torch)
-        torch.testing.assert_close(actual, expected, rtol=2e-2, atol=2e-2)
+        torch.testing.assert_close(actual, expected.to(actual.dtype), rtol=2e-2, atol=2e-2)
 
     def test_cuda_graph_capture(self):
         allocation = ThreeLevelAllocation(
@@ -317,7 +317,7 @@ class SM75BackendTest(unittest.TestCase):
             captured = three_level_linear(module, static_input, torch)
         graph.replay()
         expected = quantized_reference(module, static_input, torch)
-        torch.testing.assert_close(captured, expected, rtol=2e-2, atol=2e-2)
+        torch.testing.assert_close(captured, expected.to(captured.dtype), rtol=2e-2, atol=2e-2)
 
 
 if __name__ == "__main__":

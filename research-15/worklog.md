@@ -1289,3 +1289,10 @@ Post-repair local validation: full suite `85 passed, 6 skipped`; native INT4 ref
 The corrected v258 rerun reached kernel version 254 but nvcc found one remaining direct-WMMA FP16 assignment at `three_level_sm75.cu:396`: `__half = float` in the pure-FP16 prefill store. All integer and decode stores had already been converted; this one was missed because it was in the separate FP16 branch. The fix wraps `accumulator_fp32[warp][linear]` in `__float2half_rn`, with no arithmetic or benchmark change.
 
 Post-fix local validation is clean: full suite `85 passed, 6 skipped`; native INT4 reference proof passed; `git diff --check` passed. The version-254 Kaggle run is rejected as compile-only and contains no performance evidence. Rebuild and submit the corrected source only after commit.
+
+
+## v258 third Kaggle repair — CUDA reference dtype contracts
+
+The final v258 kernel version 255 compiled successfully, but the embedded SM75 CUDA correctness suite stopped with 19 failures because `torch.testing.assert_close` treats dtype mismatch as an assertion failure: the operator now correctly returns FP16 while the reference helper remains FP32. This is a test-contract mismatch, not a numerical or kernel-correctness failure. The repair changes the three CUDA reference comparisons to compare the reference converted to `actual.dtype`/`captured.dtype`, preserving the existing `rtol=2e-2` and `atol=2e-2` values. CPU/reference paths remain unchanged. No benchmark settings or quality checks are weakened.
+
+Post-repair local validation: full suite `85 passed, 6 skipped`; native INT4 proof passed; `git diff --check` passed. Kernel version 255 is rejected as a test-contract-only failure with no performance gate result. The corrected notebook must be rebuilt and submitted after commit.
