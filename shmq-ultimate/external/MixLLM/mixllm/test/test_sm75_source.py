@@ -125,6 +125,8 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("wmma::load_matrix_sync(b_u4,&b_packed[warp*8][0]", source_compact)
         self.assertEqual(source_compact.count("channel_base+warp*8+local_channel_base+register_index"), 2)
         self.assertIn("output[row*output_width+indices_int4[channel]]=partial[row_tile][register_index]", source_compact)
+        self.assertEqual(source_compact.count("a_low_packed[row][pair]=low0|(low1<<4)"), 1)
+        self.assertEqual(source_compact.count("b_packed[local_channel][pair]=channel<channels?weight_int4[source]:0"), 1)
 
     def test_v229_fused_int4_dispatch_contract(self):
         source_compact = "".join(self.source.split())

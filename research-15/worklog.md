@@ -1174,3 +1174,9 @@ Deep research compared the v245/v247 baseline with upstream `gemm_configs` and `
 Repair: add `CoreM64N64` and `Int8RunnerM64N64`, extend the exact-shape CUDA-event tuner to N=128/N=64/M64N64, and bump the tuning ABI to 228. The existing N=128 and N=64 runners remain deterministic fallbacks. No arithmetic, quantization, metadata ABI, streams/events, output mapping, benchmark settings, model, or quality thresholds changed.
 
 Local validation: source contracts passed (19 tests), full MixLLM suite passed (85 tests, 6 CUDA-only skips), and the native INT4 CPU proof passed. Kaggle has not yet been run for v248.
+
+## v249 — Hoist native pair A/B packing outside row-subtile loop (local validation complete)
+
+Deep research found a concrete dataflow defect in the native pair kernel: for every 32-element K chunk it repacked the complete 32-row A tile and 32-channel B tile once per each of four row subtiles, with a barrier after every reload. Upstream staged CUTLASS makes a CTA tile resident while multiple warp-level row/column MMA operations consume it. v249 packs A and B once per K chunk, synchronizes, executes all four row-subtile low/high MMAs from the resident shared tile, then synchronizes before overwrite. Arithmetic, zero correction, scales, output indices, grid, ABI, and dispatch policy are unchanged.
+
+Local validation: source contracts passed (19 tests), full MixLLM suite passed (85 tests, 6 CUDA-only skips), and the native INT4 CPU proof passed. Kaggle has not yet been run for v249.

@@ -952,38 +952,38 @@ __global__ void sm75_int4_pair_gemm_kernel(
       high_accum[row_tile].clear();
     }
 
-    for (int row_tile = 0; row_tile < kPairWarps; ++row_tile) {
-      for (int chunk = 0; chunk < kGroupSize / kPairK; ++chunk) {
-        const int k_base = group * kGroupSize + chunk * kPairK;
-        for (int item = threadIdx.x; item < kPairRows * kPairBytes;
-             item += blockDim.x) {
-          const int row = item / kPairBytes;
-          const int pair = item % kPairBytes;
-          const int global_row = row_base + row;
-          const int k = k_base + pair * 2;
-          int8_t a0 = 0;
-          int8_t a1 = 0;
-          if (global_row < rows) {
-            a0 = input_int8[global_row * width + k];
-            a1 = input_int8[global_row * width + k + 1];
-          }
-          const uint8_t low0 = static_cast<uint8_t>(a0) & 0x0f;
-          const uint8_t low1 = static_cast<uint8_t>(a1) & 0x0f;
-          const uint8_t high0 = static_cast<uint8_t>(static_cast<int>(a0) >> 4) & 0x0f;
-          const uint8_t high1 = static_cast<uint8_t>(static_cast<int>(a1) >> 4) & 0x0f;
-          a_low_packed[row][pair] = low0 | (low1 << 4);
-          a_high_packed[row][pair] = high0 | (high1 << 4);
+    for (int chunk = 0; chunk < kGroupSize / kPairK; ++chunk) {
+      const int k_base = group * kGroupSize + chunk * kPairK;
+      for (int item = threadIdx.x; item < kPairRows * kPairBytes;
+           item += blockDim.x) {
+        const int row = item / kPairBytes;
+        const int pair = item % kPairBytes;
+        const int global_row = row_base + row;
+        const int k = k_base + pair * 2;
+        int8_t a0 = 0;
+        int8_t a1 = 0;
+        if (global_row < rows) {
+          a0 = input_int8[global_row * width + k];
+          a1 = input_int8[global_row * width + k + 1];
         }
-        for (int item = threadIdx.x; item < kPairChannels * kPairBytes;
-             item += blockDim.x) {
-          const int local_channel = item / kPairBytes;
-          const int pair = item % kPairBytes;
-          const int channel = channel_base + local_channel;
-          const int source = channel * weight_bytes_per_channel + k_base / 2 + pair;
-          b_packed[local_channel][pair] = channel < channels ? weight_int4[source] : 0;
-        }
-        __syncthreads();
+        const uint8_t low0 = static_cast<uint8_t>(a0) & 0x0f;
+        const uint8_t low1 = static_cast<uint8_t>(a1) & 0x0f;
+        const uint8_t high0 = static_cast<uint8_t>(static_cast<int>(a0) >> 4) & 0x0f;
+        const uint8_t high1 = static_cast<uint8_t>(static_cast<int>(a1) >> 4) & 0x0f;
+        a_low_packed[row][pair] = low0 | (low1 << 4);
+        a_high_packed[row][pair] = high0 | (high1 << 4);
+      }
+      for (int item = threadIdx.x; item < kPairChannels * kPairBytes;
+           item += blockDim.x) {
+        const int local_channel = item / kPairBytes;
+        const int pair = item % kPairBytes;
+        const int channel = channel_base + local_channel;
+        const int source = channel * weight_bytes_per_channel + k_base / 2 + pair;
+        b_packed[local_channel][pair] = channel < channels ? weight_int4[source] : 0;
+      }
+      __syncthreads();
 
+      for (int row_tile = 0; row_tile < kPairWarps; ++row_tile) {
         wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::u4,
                        wmma::row_major> a_low_u4;
         wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::u4,
@@ -1007,9 +1007,11 @@ __global__ void sm75_int4_pair_gemm_kernel(
         PairProbeHighMma high_mma;
         low_mma(low_accum[row_tile], low_a, weights, low_accum[row_tile]);
         high_mma(high_accum[row_tile], high_a, weights, high_accum[row_tile]);
-        __syncthreads();
       }
+      __syncthreads();
+    }
 
+    for (int row_tile = 0; row_tile < kPairWarps; ++row_tile) {
       const int local_row = row_tile * 8 + (lane >> 2);
       const int local_channel_base = (lane & 3) * 2;
       const int row = row_base + local_row;
