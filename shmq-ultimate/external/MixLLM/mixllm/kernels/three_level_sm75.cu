@@ -1296,7 +1296,7 @@ at::Tensor three_level_linear_v2_core(
         indices_fp16.data_ptr<int32_t>(), output.data_ptr<float>(), width,
         output_width, n4, n8, n16);
   } else if (rows >= 32 && n4 > 0 && n8 == 0 && n16 == 0 && !has_cached_metadata) {
-    // v229 candidate: pure INT4 uses one packed-B fused pair; all mixed,
+    // v229 candidate: pure INT4 uses one packed-B fused pair; mixed,
     // cached, and unsupported shapes stay on the accepted v228 overlap path.
     run_int4_pair_partition(
         input_int8, scale_act, weight_int4, scale_int4, zero_int4,
@@ -1314,7 +1314,7 @@ at::Tensor three_level_linear_v2_core(
         has_cached_metadata ? &cached_scale_int4 : nullptr,
         has_cached_metadata ? &cached_zero_int4 : nullptr,
         has_cached_metadata ? &cached_scale_int8 : nullptr,
-        n4 > 0 && !has_cached_metadata);
+        false);
     if (n16 > 0) {
       const dim3 grid_fp16(
           (n16 + kPrefillChannels - 1) / kPrefillChannels,

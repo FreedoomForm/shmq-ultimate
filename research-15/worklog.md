@@ -1062,3 +1062,6 @@ The proven pair is now used for the INT4 auxiliary stream whenever `n4>0` and me
 
 ## v231 repair — mixed output stride
 Kaggle v230 proved the fused arithmetic but failed native correctness only in mixed rows=128: the INT4 kernel scattered with `row*n4+index`, while the shared output tensor stride is `row*(n4+n8+n16)+index`. Pure INT4 was unaffected because `n4==output_width`. Repaired the kernel to receive `output_width` and use the full output stride. Local 82-test suite, CPU proof, Python checks, and diff checks pass; Kaggle revalidation pending.
+
+## v232 decision — reject mixed fused dispatch, retain pure-only path
+Historical v228 already showed the same mixed rows=128 error (`410.69699`) before the fused mixed change, so v230 did not introduce that particular numerical discrepancy; v231 nevertheless failed timing integrity after enabling the fused branch in mixed overlap. Reverted the overlap helper to `use_fused_int4=false`, preserving v228 mixed behavior, while retaining the pure-only fused branch whose rows=128 pure-INT4 speedup was `0.686x` with correctness/timing passing. Updated the source contract. Local 82-test suite, CPU proof, Python checks, and diff checks pass. No Kaggle rerun is justified for this fallback-only repair.
