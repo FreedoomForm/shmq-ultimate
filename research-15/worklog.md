@@ -1186,3 +1186,11 @@ Local validation: source contracts passed (19 tests), full MixLLM suite passed (
 Deep research clarified that v249's mixed Qwen measurement still used `use_fused_int4=false`; the load-hoisted pair was not exercised in the mixed scenario. v250 therefore enables `n4 > 0` only for the mixed rows>=32 overlap call. INT8 remains on the staged CUTLASS auxiliary stream, FP16 remains on the caller stream, and the v249 pair kernel now packs A/B once per K chunk before its four row-subtile MMAs.
 
 No arithmetic, quantization, metadata layout, stream/event ordering, output ABI, model, benchmark setting, or quality threshold changed. Local validation: source contracts passed (19 tests), full MixLLM suite passed (85 tests, 6 CUDA-only skips), and the native INT4 CPU proof passed. Kaggle has not yet been run for v250.
+
+## v251 — Isolate load-hoisted mixed pair after rejecting M=64,N=64 (local validation complete)
+
+Kaggle v248 (server 243) rejected the M=64,N=64 tuner candidate: mixed Qwen rows=128 was 5.46x slower than dense. v249 and v250 still contained that candidate, so v249's 3.38x and v250's 11.78x mixed results were confounded. v250 also enabled the load-hoisted pair in mixed INT4, but its result cannot be attributed to that change alone.
+
+Deep research used NVIDIA PTX documentation to rule out an SM75 m16n8k32 INT8 replacement: dense integer m16n8k32 requires sm80+, while SM75 supports the smaller forms used by this port. v251 removes M=64,N=64, its tuner option, and ABI bump, restoring the v241 N=128/N=64 CUTLASS set, but keeps the v249 load-hoisted pair and mixed `n4 > 0` dispatch. This is the isolated measurement of one change versus v241.
+
+Local validation: source contracts passed (19 tests), full MixLLM suite passed (85 tests, 6 CUDA-only skips), and the native INT4 CPU proof passed. Kaggle has not yet been run for v251.
