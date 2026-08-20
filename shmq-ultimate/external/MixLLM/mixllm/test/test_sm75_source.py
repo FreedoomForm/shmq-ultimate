@@ -74,8 +74,11 @@ class SM75SourceContractTest(unittest.TestCase):
     def test_v227_persistent_runtime_cache_contract(self):
         linear_text = self.linear
         backend_compact = "".join(self.backend.split())
+        source_compact = "".join(self.source.split())
         self.assertIn("prepare_sm75_prefill_cache", linear_text)
         self.assertIn("prepare_sm75_prefill_metadata", linear_text)
+        self.assertIn("x.shape[0]>=32", backend_compact)
+        self.assertIn("expanded_int4musthaveshape[n4,K]unlesslarge-MnativeINT4isactive", source_compact)
         self.assertIn("prepare_sm75_packed_tensors", linear_text)
         self.assertIn("prepare_sm75_packed_tensors", backend_compact)
         self.assertIn("hashlib.sha256(source.read_bytes())", self.backend)

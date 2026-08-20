@@ -199,6 +199,11 @@ def _expanded_int4_for_prefill(module, x, torch_module):
         # Decode does not read this argument. Empty INT4 prefill still needs the
         # ABI-compatible [0, K] shape without allocating a separate tensor.
         return module.weight_int8[:0]
+    if x.shape[0] >= 32:
+        # The large-M native SM75 pair branch consumes packed INT4 plus the
+        # original zero/scales directly. Keep the expanded tensor only for the
+        # rows<32 direct-WMMA fallback, which actually reads it.
+        return module.weight_int8[:0]
     if x.is_cuda and module._sm75_int4_expanded is None and torch_module.cuda.is_current_stream_capturing():
         raise RuntimeError("SM75 INT4 prefill cache must be initialized before CUDA graph capture")
     prepared = module.prepare_sm75_prefill_cache()

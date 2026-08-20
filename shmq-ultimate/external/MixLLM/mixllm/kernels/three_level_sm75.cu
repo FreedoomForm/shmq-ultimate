@@ -1273,10 +1273,11 @@ at::Tensor three_level_linear_v2_core(
               "scale_act must have shape [K/128, rows]");
   TORCH_CHECK(weight_int4.size(0) == n4 && weight_int4.size(1) == width / 2,
               "invalid packed INT4 weight shape");
-  TORCH_CHECK(rows == 1 ||
-                  (expanded_int4.dim() == 2 && expanded_int4.size(0) == n4 &&
-                   expanded_int4.size(1) == width),
-              "expanded_int4 must have shape [n4, K] for prefill");
+  TORCH_CHECK(
+      (rows >= 32 && n4 > 0) || rows == 1 ||
+          (expanded_int4.dim() == 2 && expanded_int4.size(0) == n4 &&
+           expanded_int4.size(1) == width),
+      "expanded_int4 must have shape [n4, K] unless large-M native INT4 is active");
   TORCH_CHECK(weight_int8.size(0) == n8 && weight_int8.size(1) == width,
               "invalid INT8 weight shape");
   TORCH_CHECK(weight_fp16.size(0) == n16 && weight_fp16.size(1) == width,

@@ -1194,3 +1194,9 @@ Kaggle v248 (server 243) rejected the M=64,N=64 tuner candidate: mixed Qwen rows
 Deep research used NVIDIA PTX documentation to rule out an SM75 m16n8k32 INT8 replacement: dense integer m16n8k32 requires sm80+, while SM75 supports the smaller forms used by this port. v251 removes M=64,N=64, its tuner option, and ABI bump, restoring the v241 N=128/N=64 CUTLASS set, but keeps the v249 load-hoisted pair and mixed `n4 > 0` dispatch. This is the isolated measurement of one change versus v241.
 
 Local validation: source contracts passed (19 tests), full MixLLM suite passed (85 tests, 6 CUDA-only skips), and the native INT4 CPU proof passed. Kaggle has not yet been run for v251.
+
+## v252 — Lazily bypass expanded INT4 for large native mixed prefill (local validation complete)
+
+Deep research compared v251 with the original `mix_mma_multistage.cuh`: upstream passes prepared interleaved INT4 directly to its INT4 Tensor Core runner, while the SM75 module still eagerly expanded every INT4 partition into a full signed-INT8 `[n4,K]` cache during construction/load. The v251 native large-M pair branch does not read that tensor; it consumes packed INT4, original scales, and original zero points. v252 therefore returns an ABI-compatible empty `[0,K]` placeholder for rows>=32 and removes eager expanded-cache priming from device moves, construction, and state loads. Rows<32 retains the existing signed expansion and graph-capture guard.
+
+C++ shape validation now permits the empty placeholder only when `rows>=32 && n4>0`; all fallback paths retain the `[n4,K]` requirement. No arithmetic, quantization, stream/event ordering, metadata ABI, output mapping, benchmark setting, model, or quality threshold changed. Local validation: focused source/backend tests passed (39 tests, 6 CUDA-only skips), full MixLLM suite passed (86 tests, 6 CUDA-only skips), and native INT4 CPU proof passed. Kaggle has not yet been run for v252.
