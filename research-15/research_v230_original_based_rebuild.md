@@ -24,6 +24,8 @@ The line-by-line header diff confirms that SHMQ's `mq_mma_pipelined_sm75.h` is a
 
 The upstream and SHMQ `mq_mma_tensor_op_dequantizer.h` files are functionally identical; the only diff is whitespace. Therefore dequantizer replacement is not a useful rebuild target. The real adaptation seam is the global/shared iterator and its layout contract, together with a legal SM75 configuration family.
 
+The upstream `mma_multistage_testbed.h` defines `ElementA=int8_t`, `ElementB_INT4=cutlass::uint4b_t`, `ElementB_INT8=int8_t`, with a column-major B layout and a packed/interleaved INT4 tensor. Its SM80 custom `MQMmaMultistage`/operator family handles the INT4 path; this is not the same as the vendored SM75 `DefaultMmaCore` int8 path. CUTLASS's SM75 header separately exposes only 4-bit MMA instruction forms such as `u4*u4`, `s4*u4`, and `u4*s4`, so direct upstream `int8 x uint4` reuse is not a legal SM75 substitution. A faithful SM75 rebuild therefore needs a fused or staged 4-bit decomposition implementation, not a type alias.
+
 ## Proof obligations
 
 The next candidate must prove (1) the permutation is an involution or has a deterministic inverse, (2) CPU reference output is identical after permuting and undoing the layout, (3) partition scatter and metadata group order remain unchanged, (4) cache invalidation tracks the transformed tensor, (5) no candidate is used during graph capture, and (6) all local tests pass before a single T4 run.
