@@ -33,7 +33,11 @@ def git(args, cwd):
 def git_dirty(cwd, ignored=()):
     repo_root = Path(git(["rev-parse", "--show-toplevel"], cwd)).resolve()
     ignored = {path.resolve() for path in ignored}
-    for line in git(["status", "--porcelain"], cwd).splitlines():
+    status = subprocess.run(
+        ["git", "status", "--porcelain"], cwd=cwd, check=True,
+        capture_output=True, text=True,
+    ).stdout.splitlines()
+    for line in status:
         relative = line[3:].split(" -> ")[-1]
         if (repo_root / relative).resolve() not in ignored:
             return True
