@@ -1091,7 +1091,7 @@ void run_int4_pair_partition(
       reinterpret_cast<const __half*>(scale_act.data_ptr<at::Half>()),
       reinterpret_cast<const __half*>(scale_int4.data_ptr<at::Half>()),
       zero_int4.data_ptr<uint8_t>(), indices_int4.data_ptr<int32_t>(),
-      output.data_ptr<at::Half>(), rows, width, channels, output_width);
+      reinterpret_cast<__half*>(output.data_ptr<at::Half>()), rows, width, channels, output_width);
   C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 
@@ -1348,7 +1348,7 @@ at::Tensor three_level_linear_v2_core(
         reinterpret_cast<const __half*>(scale_int8.data_ptr<at::Half>()),
         indices_int8.data_ptr<int32_t>(),
         reinterpret_cast<const __half*>(weight_fp16.data_ptr<at::Half>()),
-        indices_fp16.data_ptr<int32_t>(), output.data_ptr<at::Half>(), width,
+        indices_fp16.data_ptr<int32_t>(), reinterpret_cast<__half*>(output.data_ptr<at::Half>()), width,
         output_width, n4, n8, n16);
   } else if (rows >= 32 && n4 > 0 && n8 == 0 && n16 == 0 && !has_cached_metadata) {
     // v229 candidate: pure INT4 uses one packed-B fused pair; mixed,
@@ -1389,7 +1389,7 @@ at::Tensor three_level_linear_v2_core(
         reinterpret_cast<const __half*>(scale_int8.data_ptr<at::Half>()),
         indices_int8.data_ptr<int32_t>(),
         reinterpret_cast<const __half*>(weight_fp16.data_ptr<at::Half>()),
-        indices_fp16.data_ptr<int32_t>(), output.data_ptr<at::Half>(), rows, width,
+        indices_fp16.data_ptr<int32_t>(), reinterpret_cast<__half*>(output.data_ptr<at::Half>()), rows, width,
         output_width, 0, 0, n16);
     }
     finish_integer_prefill_overlap(
@@ -1412,7 +1412,7 @@ at::Tensor three_level_linear_v2_core(
       reinterpret_cast<const __half*>(scale_int8.data_ptr<at::Half>()),
       indices_int8.data_ptr<int32_t>(),
       reinterpret_cast<const __half*>(weight_fp16.data_ptr<at::Half>()),
-      indices_fp16.data_ptr<int32_t>(), output.data_ptr<float>(), rows, width,
+      indices_fp16.data_ptr<int32_t>(), reinterpret_cast<__half*>(output.data_ptr<at::Half>()), rows, width,
       output_width, n4, n8, n16);
   }
   // timing_integrity: surface asynchronous launch failures before the caller records

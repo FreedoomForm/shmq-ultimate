@@ -196,7 +196,7 @@ struct Runner {
         reinterpret_cast<typename Mma::ElementScale const*>(matrix_scale_act.data_ptr<at::Half>()),
         params_zero,
         reinterpret_cast<typename Mma::ElementZero const*>(matrix_zero.data_ptr<uint8_t>()),
-        matrix_C.data_ptr<at::Half>(), matrix_C.stride(0), matrix_indices.data_ptr<int32_t>());
+        reinterpret_cast<__half*>(matrix_C.data_ptr<at::Half>()), matrix_C.stride(0), matrix_indices.data_ptr<int32_t>());
   }
 };
 
