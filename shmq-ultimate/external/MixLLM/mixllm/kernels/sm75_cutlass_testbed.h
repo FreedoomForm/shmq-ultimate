@@ -166,10 +166,10 @@ struct Runner {
       C10_CUDA_CHECK(cudaFuncSetAttribute(
           kernel<Mma, SharedStorage>,
           cudaFuncAttributeMaxDynamicSharedMemorySize, shared_bytes));
-      C10_CUDA_CHECK(cudaFuncSetAttribute(
-          kernel<Mma, SharedStorage>,
-          cudaFuncAttributePreferredSharedMemoryCarveout, 100));
     }
+    C10_CUDA_CHECK(cudaFuncSetAttribute(
+        kernel<Mma, SharedStorage>,
+        cudaFuncAttributePreferredSharedMemoryCarveout, 100));
     kernel<Mma, SharedStorage><<<grid, block, shared_bytes, stream>>>(
         problem_size, params_A, matrix_A.data_ptr<int8_t>(), params_B,
         matrix_B.data_ptr<int8_t>(), params_scale,
