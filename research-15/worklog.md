@@ -1282,3 +1282,10 @@ Local validation after the final ABI bump: focused/source/backend tests pass; fu
 The single v258 Kaggle run reached kernel version 253 but failed during nvcc compilation before any benchmark gate. The exact diagnostics showed that the CUDA kernels expected `__half*` while `at::Tensor.data_ptr<at::Half>()` produced `c10::Half*`, and two direct-WMMA launch sites still passed the old FP32 pointer. This was a type-boundary repair only: all production output buffers remain FP16, and explicit `reinterpret_cast<__half*>` was added at the CUDA launch/testbed boundaries. The mixed-stride diagnostic continues to allocate FP16 internally and converts its returned probe tensor to float only at the diagnostic API boundary.
 
 Post-repair local validation: full suite `85 passed, 6 skipped`; native INT4 reference proof passed; `git diff --check` passed. The failed Kaggle run is rejected as a compile-only failure and must not be treated as a performance measurement. The corrected source requires a rebuilt notebook and a new single Kaggle run after commit.
+
+
+## v258 second Kaggle repair — final direct FP16 store
+
+The corrected v258 rerun reached kernel version 254 but nvcc found one remaining direct-WMMA FP16 assignment at `three_level_sm75.cu:396`: `__half = float` in the pure-FP16 prefill store. All integer and decode stores had already been converted; this one was missed because it was in the separate FP16 branch. The fix wraps `accumulator_fp32[warp][linear]` in `__float2half_rn`, with no arithmetic or benchmark change.
+
+Post-fix local validation is clean: full suite `85 passed, 6 skipped`; native INT4 reference proof passed; `git diff --check` passed. The version-254 Kaggle run is rejected as compile-only and contains no performance evidence. Rebuild and submit the corrected source only after commit.

@@ -394,7 +394,7 @@ __global__ void three_level_tensorcore_kernel(
       const int local_channel = channel_base + linear % kTile;
       if (row < rows && local_channel < n16) {
         output[row * output_width + indices_fp16[local_channel]] =
-            accumulator_fp32[warp][linear];
+            __float2half_rn(accumulator_fp32[warp][linear]);
       }
     }
     return;
