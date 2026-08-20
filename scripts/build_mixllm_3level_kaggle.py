@@ -295,6 +295,10 @@ if capability == (7, 5):
     assert tuple(pair_probe.shape) == (2,), pair_probe.shape
     assert torch.equal(pair_probe, torch.zeros_like(pair_probe)), pair_probe
     print('SM75_INT4_PAIR_INSTRUCTION_PROBE_PASS', pair_probe.tolist(), flush=True)
+    packed_probe = torch.ops.mixllm_sm75.sm75_int4_pair_wmma_load_probe(torch.empty(0, device='cuda'))
+    expected_probe = 32 * (torch.arange(1, 9, device='cuda', dtype=torch.int32)[:, None] * torch.arange(1, 9, device='cuda', dtype=torch.int32)[None, :])
+    assert torch.equal(packed_probe, expected_probe), (packed_probe, expected_probe)
+    print('SM75_INT4_PAIR_WMMA_LOAD_PROBE_PASS', packed_probe[0].tolist(), flush=True)
     def make_case(n, width, counts, rows):
         n4, n8, n16 = counts; assert n4 + n8 + n16 == n
         alloc = ThreeLevelAllocation(indices={4: tuple(range(n4)), 8: tuple(range(n4, n4+n8)), 16: tuple(range(n4+n8, n))}, scores={b: (0.0,) * n for b in (4, 8, 16)}, budget=ThreeLevelBudget(*(100*c/n for c in counts)))

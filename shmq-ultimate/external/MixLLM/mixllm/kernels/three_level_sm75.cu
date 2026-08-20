@@ -768,6 +768,58 @@ at::Tensor sm75_int4_pair_instruction_probe_cuda(const at::Tensor& device_tensor
   return output;
 }
 
+__global__ void sm75_int4_pair_wmma_load_probe_kernel(int* output) {
+#if __CUDA_ARCH__ >= 750
+  namespace precision = wmma::experimental::precision;
+  __shared__ __align__(16) uint8_t a_packed[8 * 16];
+  __shared__ __align__(16) uint8_t a_high_packed[8 * 16];
+  __shared__ __align__(16) uint8_t b_packed[8 * 16];
+  __shared__ __align__(16) int accumulator[8 * 8];
+  const int lane = threadIdx.x;
+  for (int item = lane; item < 8 * 16; item += kWarpSize) {
+    const int row = item / 16;
+    const int byte = item % 16;
+    const int value = row + 1;
+    a_packed[item] = static_cast<uint8_t>(value | (value << 4));
+    a_high_packed[item] = 0;
+    const int column = row;
+    const int weight = column + 1;
+    b_packed[item] = static_cast<uint8_t>(weight | (weight << 4));
+  }
+  __syncwarp();
+  wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::u4,
+                 wmma::row_major> a_low;
+  wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::s4,
+                 wmma::row_major> a_high;
+  wmma::fragment<wmma::matrix_b, 8, 8, 32, precision::u4,
+                 wmma::col_major> weights;
+  wmma::fragment<wmma::accumulator, 8, 8, 32, int> low_accum;
+  wmma::fragment<wmma::accumulator, 8, 8, 32, int> high_accum;
+  wmma::load_matrix_sync(a_low, a_packed, 32);
+  wmma::load_matrix_sync(a_high, a_high_packed, 32);
+  wmma::load_matrix_sync(weights, b_packed, 32);
+  wmma::fill_fragment(low_accum, 0);
+  wmma::fill_fragment(high_accum, 0);
+  wmma::mma_sync(low_accum, a_low, weights, low_accum);
+  wmma::mma_sync(high_accum, a_high, weights, high_accum);
+  wmma::store_matrix_sync(accumulator, low_accum, 8, wmma::mem_row_major);
+  __syncwarp();
+  for (int item = lane; item < 8 * 8; item += kWarpSize) {
+    output[item] = accumulator[item];
+  }
+#endif
+}
+
+at::Tensor sm75_int4_pair_wmma_load_probe_cuda(const at::Tensor& device_tensor) {
+  TORCH_CHECK(device_tensor.is_cuda(), "SM75 WMMA probe requires a CUDA tensor argument");
+  auto output = at::empty({8, 8}, device_tensor.options().dtype(at::kInt));
+  auto stream = at::cuda::getCurrentCUDAStream();
+  sm75_int4_pair_wmma_load_probe_kernel<<<1, kWarpSize, 0, stream>>>(
+      output.data_ptr<int>());
+  C10_CUDA_KERNEL_LAUNCH_CHECK();
+  return output;
+}
+
 void check_cuda_contiguous(const at::Tensor& tensor, const char* name) {
   TORCH_CHECK(tensor.is_cuda(), name, " must be a CUDA tensor");
   TORCH_CHECK(tensor.is_contiguous(), name, " must be contiguous");
@@ -1195,6 +1247,7 @@ at::Tensor three_level_linear_legacy_cuda(
 TORCH_LIBRARY(mixllm_sm75, m) {
   m.def("quantize_activation(Tensor input) -> (Tensor, Tensor)");
   m.def("sm75_int4_pair_instruction_probe(Tensor device_tensor) -> Tensor");
+  m.def("sm75_int4_pair_wmma_load_probe(Tensor device_tensor) -> Tensor");
   m.def("_three_level_linear_v2_unchecked(Tensor input_fp16, Tensor input_int8, "
         "Tensor scale_act, Tensor weight_int4, Tensor expanded_int4, "
         "Tensor scale_int4, "
@@ -1230,6 +1283,7 @@ TORCH_LIBRARY(mixllm_sm75, m) {
 TORCH_LIBRARY_IMPL(mixllm_sm75, CUDA, m) {
   m.impl("quantize_activation", &quantize_activation_sm75);
   m.impl("sm75_int4_pair_instruction_probe", &sm75_int4_pair_instruction_probe_cuda);
+  m.impl("sm75_int4_pair_wmma_load_probe", &sm75_int4_pair_wmma_load_probe_cuda);
   m.impl("_three_level_linear_v2_unchecked", &three_level_linear_v2_unchecked_cuda);
   m.impl("three_level_linear_v2", &three_level_linear_v2_cuda);
   m.impl("_three_level_linear_v3_unchecked", &three_level_linear_v3_unchecked_cuda);

@@ -1038,3 +1038,6 @@ The v223 compile-only probe succeeded, so v224 adds a standalone CUDA/Torch prob
 
 ## v225 fix — make the runtime probe dispatchable
 Kaggle v224 compiled the two native MMA forms but failed before execution because a Torch operator with no tensor arguments cannot select the CUDA dispatch key. Corrected the probe schema to accept an empty CUDA tensor and create its output on that tensor's device. This is a probe-only dispatch fix; no production path changed. Local 81-test suite, CPU reference proof, Python compilation, and diff checks pass. Kaggle rerun pending.
+
+## v226 probe — packed row/column WMMA layout
+After v225 confirmed both raw SM75 MMA instructions execute, v226 adds a second probe using packed row-major A and column-major B shared-memory tiles. It asserts the exact 8x8 result `32*(row+1)*(column+1)` from `u4*u4` WMMA, while also executing the `s4*u4` high path. Runtime dispatch remains probe-only. Local 81-test suite, CPU proof, Python checks, and diff checks pass. Kaggle validation pending.
