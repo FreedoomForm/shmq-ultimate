@@ -1044,3 +1044,6 @@ After v225 confirmed both raw SM75 MMA instructions execute, v226 adds a second 
 
 ## v227 diagnosis — WMMA signed/unsigned mixed overload is unavailable
 Kaggle v226 failed at nvcc line 804: CUDA’s WMMA API exposes `m8n8k32` `u4*u4` and `s4*s4`, but no `s4*u4` overload. The earlier CUTLASS `arch::Mma` probe still compiles and executes the mixed signed/unsigned path; the WMMA packed-load probe is therefore narrowed to the legal `u4*u4` load/arithmetic, while the separate CUTLASS probe continues to execute `s4*u4`. Duplicate declarations introduced while narrowing the probe were removed. No production dispatch is changed.
+
+## v228 probe — first true fused packed pair
+Built a standalone fused probe that stages one shared packed B tile, loads low/high activation nibble tiles through WMMA u4 loaders, reinterprets the register word into CUTLASS fragments, and issues both `u4*u4` and `s4*u4` MMA instructions before returning four accumulator values per lane. The constant case is expected to produce `[64, 64, -64, -64]`. This is still outside production dispatch, but it is the first probe matching the intended fused dataflow. Local 81-test suite, CPU proof, Python checks, and diff checks pass. Kaggle compile/runtime validation pending.
