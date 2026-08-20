@@ -1376,3 +1376,11 @@ Kaggle kernel version 261 completed on Tesla T4. The run passed embedded tests, 
 Deep research of the original fused epilogue and v263 found that SHMQ's cuBLAS FP16 helper still creates a separate custom scatter launch. v264 will replace only that scatter launch with `output.index_copy_(1, indices_fp16, partial)`, preserving the same sorted local-to-global index mapping, FP16 output, caller stream, and all arithmetic. This is an epilogue implementation experiment with no partition or benchmark changes; no Kaggle run has been made.
 
 v264 local validation completed: focused source/backend tests `40 passed, 6 skipped`; full suite `87 passed, 6 skipped`; Python compilation and `git diff --check` passed. CUDA compilation remains deferred to the next single Kaggle T4 run.
+
+## v264 result — rejected on runtime correctness
+
+Kaggle kernel version 262 compiled successfully and embedded tests passed, but the first native SM75 execution failed before performance gates with `RuntimeError: index_copy_(): Expected a long tensor for index, but got Int`. The production ABI intentionally stores indices as int32, matching the original MixLLM epilogue and all existing CUDA kernels. Because v264 did not reach a valid gate evaluation, the ATen index-copy change is rejected and must not be retained. v265 restores v263's custom int32 scatter behavior before any further benchmark.
+
+## v265 — restore validated v263 scatter after v264 runtime failure
+
+The v264 `index_copy_` experiment was removed after Kaggle showed the production int32 index ABI is incompatible with ATen index_copy. v265 restores the exact v263 transpose-view cuBLAS helper and custom int32 scatter. Local validation passed: focused source/backend tests `40 passed, 6 skipped`; full suite `87 passed, 6 skipped`; Python compilation and `git diff --check` passed. This restoration is not submitted as a new performance claim; it re-establishes v263's last valid measured state before the next original-first research change.
