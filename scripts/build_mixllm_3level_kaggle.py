@@ -291,7 +291,7 @@ if capability == (7, 5):
     from mixllm.quantization.three_level import ThreeLevelAllocation, ThreeLevelBudget
     from mixllm.sm75_backend import benchmark_sm75_backend, load_sm75_backend
     load_sm75_backend(torch)
-    pair_probe = torch.ops.mixllm_sm75.sm75_int4_pair_instruction_probe()
+    pair_probe = torch.ops.mixllm_sm75.sm75_int4_pair_instruction_probe(torch.empty(0, device='cuda'))
     assert tuple(pair_probe.shape) == (2,), pair_probe.shape
     assert torch.equal(pair_probe, torch.zeros_like(pair_probe)), pair_probe
     print('SM75_INT4_PAIR_INSTRUCTION_PROBE_PASS', pair_probe.tolist(), flush=True)

@@ -1035,3 +1035,6 @@ Kaggle v223 ran on Tesla T4 / SM75 and compiled the embedded extension with `/us
 
 ## v224 probe — execute native SM75 `u4*u4` and `s4*u4`
 The v223 compile-only probe succeeded, so v224 adds a standalone CUDA/Torch probe that executes both legal `m8n8k32` instruction specializations with zero fragments and asserts a zero result on T4. It remains outside production dispatch; the goal is to validate runtime instruction execution before implementing the full staged pair. Full local discovery passes 81 tests with 6 CUDA-only skips, the CPU reference proof passes, and Python/diff checks pass. Kaggle run pending.
+
+## v225 fix — make the runtime probe dispatchable
+Kaggle v224 compiled the two native MMA forms but failed before execution because a Torch operator with no tensor arguments cannot select the CUDA dispatch key. Corrected the probe schema to accept an empty CUDA tensor and create its output on that tensor's device. This is a probe-only dispatch fix; no production path changed. Local 81-test suite, CPU reference proof, Python compilation, and diff checks pass. Kaggle rerun pending.

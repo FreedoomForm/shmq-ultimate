@@ -758,8 +758,9 @@ __global__ void sm75_int4_pair_instruction_probe_kernel(int* output) {
 #endif
 }
 
-at::Tensor sm75_int4_pair_instruction_probe_cuda() {
-  auto output = at::zeros({2}, at::TensorOptions().device(at::kCUDA).dtype(at::kInt));
+at::Tensor sm75_int4_pair_instruction_probe_cuda(const at::Tensor& device_tensor) {
+  TORCH_CHECK(device_tensor.is_cuda(), "SM75 INT4 probe requires a CUDA tensor argument");
+  auto output = at::zeros({2}, device_tensor.options().dtype(at::kInt));
   auto stream = at::cuda::getCurrentCUDAStream();
   sm75_int4_pair_instruction_probe_kernel<<<1, kWarpSize, 0, stream>>>(
       output.data_ptr<int>());
@@ -1193,7 +1194,7 @@ at::Tensor three_level_linear_legacy_cuda(
 
 TORCH_LIBRARY(mixllm_sm75, m) {
   m.def("quantize_activation(Tensor input) -> (Tensor, Tensor)");
-  m.def("sm75_int4_pair_instruction_probe() -> Tensor");
+  m.def("sm75_int4_pair_instruction_probe(Tensor device_tensor) -> Tensor");
   m.def("_three_level_linear_v2_unchecked(Tensor input_fp16, Tensor input_int8, "
         "Tensor scale_act, Tensor weight_int4, Tensor expanded_int4, "
         "Tensor scale_int4, "
