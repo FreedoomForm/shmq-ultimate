@@ -1047,3 +1047,6 @@ Kaggle v226 failed at nvcc line 804: CUDA’s WMMA API exposes `m8n8k32` `u4*u4`
 
 ## v228 probe — first true fused packed pair
 Built a standalone fused probe that stages one shared packed B tile, loads low/high activation nibble tiles through WMMA u4 loaders, reinterprets the register word into CUTLASS fragments, and issues both `u4*u4` and `s4*u4` MMA instructions before returning four accumulator values per lane. The constant case is expected to produce `[64, 64, -64, -64]`. This is still outside production dispatch, but it is the first probe matching the intended fused dataflow. Local 81-test suite, CPU proof, Python checks, and diff checks pass. Kaggle compile/runtime validation pending.
+
+## v228 Kaggle result — fused packed pair passes on T4
+Kaggle v228 compiled and executed the first true fused packed pair on Tesla T4. All three markers passed: instruction probe `[0, 0]`, packed WMMA layout `[32, 64, 96, 128, 160, 192, 224, 256]`, and fused low/high result `[64, 64, -64, -64]`. This proves one staged packed B tile can feed both legal SM75 MMA paths with exact signed high-nibble arithmetic. Production dispatch remains unchanged; next work is an adapter/runner with real tile iteration and zero correction behind the v200 fallback.
