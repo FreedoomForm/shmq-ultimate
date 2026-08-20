@@ -850,6 +850,32 @@ __global__ void sm75_int4_pair_fused_probe_kernel(int* output) {
 #endif
 }
 
+void run_int4_pair_partition(
+    const at::Tensor& input_int8, const at::Tensor& scale_act,
+    const at::Tensor& weight_int4, const at::Tensor& scale_int4,
+    const at::Tensor& zero_int4, const at::Tensor& indices_int4,
+    at::Tensor& output, int rows, int width, cudaStream_t stream);
+
+at::Tensor sm75_int4_pair_mixed_stride_probe_cuda(const at::Tensor& device_tensor) {
+  TORCH_CHECK(device_tensor.is_cuda(), "SM75 mixed-stride probe requires a CUDA tensor argument");
+  const auto options = device_tensor.options();
+  constexpr int rows = 32;
+  constexpr int width = 128;
+  constexpr int channels = 32;
+  constexpr int output_width = 64;
+  auto input_int8 = at::ones({rows, width}, options.dtype(at::kChar));
+  auto scale_act = at::ones({1, rows}, options.dtype(at::kHalf));
+  auto weight_int4 = at::full({channels, width / 2}, 0x11, options.dtype(at::kByte));
+  auto scale_int4 = at::ones({channels, 1}, options.dtype(at::kHalf));
+  auto zero_int4 = at::zeros({channels, 1}, options.dtype(at::kByte));
+  auto indices_int4 = at::arange(channels, options.dtype(at::kInt));
+  auto output = at::full({rows, output_width}, -999.0, options.dtype(at::kFloat));
+  run_int4_pair_partition(
+      input_int8, scale_act, weight_int4, scale_int4, zero_int4,
+      indices_int4, output, rows, width, at::cuda::getCurrentCUDAStream());
+  return output;
+}
+
 at::Tensor sm75_int4_pair_fused_probe_cuda(const at::Tensor& device_tensor) {
   TORCH_CHECK(device_tensor.is_cuda(), "SM75 fused INT4 probe requires a CUDA tensor argument");
   auto output = at::empty({kWarpSize, 4}, device_tensor.options().dtype(at::kInt));
@@ -1484,6 +1510,7 @@ TORCH_LIBRARY(mixllm_sm75, m) {
   m.def("sm75_int4_pair_instruction_probe(Tensor device_tensor) -> Tensor");
   m.def("sm75_int4_pair_wmma_load_probe(Tensor device_tensor) -> Tensor");
   m.def("sm75_int4_pair_fused_probe(Tensor device_tensor) -> Tensor");
+  m.def("sm75_int4_pair_mixed_stride_probe(Tensor device_tensor) -> Tensor");
   m.def("_three_level_linear_v2_unchecked(Tensor input_fp16, Tensor input_int8, "
         "Tensor scale_act, Tensor weight_int4, Tensor expanded_int4, "
         "Tensor scale_int4, "
@@ -1521,6 +1548,7 @@ TORCH_LIBRARY_IMPL(mixllm_sm75, CUDA, m) {
   m.impl("sm75_int4_pair_instruction_probe", &sm75_int4_pair_instruction_probe_cuda);
   m.impl("sm75_int4_pair_wmma_load_probe", &sm75_int4_pair_wmma_load_probe_cuda);
   m.impl("sm75_int4_pair_fused_probe", &sm75_int4_pair_fused_probe_cuda);
+  m.impl("sm75_int4_pair_mixed_stride_probe", &sm75_int4_pair_mixed_stride_probe_cuda);
   m.impl("_three_level_linear_v2_unchecked", &three_level_linear_v2_unchecked_cuda);
   m.impl("three_level_linear_v2", &three_level_linear_v2_cuda);
   m.impl("_three_level_linear_v3_unchecked", &three_level_linear_v3_unchecked_cuda);

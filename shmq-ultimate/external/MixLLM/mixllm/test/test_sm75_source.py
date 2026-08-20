@@ -97,6 +97,13 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("struct InstructionPair", probe)
         self.assertIn("mq_mma_sm75_int4_pair.h", self.cutlass_testbed)
 
+    def test_v233_mixed_stride_probe_contract(self):
+        source_compact = "".join(self.source.split())
+        self.assertIn("sm75_int4_pair_mixed_stride_probe_cuda", source_compact)
+        self.assertIn("sm75_int4_pair_mixed_stride_probe(Tensordevice_tensor)->Tensor", source_compact)
+        self.assertIn("output_width=static_cast<int>(output.size(1))", source_compact)
+        self.assertIn("output[row*output_width+indices_int4[channel]]", source_compact)
+
     def test_v229_fused_int4_dispatch_contract(self):
         source_compact = "".join(self.source.split())
         self.assertIn("__global__voidsm75_int4_pair_gemm_kernel", source_compact)

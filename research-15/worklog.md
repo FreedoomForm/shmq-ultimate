@@ -1065,3 +1065,6 @@ Kaggle v230 proved the fused arithmetic but failed native correctness only in mi
 
 ## v232 decision — reject mixed fused dispatch, retain pure-only path
 Historical v228 already showed the same mixed rows=128 error (`410.69699`) before the fused mixed change, so v230 did not introduce that particular numerical discrepancy; v231 nevertheless failed timing integrity after enabling the fused branch in mixed overlap. Reverted the overlap helper to `use_fused_int4=false`, preserving v228 mixed behavior, while retaining the pure-only fused branch whose rows=128 pure-INT4 speedup was `0.686x` with correctness/timing passing. Updated the source contract. Local 82-test suite, CPU proof, Python checks, and diff checks pass. No Kaggle rerun is justified for this fallback-only repair.
+
+## v233 probe — isolate mixed output correctness
+Because the historical v228 report already contains the same mixed rows=128 error as v231, v233 adds a probe-only mixed-stride case: 32 INT4 channels write into a 64-column output initialized to `-999`, with expected fused values `128` in columns 0–31 and untouched sentinels in columns 32–63. This separates the fused runner’s scatter correctness from the pre-existing aggregate mixed gate. Production dispatch remains pure-only. Local 83-test suite, CPU proof, Python checks, and diff checks pass; Kaggle validation pending.

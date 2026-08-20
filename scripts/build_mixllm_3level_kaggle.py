@@ -303,6 +303,10 @@ if capability == (7, 5):
     expected_fused = torch.tensor([64, 64, -64, -64], device='cuda', dtype=torch.int32)
     assert torch.equal(fused_probe, expected_fused.expand_as(fused_probe)), (fused_probe, expected_fused)
     print('SM75_INT4_PAIR_FUSED_PROBE_PASS', fused_probe[0].tolist(), flush=True)
+    stride_probe = torch.ops.mixllm_sm75.sm75_int4_pair_mixed_stride_probe(torch.empty(0, device='cuda'))
+    assert torch.equal(stride_probe[:, :32], torch.full((32, 32), 128.0, device='cuda')), stride_probe
+    assert torch.equal(stride_probe[:, 32:], torch.full((32, 32), -999.0, device='cuda')), stride_probe
+    print('SM75_INT4_PAIR_MIXED_STRIDE_PROBE_PASS', stride_probe[0, :4].tolist(), flush=True)
     def make_case(n, width, counts, rows):
         n4, n8, n16 = counts; assert n4 + n8 + n16 == n
         alloc = ThreeLevelAllocation(indices={4: tuple(range(n4)), 8: tuple(range(n4, n4+n8)), 16: tuple(range(n4+n8, n))}, scores={b: (0.0,) * n for b in (4, 8, 16)}, budget=ThreeLevelBudget(*(100*c/n for c in counts)))
