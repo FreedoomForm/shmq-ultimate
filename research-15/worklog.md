@@ -1384,3 +1384,9 @@ Kaggle kernel version 262 compiled successfully and embedded tests passed, but t
 ## v265 — restore validated v263 scatter after v264 runtime failure
 
 The v264 `index_copy_` experiment was removed after Kaggle showed the production int32 index ABI is incompatible with ATen index_copy. v265 restores the exact v263 transpose-view cuBLAS helper and custom int32 scatter. Local validation passed: focused source/backend tests `40 passed, 6 skipped`; full suite `87 passed, 6 skipped`; Python compilation and `git diff --check` passed. This restoration is not submitted as a new performance claim; it re-establishes v263's last valid measured state before the next original-first research change.
+
+## v266 — skip redundant cached-metadata allocator records (pre-run)
+
+Deep research of original MixLLM's persistent operands and SHMQ's v3 cache found that cached `matrix_scale`/`matrix_zero` buffers are module-owned immutable tensors, yet the auxiliary integer launcher records them on every call. v266 will skip only those two records when cached metadata are present; dynamic activation, activation scales, output, and v2 temporary metadata remain recorded. No arithmetic, ABI, model partition, stream dependency, or benchmark setting changes. No Kaggle run has been made.
+
+v266 local validation completed: focused source/backend tests `41 passed, 6 skipped`; full suite `88 passed, 6 skipped`; Python compilation and `git diff --check` passed. CUDA compilation remains deferred to the next single Kaggle T4 run.

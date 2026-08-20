@@ -167,7 +167,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("usingInt8RunnerM64N64=Runner<CoreM64N64,2>", cutlass_compact)
         self.assertIn("kM128N64=2", source_compact)
         self.assertIn("kM64N64=3", source_compact)
-        self.assertIn("kCutlassTuningAbi=263", source_compact)
+        self.assertIn("kCutlassTuningAbi=266", source_compact)
         self.assertNotIn("GemmShape<128,128,64>", cutlass_compact)
         self.assertNotIn("kM128N128", source_compact)
         self.assertIn("kM128N64", source_compact)
@@ -176,6 +176,13 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("cudaEventElapsedTime", source_compact)
         self.assertIn("SHMQ_SM75_TUNE_CACHE", source_compact)
         self.assertIn("cudaStreamIsCapturing", source_compact)
+
+    def test_v266_cached_metadata_skips_redundant_allocator_records(self):
+        source_compact = "".join(self.source.split())
+        self.assertIn("boolpersistent_metadata", source_compact)
+        self.assertIn("if(!persistent_metadata){record_tensor_stream(matrix_scale,stream);record_tensor_stream(matrix_zero,stream);}", source_compact)
+        self.assertIn("cached_scale_int4!=nullptr", source_compact)
+        self.assertIn("cached_scale_int8!=nullptr", source_compact)
 
     def test_v200_integer_prefill_overlap_contract(self):
         source_compact = "".join(self.source.split())
