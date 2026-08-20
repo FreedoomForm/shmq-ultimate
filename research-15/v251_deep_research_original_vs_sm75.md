@@ -13,3 +13,8 @@ NVIDIA's PTX ISA states that dense integer `.m16n8k32` MMA requires `sm_80` or h
 ## Candidate
 
 Remove the rejected M=64,N=64 alias, tuner option, and ABI bump, restoring the v241 legal N=128/N=64 CUTLASS set. Keep the v249 load-hoisted native pair implementation and its mixed `n4 > 0` dispatch. This produces a controlled measurement of exactly one change versus v241: native mixed INT4 branch load/barrier reuse. If it still fails or regresses, revert the pair dispatch and retain only v241; if it improves, keep only after all four gates and timing integrity pass.
+
+
+## External primary source
+
+NVIDIA PTX ISA 9.3, section 9.7.15: [Parallel Thread Execution ISA](https://docs.nvidia.com/cuda/parallel-thread-execution/index.html). The instruction tables state that dense integer `.m16n8k32` is an sm80+ operation, while `.m8n8k16` INT8 and `.m8n8k32` sub-byte integer forms require sm75+. This is why a direct m16n8k32 replacement is excluded from the SM75 repair space.
