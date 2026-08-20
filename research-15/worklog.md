@@ -1366,3 +1366,7 @@ For Qwen mixed QKV `{INT4: 2400, INT8: 896, FP16: 288}`, rows=128 measured GEMM 
 Deep research of the original dataflow and v262 found that the new FP16 helper eagerly executes `weight_fp16.transpose(0, 1).contiguous()` each forward. This is unlike the original module's once-prepared kernel-native operand organization. v263 will pass the transpose view directly to `at::mm`, retaining identical FP16 operands, output dtype, row-major scatter, caller-stream ordering, and all integer computations. It is a no-quality-change allocation/layout experiment; no Kaggle run has been made.
 
 v263 local validation completed: focused source/backend tests `40 passed, 6 skipped`; full suite `87 passed, 6 skipped`; Python compilation and `git diff --check` passed. CUDA compilation remains deferred to the next single Kaggle T4 run.
+
+## v263 result — transpose-view FP16 helper is a small improvement but remains rejected
+
+Kaggle kernel version 261 completed on Tesla T4. The run passed embedded tests, `sm75_native_correctness`, and `timing_integrity`; the new source compiled successfully under nvcc. For Qwen mixed QKV `{INT4: 2400, INT8: 896, FP16: 288}`, rows=128 measured GEMM `0.422400 ms`, end-to-end `0.552032 ms`, dense FP16 `0.226688 ms`, giving GEMM speedup `0.536667x` and E2E speedup `0.410643x`. This is a modest improvement over v262's `0.388131x`, but both required end-to-end gates still failed and terminal decision was `no_go`. v263 is rejected as a production baseline; the cuBLAS FP16 helper remains a useful measured component for subsequent work.
