@@ -1112,3 +1112,10 @@ v239 adds `warp * 8` to the channel mapping consistently for correction, scales,
 The terminal v239 Kaggle run used the current source and failed at the strict mixed-stride probe before native correctness or performance gates. Because Kaggle abbreviated the tensor repr, v240 adds only diagnostic output before the unchanged assertions: sorted unique values/counts, mismatch count, and the first mismatch coordinates and values. No CUDA source, arithmetic, model, quality path, benchmark shape, timing method, or gate threshold changed.
 
 Local notebook build and `--check` passed with 30 embedded files. This diagnostic run is needed to identify the remaining v239 mapping error without making another speculative kernel repair.
+
+
+## v241 — Fix final fused scatter warp-N offset (local, Kaggle pending)
+
+Kaggle version 238 diagnostic output proved the remaining defect exactly: `-999.0` count 1792, `128.0` count 256, 768 mismatches, beginning at every row and column 8. The correction/scaling path already used `warp * 8`, but the final output scatter omitted it, causing all four warps to write into columns 0–7. v241 adds `warp * 8` to the final scatter and requires both channel expressions by source contract.
+
+Local verification: 79 repository tests passed, 6 CUDA-only tests skipped, 3 subtests passed, and the native INT4 CPU proof passed. v241 is ready for one Kaggle T4 mixed-stride validation.

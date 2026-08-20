@@ -88,3 +88,9 @@ The original CUTLASS warp decomposition assigns both a warp-M and a warp-N coord
 ## v239 T4 outcome and diagnostic requirement
 
 The terminal Kaggle log confirms v239’s exact CUDA source hash and source-digest extension name, so the tested binary is current. It ran 80 embedded tests successfully and passed the three basic SM75 probes, but failed the mixed-stride assertion before native correctness and performance gates. The visible tensor repr is abbreviated and cannot distinguish residual channel-offset, row-tile, or accumulator-value errors. The next iteration will add diagnostic-only printing of `torch.unique` counts and the first mismatch coordinates/values before the existing strict assertions. This changes no kernel, arithmetic, benchmark, or quality path and is required to avoid guessing from a shortened tensor repr.
+
+## v240 diagnostic result and v241 final-scatter correction
+
+The diagnostic Kaggle run compiled the current v239 source and produced exact statistics: `(-999.0, 1792)` and `(128.0, 256)`, with 768 mismatches. The first mismatches were every row at columns 8–31, proving that rows and arithmetic are correct but only the first eight output columns are written.
+
+Inspection found that v239 added `warp * 8` to the channel used during correction/scaling, but the final scatter still used `channel_base + local_channel_base + register_index`. Thus warps 1–3 computed their own channel tiles but all wrote back to columns 0–7, overwriting warp 0. v241 will add the same warp-N offset to final scatter and strengthen the source contract to require both channel expressions.

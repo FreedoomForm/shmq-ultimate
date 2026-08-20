@@ -1028,7 +1028,7 @@ __global__ void sm75_int4_pair_gemm_kernel(
   for (int row_tile = 0; row_tile < kPairWarps; ++row_tile) {
     const int row = row_base + row_tile * 8 + (lane >> 2);
     for (int register_index = 0; register_index < 2; ++register_index) {
-      const int channel = channel_base + local_channel_base + register_index;
+      const int channel = channel_base + warp * 8 + local_channel_base + register_index;
       if (row < rows && channel < channels) {
         output[row * output_width + indices_int4[channel]] = partial[row_tile][register_index];
       }
