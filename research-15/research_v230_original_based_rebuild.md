@@ -1,0 +1,29 @@
+# v230 original-based rebuild audit
+
+## Decision
+
+Starting from the original MixLLM is promising, but a literal SM80 copy is not viable on the current T4. The correct strategy is to preserve the original's module shape—kernel-family-specific packed weights, iterator-owned dequantization, shape/config selection, and separate precision streams—while replacing only the architecture-specific MMA/core implementation with legal SM75 code. v200's event topology and exact three-level output ABI remain the safety fallback.
+
+| Seam | Original MixLLM | Current SHMQ v200 | Rebuild decision |
+|---|---|---|---|
+| Weight ABI | Upstream test path interleaves K coordinates in two stages and packs uint4 after interleaving. vLLM extracts partition rows but relies on the kernel-family layout. | SHMQ accepts checkpoint packed `[N,K/2]` and expands to signed `[N,K]` for prefill. | Add an explicit kernel-owned interleaved representation only behind a new adapter; keep checkpoint ABI and v200 expanded fallback. |
+| Mainloop | `mq_mma_multistage.cuh` owns staged global-to-shared iterators, scale/zero iterators, dequantizer, and warp MMA policy. | `mq_mma_pipelined_sm75.h` is a custom SM75 analogue with the same broad roles but fixed legal core and K=64 schedule. | Reuse the original iterator/dequantizer interfaces where their element/layout contracts compile on SM75; do not copy `arch::Sm80`, cp.async, or unsupported stage/shape specializations. |
+| Tile selection | Upstream has separate row/column-major config families, searches legal configurations, and caches the selected config. | v229 has only N128/N64 legal SM75 candidates and cache. | Keep bounded tuner interface, but candidate registry must be tied to actual SM75 `DefaultMmaCore` specializations. No speculative K=128/stage-5. |
+| Streams | Upstream uses separate precision streams and joins completion events. | v200 has persistent INT4/INT8 streams, fork/join events, and caller-stream FP16. | Preserve v200 topology; replace only branch implementation behind `run_cutlass_int_partition`. |
+| Epilogue | Upstream has layout-specific epilogues but retains exact indexed output mapping. | SHMQ has a generic scatter epilogue, now with hoisted index fragment. | Keep exact indices/float ABI; consider a dedicated packed-output epilogue only after a reference test. |
+| Metadata | Upstream scale/zero iterators are directly coupled to the selected kernel family. | SHMQ transposes/cache metadata but v2 mixed path still transposes on the caller stream unless v3 is used. | Prefer a single kernel-family adapter that consumes the prepared metadata layout directly, rather than adding another Python ABI branch. |
+| INT4 arithmetic | Upstream SM80 path uses its supported mixed/dequantization family. | SHMQ SM75 cannot use SM80 mixed INT8xINT4 instructions and prior scalar packed paths were catastrophic. | First experiment should be a layout adapter for the existing SM75 signed-INT8 core, not a new unsupported int4 MMA. It can test whether interleaved contiguous rows improve staging without changing arithmetic. |
+
+## Highest-confidence next seam
+
+The highest-confidence original-derived seam is **pre-interleaved signed-INT8 expansion**: perform the exact existing nibble/zero conversion once, then apply the upstream K-coordinate permutation to the persistent expanded rows before the SM75 CUTLASS runner. This preserves signed INT8 arithmetic and exact scale/zero semantics while aligning global B storage with the original staged iterator's access order. It is not yet proven to match the current SM75 iterator's expected layout, so it must begin as a reference-tested optional adapter with v200 fallback. If the current iterator expects ordinary row-major B, the adapter must be rejected locally rather than measured.
+
+A literal upstream packed uint4 iterator is lower confidence because v201/v202 already showed that scalar packed decode destroys large-M throughput on this SM75 path. A literal upstream SM80 core is invalid because the vendored SM75 `DefaultMmaCore` supports only stage 2 for the TensorOp specialization used here.
+
+The line-by-line header diff confirms that SHMQ's `mq_mma_pipelined_sm75.h` is already a synchronous-copy derivative of upstream `mq_mma_multistage.h`: `cp_async_zfill`, `cp_async_fence`, and `cp_async_wait` were replaced by `sync_copy` and CTA barriers; the upstream two-call mainloop batching remains for K=64, while K=128 requires a guarded single call. This means simply copying the upstream header again would not add a missing algorithm. The remaining performance gap is in the legal SM75 data movement/configuration and the INT4 representation, not an absent stream abstraction.
+
+The upstream and SHMQ `mq_mma_tensor_op_dequantizer.h` files are functionally identical; the only diff is whitespace. Therefore dequantizer replacement is not a useful rebuild target. The real adaptation seam is the global/shared iterator and its layout contract, together with a legal SM75 configuration family.
+
+## Proof obligations
+
+The next candidate must prove (1) the permutation is an involution or has a deterministic inverse, (2) CPU reference output is identical after permuting and undoing the layout, (3) partition scatter and metadata group order remain unchanged, (4) cache invalidation tracks the transformed tensor, (5) no candidate is used during graph capture, and (6) all local tests pass before a single T4 run.
