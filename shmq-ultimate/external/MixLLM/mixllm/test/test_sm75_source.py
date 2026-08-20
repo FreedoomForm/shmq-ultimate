@@ -109,12 +109,21 @@ class SM75SourceContractTest(unittest.TestCase):
 
     def test_v235_direct_sm75_accumulator_mapping_contract(self):
         source_compact = "".join(self.source.split())
-        self.assertIn("floatpartial[2]", source_compact)
-        self.assertIn("constintlocal_row=warp*8+(lane>>2)", source_compact)
+        self.assertIn("floatpartial[kPairWarps][2]", source_compact)
+        self.assertIn("for(introw_tile=0;row_tile<kPairWarps;++row_tile)", source_compact)
+        self.assertIn("wmma::load_matrix_sync(a_low_u4,&a_low_packed[row_tile*8][0]", source_compact)
+        self.assertIn("constintlocal_row=row_tile*8+(lane>>2)", source_compact)
         self.assertIn("constintlocal_channel_base=(lane&3)*2", source_compact)
-        self.assertIn("low_accum[register_index]+16*high_accum[register_index]", source_compact)
+        self.assertIn("low_accum[row_tile][register_index]+16*high_accum[row_tile][register_index]", source_compact)
         self.assertNotIn("low_tile[warp][item]", source_compact)
         self.assertNotIn("wmma::store_matrix_sync(low_tile", self.source)
+
+    def test_v238_complete_fused_warp_tile_contract(self):
+        source_compact = "".join(self.source.split())
+        self.assertIn("constexprintkPairWarps=4", source_compact)
+        self.assertIn("floatpartial[kPairWarps][2]", source_compact)
+        self.assertIn("wmma::load_matrix_sync(b_u4,&b_packed[warp*8][0]", source_compact)
+        self.assertIn("output[row*output_width+indices_int4[channel]]=partial[row_tile][register_index]", source_compact)
 
     def test_v229_fused_int4_dispatch_contract(self):
         source_compact = "".join(self.source.split())
@@ -126,7 +135,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("has_cached_metadata?&cached_scale_int8:nullptr,false)", source_compact)
         self.assertIn("low_mma(low_accum,low_a,weights,low_accum)", source_compact)
         self.assertIn("high_mma(high_accum,high_a,weights,high_accum)", source_compact)
-        self.assertIn("16*high_accum[register_index]-correction", source_compact)
+        self.assertIn("16*high_accum[row_tile][register_index]-correction", source_compact)
 
     def test_v226_legal_sm75_candidate_tuner_contract(self):
         source_compact = "".join(self.source.split())

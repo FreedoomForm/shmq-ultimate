@@ -921,7 +921,9 @@ __global__ void sm75_int4_pair_gemm_kernel(
   const int weight_bytes_per_channel = width / 2;
   // PTX m8n8k32 accumulator mapping: each lane owns two adjacent columns
   // in one row, with row = lane >> 2 and col = (lane & 3) * 2 + r.
-  float partial[2] = {};
+  // Each warp owns one 8-column channel tile and iterates all four 8-row
+  // subtiles so the 4-warp block covers the complete 32x32 output tile.
+  float partial[kPairWarps][2] = {};
 
   for (int group = 0; group < groups; ++group) {
     if (lane < 8) {
@@ -937,96 +939,99 @@ __global__ void sm75_int4_pair_gemm_kernel(
     }
     __syncthreads();
 
-    PairProbeLowMma::FragmentC low_accum;
-    PairProbeHighMma::FragmentC high_accum;
-    low_accum.clear();
-    high_accum.clear();
-
-    for (int chunk = 0; chunk < kGroupSize / kPairK; ++chunk) {
-      const int k_base = group * kGroupSize + chunk * kPairK;
-      for (int item = threadIdx.x; item < kPairRows * kPairBytes;
-           item += blockDim.x) {
-        const int row = item / kPairBytes;
-        const int pair = item % kPairBytes;
-        const int global_row = row_base + row;
-        const int k = k_base + pair * 2;
-        int8_t a0 = 0;
-        int8_t a1 = 0;
-        if (global_row < rows) {
-          a0 = input_int8[global_row * width + k];
-          a1 = input_int8[global_row * width + k + 1];
-        }
-        const uint8_t low0 = static_cast<uint8_t>(a0) & 0x0f;
-        const uint8_t low1 = static_cast<uint8_t>(a1) & 0x0f;
-        const uint8_t high0 = static_cast<uint8_t>(static_cast<int>(a0) >> 4) & 0x0f;
-        const uint8_t high1 = static_cast<uint8_t>(static_cast<int>(a1) >> 4) & 0x0f;
-        a_low_packed[row][pair] = low0 | (low1 << 4);
-        a_high_packed[row][pair] = high0 | (high1 << 4);
-      }
-      for (int item = threadIdx.x; item < kPairChannels * kPairBytes;
-           item += blockDim.x) {
-        const int local_channel = item / kPairBytes;
-        const int pair = item % kPairBytes;
-        const int channel = channel_base + local_channel;
-        const int source = channel * weight_bytes_per_channel + k_base / 2 + pair;
-        b_packed[local_channel][pair] = channel < channels ? weight_int4[source] : 0;
-      }
-      __syncthreads();
-
-      wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::u4,
-                     wmma::row_major> a_low_u4;
-      wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::u4,
-                     wmma::row_major> a_high_u4;
-      wmma::fragment<wmma::matrix_b, 8, 8, 32, precision::u4,
-                     wmma::col_major> b_u4;
-      wmma::load_matrix_sync(a_low_u4, &a_low_packed[warp * 8][0], kPairK);
-      wmma::load_matrix_sync(a_high_u4, &a_high_packed[warp * 8][0], kPairK);
-      wmma::load_matrix_sync(b_u4, &b_packed[warp * 8][0], kPairK);
-
-      PairProbeLowMma::FragmentA low_a;
-      PairProbeHighMma::FragmentA high_a;
-      PairProbeLowMma::FragmentB weights;
-      low_a.clear();
-      high_a.clear();
-      weights.clear();
-      reinterpret_cast<unsigned&>(low_a) = a_low_u4.x[0];
-      reinterpret_cast<unsigned&>(high_a) = a_high_u4.x[0];
-      reinterpret_cast<unsigned&>(weights) = b_u4.x[0];
-      PairProbeLowMma low_mma;
-      PairProbeHighMma high_mma;
-      low_mma(low_accum, low_a, weights, low_accum);
-      high_mma(high_accum, high_a, weights, high_accum);
-      __syncthreads();
+    PairProbeLowMma::FragmentC low_accum[kPairWarps];
+    PairProbeHighMma::FragmentC high_accum[kPairWarps];
+    for (int row_tile = 0; row_tile < kPairWarps; ++row_tile) {
+      low_accum[row_tile].clear();
+      high_accum[row_tile].clear();
     }
 
-    // FragmentC has exactly two registers per lane. Do not copy only those
-    // registers into a larger WMMA accumulator fragment: its internal mapping
-    // is unspecified and that would leave the rest of the tile undefined.
-    const int local_row = warp * 8 + (lane >> 2);
-    const int local_channel_base = (lane & 3) * 2;
-    const int row = row_base + local_row;
-    for (int register_index = 0; register_index < 2; ++register_index) {
-      const int channel = channel_base + local_channel_base + register_index;
-      if (row < rows && channel < channels) {
-        const int correction = static_cast<int>(zero_int4[channel * groups + group]) *
-                               row_sums[warp][lane >> 2];
-        const int accumulator = low_accum[register_index] +
-                                 16 * high_accum[register_index] - correction;
-        const float value = static_cast<float>(accumulator) *
-            __half2float(scale_act[group * rows + row]) *
-            __half2float(scale_int4[channel * groups + group]);
-        partial[register_index] += value;
+    for (int row_tile = 0; row_tile < kPairWarps; ++row_tile) {
+      for (int chunk = 0; chunk < kGroupSize / kPairK; ++chunk) {
+        const int k_base = group * kGroupSize + chunk * kPairK;
+        for (int item = threadIdx.x; item < kPairRows * kPairBytes;
+             item += blockDim.x) {
+          const int row = item / kPairBytes;
+          const int pair = item % kPairBytes;
+          const int global_row = row_base + row;
+          const int k = k_base + pair * 2;
+          int8_t a0 = 0;
+          int8_t a1 = 0;
+          if (global_row < rows) {
+            a0 = input_int8[global_row * width + k];
+            a1 = input_int8[global_row * width + k + 1];
+          }
+          const uint8_t low0 = static_cast<uint8_t>(a0) & 0x0f;
+          const uint8_t low1 = static_cast<uint8_t>(a1) & 0x0f;
+          const uint8_t high0 = static_cast<uint8_t>(static_cast<int>(a0) >> 4) & 0x0f;
+          const uint8_t high1 = static_cast<uint8_t>(static_cast<int>(a1) >> 4) & 0x0f;
+          a_low_packed[row][pair] = low0 | (low1 << 4);
+          a_high_packed[row][pair] = high0 | (high1 << 4);
+        }
+        for (int item = threadIdx.x; item < kPairChannels * kPairBytes;
+             item += blockDim.x) {
+          const int local_channel = item / kPairBytes;
+          const int pair = item % kPairBytes;
+          const int channel = channel_base + local_channel;
+          const int source = channel * weight_bytes_per_channel + k_base / 2 + pair;
+          b_packed[local_channel][pair] = channel < channels ? weight_int4[source] : 0;
+        }
+        __syncthreads();
+
+        wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::u4,
+                       wmma::row_major> a_low_u4;
+        wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::u4,
+                       wmma::row_major> a_high_u4;
+        wmma::fragment<wmma::matrix_b, 8, 8, 32, precision::u4,
+                       wmma::col_major> b_u4;
+        wmma::load_matrix_sync(a_low_u4, &a_low_packed[row_tile * 8][0], kPairK);
+        wmma::load_matrix_sync(a_high_u4, &a_high_packed[row_tile * 8][0], kPairK);
+        wmma::load_matrix_sync(b_u4, &b_packed[warp * 8][0], kPairK);
+
+        PairProbeLowMma::FragmentA low_a;
+        PairProbeHighMma::FragmentA high_a;
+        PairProbeLowMma::FragmentB weights;
+        low_a.clear();
+        high_a.clear();
+        weights.clear();
+        reinterpret_cast<unsigned&>(low_a) = a_low_u4.x[0];
+        reinterpret_cast<unsigned&>(high_a) = a_high_u4.x[0];
+        reinterpret_cast<unsigned&>(weights) = b_u4.x[0];
+        PairProbeLowMma low_mma;
+        PairProbeHighMma high_mma;
+        low_mma(low_accum[row_tile], low_a, weights, low_accum[row_tile]);
+        high_mma(high_accum[row_tile], high_a, weights, high_accum[row_tile]);
+        __syncthreads();
+      }
+
+      const int local_row = row_tile * 8 + (lane >> 2);
+      const int local_channel_base = (lane & 3) * 2;
+      const int row = row_base + local_row;
+      for (int register_index = 0; register_index < 2; ++register_index) {
+        const int channel = channel_base + local_channel_base + register_index;
+        if (row < rows && channel < channels) {
+          const int correction = static_cast<int>(zero_int4[channel * groups + group]) *
+                                 row_sums[row_tile][lane >> 2];
+          const int accumulator = low_accum[row_tile][register_index] +
+                                   16 * high_accum[row_tile][register_index] - correction;
+          const float value = static_cast<float>(accumulator) *
+              __half2float(scale_act[group * rows + row]) *
+              __half2float(scale_int4[channel * groups + group]);
+          partial[row_tile][register_index] += value;
+        }
       }
     }
     __syncthreads();
   }
-  const int local_row = warp * 8 + (lane >> 2);
+
   const int local_channel_base = (lane & 3) * 2;
-  const int row = row_base + local_row;
-  for (int register_index = 0; register_index < 2; ++register_index) {
-    const int channel = channel_base + local_channel_base + register_index;
-    if (row < rows && channel < channels) {
-      output[row * output_width + indices_int4[channel]] = partial[register_index];
+  for (int row_tile = 0; row_tile < kPairWarps; ++row_tile) {
+    const int row = row_base + row_tile * 8 + (lane >> 2);
+    for (int register_index = 0; register_index < 2; ++register_index) {
+      const int channel = channel_base + local_channel_base + register_index;
+      if (row < rows && channel < channels) {
+        output[row * output_width + indices_int4[channel]] = partial[row_tile][register_index];
+      }
     }
   }
 #endif

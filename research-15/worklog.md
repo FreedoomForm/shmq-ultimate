@@ -1089,3 +1089,12 @@ The v236 Kaggle run reached T4, ran 79 embedded contract tests successfully, and
 Deep research of the original-vs-SHMQ build seam found that SHMQ’s loader used a fixed `torch.utils.cpp_extension.load(name="mixllm_sm75_backend")` with the default persistent PyTorch extension cache. The Kaggle execution log repeatedly reported `ninja: no work to do` across source-changing notebook versions. The original MixLLM builds its extension in its normal clean source environment; SHMQ’s repeated Kaggle notebook versions can instead reuse a stale object. v237 now hashes the exact embedded `three_level_sm75.cu` source and includes the digest in the extension name, while preserving the registered `mixllm_sm75` operator namespace. This is a build-provenance fix only; arithmetic, model, quality checks, and benchmark settings are unchanged.
 
 Local verification: 78 repository tests passed, 6 CUDA-only tests skipped, and `verify_v230_native_int4_reference.py` passed. Kaggle has not yet been run for v237.
+
+
+## v238 — Complete fused SM75 32x32 warp tile (local, Kaggle pending)
+
+Kaggle v235 (v237 source) proved that source-digest compilation was fresh, but the mixed-stride probe still failed. The full tensor pattern showed the underlying geometry defect: each of four warps loaded an `A` tile at `warp*8` rows and a `B` tile at `warp*8` channels, so it computed only four diagonal 8x8 subtiles. The original MixLLM staged runner covers a complete threadblock tile by iterating independent warp-level row/column subtiles.
+
+v238 keeps the legal SM75 `u4*u4` and `s4*u4` m8n8k32 instructions, exact packed-weight arithmetic, zero correction, scales, output ABI, grid, model, and benchmark settings. It changes the fused kernel to assign each warp one 8-column channel tile and iterate all four 8-row subtiles, maintaining four two-register accumulator fragments and scattering all 32 rows × 32 channels exactly once. This is a correctness/completeness repair; the increased per-thread accumulator state will be measured honestly on T4.
+
+Local verification: 79 repository tests passed, 6 CUDA-only tests skipped, 3 subtests passed, and `verify_v230_native_int4_reference.py` passed. Kaggle v235 is rejected at the mixed-stride probe; v238 is not yet submitted.
