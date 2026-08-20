@@ -1,0 +1,9 @@
+# v229 original-first research: final T4 failures
+
+The single final v228 T4 run proves the local repairs did not damage operator correctness: native correctness, embedded contracts, and timing-integrity passed. The remaining failures are performance/dataflow failures, not stream-deadlock or numerical failures. Qwen-shaped mixed rows=128 measured 0.2897x E2E and 0.2942x GEMM speedup versus dense FP16; the mixed decode E2E and mixed prefill gates failed. Pure INT4 rows=128 measured 0.6254x E2E and failed timing-integrity at 1.1974. Pure INT8 rows=128 measured 0.6967x E2E.
+
+Upstream MixLLM's integer path is not merely a set of overlapping launches. It consumes a kernel-family-specific packed/interleaved weight layout through staged dequantization iterators, while SHMQ still materializes signed expanded INT4 `[n4,K]` for prefill and feeds a custom SM75 iterator. The final report shows activation quantization is only about 0.025-0.030 ms, so it is not the primary bottleneck; the large-M integer GEMM/data movement remains dominant. Persistent expansion moved allocation out of the hot dispatcher but did not change the arithmetic/dataflow cost of every integer GEMM.
+
+The final tuner did add a legal N64/N128 choice and preserved v200 fallback, but this does not reproduce upstream's full `gemm_configs`/`gemm_configs_rm` family. The pure INT4 rows=128 timing-integrity failure indicates that enabling the extra N64 family is not sufficient to make the per-partition branch stable. Therefore the next repair must target native packed INT4 consumption or a correctness-proven specialized large-M integer dataflow, not another heuristic or wrapper tweak.
+
+The vLLM and full-model gates are environment failures: Kaggle had vLLM 0.27.1 instead of pinned 0.9.0, and the exact Qwen2.5-0.5B model fingerprint was absent. These are not evidence of a kernel correctness failure.
