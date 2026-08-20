@@ -58,14 +58,6 @@ class SM75PythonDispatchTest(unittest.TestCase):
         third = module.prepare_sm75_prefill_cache()
         self.assertIsNot(first, third)
 
-    def test_large_prefill_native_pair_uses_empty_int4_placeholder(self):
-        module = self._module((2, 1, 1))
-        placeholder = sm75_backend._expanded_int4_for_prefill(
-            module, torch.empty(32, 128, dtype=torch.float16), torch,
-        )
-        self.assertEqual(tuple(placeholder.shape), (0, 128))
-        self.assertIsNone(module._sm75_int4_expanded)
-
     def test_prefill_int4_expansion_is_signed_cached_and_invalidated(self):
         module = self._module((2, 0, 0))
         x = torch.empty(2, 128, dtype=torch.float16)

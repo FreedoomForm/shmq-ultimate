@@ -61,8 +61,8 @@ class ThreeLevelLinear(nn.Module):
         self._sm75_prefill_metadata = None
         self._sm75_packed_tensors = None
         result = super()._apply(fn, recurse)
-        # Large-M native SM75 prefill consumes packed INT4 directly; the
-        # expanded cache is created lazily only if a rows<32 fallback needs it.
+        if self.weight_int4.is_cuda and self.indices_4.numel():
+            self.prepare_sm75_prefill_cache()
         if self.weight_int4.is_cuda and (self.indices_4.numel() or self.indices_8.numel()):
             self.prepare_sm75_prefill_metadata()
         return result
@@ -174,6 +174,7 @@ class ThreeLevelLinear(nn.Module):
                 layer.zero_int4 = zero.to(torch.uint8).contiguous()
         layer.prepare_sm75_packed_tensors()
         if layer.weight_int4.is_cuda:
+            layer.prepare_sm75_prefill_cache()
             layer.prepare_sm75_prefill_metadata()
         return layer
 
@@ -221,6 +222,7 @@ class ThreeLevelLinear(nn.Module):
                                       missing_keys, unexpected_keys, error_msgs)
         self.prepare_sm75_packed_tensors()
         if self.weight_int4.is_cuda:
+            self.prepare_sm75_prefill_cache()
             self.prepare_sm75_prefill_metadata()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
