@@ -1068,3 +1068,6 @@ Historical v228 already showed the same mixed rows=128 error (`410.69699`) befor
 
 ## v233 probe — isolate mixed output correctness
 Because the historical v228 report already contains the same mixed rows=128 error as v231, v233 adds a probe-only mixed-stride case: 32 INT4 channels write into a 64-column output initialized to `-999`, with expected fused values `128` in columns 0–31 and untouched sentinels in columns 32–63. This separates the fused runner’s scatter correctness from the pre-existing aggregate mixed gate. Production dispatch remains pure-only. Local 83-test suite, CPU proof, Python checks, and diff checks pass; Kaggle validation pending.
+
+## v234 repair — fused warp output mapping
+Kaggle v232 isolated the remaining probe failure: rows 0–7 were correct but later rows stayed at the sentinel because writeback used `local_channel=warp*8+...` while the per-warp tile was already selected in `low_tile[warp]`; each warp therefore overwrote the same first eight rows. Corrected mapping to `local_row=warp*8+item/8`, `local_channel=item%8` in both accumulation and final scatter. Local 83-test suite, CPU proof, Python checks, and diff checks pass; Kaggle revalidation pending.

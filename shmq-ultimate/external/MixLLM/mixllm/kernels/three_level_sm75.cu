@@ -1010,8 +1010,8 @@ __global__ void sm75_int4_pair_gemm_kernel(
     __syncwarp();
 
     for (int item = lane; item < 64; item += kWarpSize) {
-      const int local_row = item / 8;
-      const int local_channel = warp * 8 + item % 8;
+      const int local_row = warp * 8 + item / 8;
+      const int local_channel = item % 8;
       const int row = row_base + local_row;
       const int channel = channel_base + local_channel;
       if (row < rows && channel < channels) {
@@ -1028,8 +1028,8 @@ __global__ void sm75_int4_pair_gemm_kernel(
     __syncthreads();
   }
   for (int item = lane; item < 64; item += kWarpSize) {
-    const int local_row = item / 8;
-    const int local_channel = warp * 8 + item % 8;
+    const int local_row = warp * 8 + item / 8;
+    const int local_channel = item % 8;
     const int row = row_base + local_row;
     const int channel = channel_base + local_channel;
     if (row < rows && channel < channels) {
