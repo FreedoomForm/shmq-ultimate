@@ -110,8 +110,8 @@ class SM75SourceContractTest(unittest.TestCase):
 
     def test_v235_direct_sm75_accumulator_mapping_contract(self):
         source_compact = "".join(self.source.split())
-        self.assertIn("floatpartial[kPairRowTiles][kPairNSubtiles][2]", source_compact)
-        self.assertIn("for(introw_tile=0;row_tile<kPairRowTiles;++row_tile)", source_compact)
+        self.assertIn("floatpartial[kPairWarps][kPairNSubtiles][2]", source_compact)
+        self.assertIn("for(introw_tile=0;row_tile<kPairWarps;++row_tile)", source_compact)
         self.assertIn("wmma::load_matrix_sync(a_low_u4,&a_low_packed[row_tile*8][0]", source_compact)
         self.assertIn("constintlocal_row=row_tile*8+(lane>>2)", source_compact)
         self.assertIn("constintlocal_channel_base=(lane&3)*2", source_compact)
@@ -121,16 +121,13 @@ class SM75SourceContractTest(unittest.TestCase):
 
     def test_v238_complete_fused_warp_tile_contract(self):
         source_compact = "".join(self.source.split())
-        self.assertIn("constexprintkPairWarps=8", source_compact)
-        self.assertIn("floatpartial[kPairRowTiles][kPairNSubtiles][2]", source_compact)
-        self.assertIn("constexprintkPairChannels=128", source_compact)
-        self.assertIn("constexprintkPairRowTiles=4", source_compact)
+        self.assertIn("constexprintkPairWarps=4", source_compact)
+        self.assertIn("floatpartial[kPairWarps][kPairNSubtiles][2]", source_compact)
+        self.assertIn("constexprintkPairChannels=64", source_compact)
         self.assertIn("constexprintkPairNSubtiles=2", source_compact)
         self.assertIn("wmma::load_matrix_sync(b_u4,&b_packed[warp*16+n_tile*8][0]", source_compact)
         self.assertEqual(source_compact.count("channel_base+warp*16+n_tile*8+local_channel_base+register_index"), 2)
         self.assertIn("output[row*output_width+indices_int4[channel]]=__float2half_rn(partial[row_tile][n_tile][register_index])", source_compact)
-        self.assertIn("grid((channels+127)/128,(rows+31)/32)", source_compact)
-        self.assertIn("sm75_int4_pair_gemm_kernel<<<grid,256", source_compact)
         self.assertEqual(source_compact.count("a_low_packed[row][pair]=low0|(low1<<4)"), 1)
         self.assertEqual(source_compact.count("b_packed[local_channel][pair]=channel<channels?weight_int4[source]:0"), 1)
 
@@ -140,7 +137,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("voidrun_int4_pair_partition(", source_compact)
         self.assertIn("use_fused_int4", source_compact)
         self.assertIn("n4>0&&n8==0&&n16==0&&!has_cached_metadata", source_compact)
-        self.assertIn("has_cached_metadata?&cached_scale_int8:nullptr,n4>0)", source_compact)
+        self.assertIn("has_cached_metadata?&cached_scale_int8:nullptr,false)", source_compact)
         self.assertIn("n4>0&&n8==0&&n16==0&&!has_cached_metadata", source_compact)
         self.assertIn("low_mma(low_accum[row_tile][n_tile],low_a,weights,low_accum[row_tile][n_tile])", source_compact)
         self.assertIn("high_mma(high_accum[row_tile][n_tile],high_a,weights,high_accum[row_tile][n_tile])", source_compact)
@@ -157,7 +154,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("usingInt8RunnerM64N64=Runner<CoreM64N64,2>", cutlass_compact)
         self.assertIn("kM128N64=2", source_compact)
         self.assertIn("kM64N64=3", source_compact)
-        self.assertIn("kCutlassTuningAbi=259", source_compact)
+        self.assertIn("kCutlassTuningAbi=260", source_compact)
         self.assertNotIn("GemmShape<128,128,64>", cutlass_compact)
         self.assertNotIn("kM128N128", source_compact)
         self.assertIn("kM128N64", source_compact)

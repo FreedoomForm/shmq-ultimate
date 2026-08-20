@@ -1314,3 +1314,19 @@ Deep research found that the rejected v244 “wider” pair was not a valid N=12
 The mixed large-M overlap selector now uses the native pair only when INT4 exists (`n4 > 0`), while the pure-INT4 fast branch remains unchanged. The tuning ABI is 259. Source contracts require the exact 8-warp geometry, row-tile separation, 128-channel tile, 256-thread launch, and mixed selector.
 
 Local validation: focused/source/backend tests `38 passed, 6 skipped`; full suite `85 passed, 6 skipped`; native INT4 reference proof passed; `git diff --check` passed. No v259 Kaggle run has been made yet.
+
+
+## v259 Kaggle result — correctly mapped 8-warp 32x128 pair rejected
+
+The v259 notebook compiled on T4 with exact source identity: expected and observed JIT digest `7963a105f9bbd943`. Embedded tests returned code 0, native SM75 correctness passed, and the mixed-stride INT4 probe returned `[128.0, 128.0, 128.0, 128.0]`.
+
+For Qwen mixed QKV `{INT4: 2400, INT8: 896, FP16: 288}`, end-to-end speedups versus dense FP16 were `0.747x` at rows=1, `0.284x` at rows=16, and `0.193x` at rows=128. Rows=128 measured GEMM `1.832832 ms`, end-to-end `0.843776 ms`, and dense FP16 `0.163200 ms`; timing-integrity ratio was `2.172178` and failed. The candidate is materially worse than v258's `0.373x` rows=128 result, proving that the corrected N=128 native pair still has excessive register/warp work or synchronization cost on T4 despite exact channel coverage.
+
+Gate result: `t4_hardware=passed`, `embedded_contract_tests=passed`, `sm75_native_correctness=passed`, `mixed_decode_gemm_performance=passed`, `mixed_decode_end_to_end_performance=failed`, `mixed_prefill_end_to_end_performance=failed`, `timing_integrity=failed`, `terminal_decision=no_go`. v259 is rejected and will not be retained as a production baseline.
+
+
+## v260 — restore v258 geometry and remove redundant persistent stream records (local validation complete)
+
+v259 was rejected after the valid 8-warp native pair regressed the mixed rows=128 result. v260 restores the validated v258 4-warp 32x64 native pair and staged mixed selector (`use_fused_int4=false`). Deep comparison with the official MixLLM launcher then isolated a lower-risk bookkeeping mismatch: SHMQ recorded immutable module-owned weights, scales, zeros, and indices on every auxiliary-stream launch even though the Python module keeps those tensors alive for the entire forward call. v260 removes only those redundant allocator records. It retains recording for dynamic `input_int8`, activation scales, output, and temporary transposed CUTLASS metadata. No arithmetic, tensor lifetime, partition, model, quality, or benchmark condition is changed.
+
+The tuning ABI is bumped to 260 to invalidate disk cache entries created by v258/v259. Local validation: focused/source/backend tests `38 passed, 6 skipped`; full suite `85 passed, 6 skipped`; native INT4 reference proof passed; `git diff --check` passed. No v260 Kaggle run has been made yet.

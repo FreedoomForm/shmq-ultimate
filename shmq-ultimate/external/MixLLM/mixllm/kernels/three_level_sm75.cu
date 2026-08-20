@@ -74,7 +74,7 @@ enum class CutlassConfig : int {
   kM64N64 = 3,
 };
 
-constexpr int kCutlassTuningAbi = 259;
+constexpr int kCutlassTuningAbi = 260;
 constexpr int kCutlassTuningWarmup = 2;
 constexpr int kCutlassTuningIterations = 4;
 std::mutex g_cutlass_tuning_mutex;
@@ -917,17 +917,16 @@ __global__ void sm75_int4_pair_gemm_kernel(
     __half* output, int rows, int width, int channels, int output_width) {
 #if __CUDA_ARCH__ >= 750
   namespace precision = wmma::experimental::precision;
-  constexpr int kPairWarps = 8;
+  constexpr int kPairWarps = 4;
   constexpr int kPairRows = 32;
-  constexpr int kPairChannels = 128;
-  constexpr int kPairRowTiles = 4;
+  constexpr int kPairChannels = 64;
   constexpr int kPairNSubtiles = 2;
   constexpr int kPairK = 32;
   constexpr int kPairBytes = kPairK / 2;
   __shared__ __align__(16) uint8_t a_low_packed[kPairRows][kPairBytes];
   __shared__ __align__(16) uint8_t a_high_packed[kPairRows][kPairBytes];
   __shared__ __align__(16) uint8_t b_packed[kPairChannels][kPairBytes];
-  __shared__ int row_sums[kPairRowTiles][8];
+  __shared__ int row_sums[kPairWarps][8];
 
   const int warp = threadIdx.x / kWarpSize;
   const int lane = threadIdx.x % kWarpSize;
@@ -937,30 +936,27 @@ __global__ void sm75_int4_pair_gemm_kernel(
   const int weight_bytes_per_channel = width / 2;
   // PTX m8n8k32 accumulator mapping: each lane owns two adjacent columns
   // in one row, with row = lane >> 2 and col = (lane & 3) * 2 + r.
-  // Each warp owns a 16-channel slice of the 128-channel tile and iterates
-  // all four 8-row subtiles. Eight warps therefore cover 32x128 exactly
-  // once, while the row-tile count remains independent of warp count.
-  float partial[kPairRowTiles][kPairNSubtiles][2] = {};
+  // Each warp owns one 8-column channel tile and iterates all four 8-row
+  // subtiles so the 4-warp block covers the complete 32x32 output tile.
+  float partial[kPairWarps][kPairNSubtiles][2] = {};
 
   for (int group = 0; group < groups; ++group) {
     if (lane < 8) {
       int sum = 0;
       const int row = row_base + warp * 8 + lane;
-      if (warp < kPairRowTiles && row < rows) {
+      if (row < rows) {
 #pragma unroll 4
         for (int k = 0; k < kGroupSize; ++k) {
           sum += static_cast<int>(input_int8[row * width + group * kGroupSize + k]);
         }
       }
-      if (warp < kPairRowTiles) {
-        row_sums[warp][lane] = sum;
-      }
+      row_sums[warp][lane] = sum;
     }
     __syncthreads();
 
-    PairProbeLowMma::FragmentC low_accum[kPairRowTiles][kPairNSubtiles];
-    PairProbeHighMma::FragmentC high_accum[kPairRowTiles][kPairNSubtiles];
-    for (int row_tile = 0; row_tile < kPairRowTiles; ++row_tile) {
+    PairProbeLowMma::FragmentC low_accum[kPairWarps][kPairNSubtiles];
+    PairProbeHighMma::FragmentC high_accum[kPairWarps][kPairNSubtiles];
+    for (int row_tile = 0; row_tile < kPairWarps; ++row_tile) {
       for (int n_tile = 0; n_tile < kPairNSubtiles; ++n_tile) {
         low_accum[row_tile][n_tile].clear();
         high_accum[row_tile][n_tile].clear();
@@ -998,7 +994,7 @@ __global__ void sm75_int4_pair_gemm_kernel(
       }
       __syncthreads();
 
-      for (int row_tile = 0; row_tile < kPairRowTiles; ++row_tile) {
+      for (int row_tile = 0; row_tile < kPairWarps; ++row_tile) {
         wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::u4,
                        wmma::row_major> a_low_u4;
         wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::u4,
@@ -1031,7 +1027,7 @@ __global__ void sm75_int4_pair_gemm_kernel(
       __syncthreads();
     }
 
-    for (int row_tile = 0; row_tile < kPairRowTiles; ++row_tile) {
+    for (int row_tile = 0; row_tile < kPairWarps; ++row_tile) {
       const int local_row = row_tile * 8 + (lane >> 2);
       const int local_channel_base = (lane & 3) * 2;
       const int row = row_base + local_row;
@@ -1056,7 +1052,7 @@ __global__ void sm75_int4_pair_gemm_kernel(
   }
 
   const int local_channel_base = (lane & 3) * 2;
-  for (int row_tile = 0; row_tile < kPairRowTiles; ++row_tile) {
+  for (int row_tile = 0; row_tile < kPairWarps; ++row_tile) {
     const int row = row_base + row_tile * 8 + (lane >> 2);
     for (int n_tile = 0; n_tile < kPairNSubtiles; ++n_tile) {
       for (int register_index = 0; register_index < 2; ++register_index) {
@@ -1082,15 +1078,14 @@ void run_int4_pair_partition(
   }
   record_tensor_stream(input_int8, stream);
   record_tensor_stream(scale_act, stream);
-  record_tensor_stream(weight_int4, stream);
-  record_tensor_stream(scale_int4, stream);
-  record_tensor_stream(zero_int4, stream);
-  record_tensor_stream(indices_int4, stream);
+  // Module-owned INT4 weights, scales, zeros, and indices remain alive for
+  // the complete forward call; only dynamic activation/output tensors need
+  // allocator stream recording here.
   record_tensor_stream(output, stream);
   const int channels = static_cast<int>(indices_int4.numel());
   const int output_width = static_cast<int>(output.size(1));
-  const dim3 grid((channels + 127) / 128, (rows + 31) / 32);
-  sm75_int4_pair_gemm_kernel<<<grid, 256, 0, stream>>>(
+  const dim3 grid((channels + 31) / 32, (rows + 31) / 32);
+  sm75_int4_pair_gemm_kernel<<<grid, 128, 0, stream>>>(
       input_int8.data_ptr<int8_t>(), weight_int4.data_ptr<uint8_t>(),
       reinterpret_cast<const __half*>(scale_act.data_ptr<at::Half>()),
       reinterpret_cast<const __half*>(scale_int4.data_ptr<at::Half>()),
@@ -1121,10 +1116,10 @@ void run_cutlass_int_partition(
   }
   record_tensor_stream(input_int8, stream);
   record_tensor_stream(scale_act, stream);
-  record_tensor_stream(weight, stream);
+  // `weight` and `indices` are persistent module buffers.  The transposed
+  // matrix metadata can be a temporary v2 allocation, so retain its record.
   record_tensor_stream(matrix_scale, stream);
   record_tensor_stream(matrix_zero, stream);
-  record_tensor_stream(indices, stream);
   record_tensor_stream(output, stream);
   CutlassConfig config = select_cutlass_config(
       input_int8.device().index(), rows, static_cast<int>(indices.numel()), width,
@@ -1361,9 +1356,10 @@ at::Tensor three_level_linear_v2_core(
         input_int8, scale_act, weight_int4, scale_int4, zero_int4,
         indices_int4, output, rows, width, stream.stream());
   } else if (rows >= 32 && (n4 > 0 || n8 > 0)) {
-    // The original MixLLM overlaps independent integer partitions. v259
-    // enables the research-backed 8-warp 32x128 native packed pair for INT4
-    // mixed large-M work; the v253 4-warp 32x64 geometry remains rejected.
+    // The original MixLLM relies on iterator-based, staged Tensor Core GEMMs
+    // for larger M. Keep the measured v188 overlap path here: the native
+    // packed pair kernel is reserved for the pure-INT4 candidate because its
+    // 32x32 small-tile geometry is not competitive for mixed large-M work.
     // The helper is deliberately selected only for rows>=32: the SM75
     // 16x128 CUTLASS geometry is not a valid portable small-M core, and
     // rows==16 remains on the validated direct-WMMA control path.
@@ -1375,7 +1371,7 @@ at::Tensor three_level_linear_v2_core(
         has_cached_metadata ? &cached_scale_int4 : nullptr,
         has_cached_metadata ? &cached_zero_int4 : nullptr,
         has_cached_metadata ? &cached_scale_int8 : nullptr,
-        n4 > 0);
+        false);
     if (n16 > 0) {
       const dim3 grid_fp16(
           (n16 + kPrefillChannels - 1) / kPrefillChannels,
