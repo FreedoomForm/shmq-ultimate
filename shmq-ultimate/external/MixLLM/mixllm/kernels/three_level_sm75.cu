@@ -905,7 +905,8 @@ __global__ void sm75_int4_pair_gemm_kernel(
   namespace precision = wmma::experimental::precision;
   constexpr int kPairWarps = 4;
   constexpr int kPairRows = 32;
-  constexpr int kPairChannels = 32;
+  constexpr int kPairChannels = 64;
+  constexpr int kPairNSubtiles = 2;
   constexpr int kPairK = 32;
   constexpr int kPairBytes = kPairK / 2;
   __shared__ __align__(16) uint8_t a_low_packed[kPairRows][kPairBytes];
@@ -923,7 +924,7 @@ __global__ void sm75_int4_pair_gemm_kernel(
   // in one row, with row = lane >> 2 and col = (lane & 3) * 2 + r.
   // Each warp owns one 8-column channel tile and iterates all four 8-row
   // subtiles so the 4-warp block covers the complete 32x32 output tile.
-  float partial[kPairWarps][2] = {};
+  float partial[kPairWarps][kPairNSubtiles][2] = {};
 
   for (int group = 0; group < groups; ++group) {
     if (lane < 8) {
@@ -939,11 +940,13 @@ __global__ void sm75_int4_pair_gemm_kernel(
     }
     __syncthreads();
 
-    PairProbeLowMma::FragmentC low_accum[kPairWarps];
-    PairProbeHighMma::FragmentC high_accum[kPairWarps];
+    PairProbeLowMma::FragmentC low_accum[kPairWarps][kPairNSubtiles];
+    PairProbeHighMma::FragmentC high_accum[kPairWarps][kPairNSubtiles];
     for (int row_tile = 0; row_tile < kPairWarps; ++row_tile) {
-      low_accum[row_tile].clear();
-      high_accum[row_tile].clear();
+      for (int n_tile = 0; n_tile < kPairNSubtiles; ++n_tile) {
+        low_accum[row_tile][n_tile].clear();
+        high_accum[row_tile][n_tile].clear();
+      }
     }
 
     for (int chunk = 0; chunk < kGroupSize / kPairK; ++chunk) {
@@ -982,25 +985,30 @@ __global__ void sm75_int4_pair_gemm_kernel(
                        wmma::row_major> a_low_u4;
         wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::u4,
                        wmma::row_major> a_high_u4;
-        wmma::fragment<wmma::matrix_b, 8, 8, 32, precision::u4,
-                       wmma::col_major> b_u4;
         wmma::load_matrix_sync(a_low_u4, &a_low_packed[row_tile * 8][0], kPairK);
         wmma::load_matrix_sync(a_high_u4, &a_high_packed[row_tile * 8][0], kPairK);
-        wmma::load_matrix_sync(b_u4, &b_packed[warp * 8][0], kPairK);
+        for (int n_tile = 0; n_tile < kPairNSubtiles; ++n_tile) {
+          wmma::fragment<wmma::matrix_b, 8, 8, 32, precision::u4,
+                         wmma::col_major> b_u4;
+          wmma::load_matrix_sync(
+              b_u4, &b_packed[warp * 16 + n_tile * 8][0], kPairK);
 
-        PairProbeLowMma::FragmentA low_a;
-        PairProbeHighMma::FragmentA high_a;
-        PairProbeLowMma::FragmentB weights;
-        low_a.clear();
-        high_a.clear();
-        weights.clear();
-        reinterpret_cast<unsigned&>(low_a) = a_low_u4.x[0];
-        reinterpret_cast<unsigned&>(high_a) = a_high_u4.x[0];
-        reinterpret_cast<unsigned&>(weights) = b_u4.x[0];
-        PairProbeLowMma low_mma;
-        PairProbeHighMma high_mma;
-        low_mma(low_accum[row_tile], low_a, weights, low_accum[row_tile]);
-        high_mma(high_accum[row_tile], high_a, weights, high_accum[row_tile]);
+          PairProbeLowMma::FragmentA low_a;
+          PairProbeHighMma::FragmentA high_a;
+          PairProbeLowMma::FragmentB weights;
+          low_a.clear();
+          high_a.clear();
+          weights.clear();
+          reinterpret_cast<unsigned&>(low_a) = a_low_u4.x[0];
+          reinterpret_cast<unsigned&>(high_a) = a_high_u4.x[0];
+          reinterpret_cast<unsigned&>(weights) = b_u4.x[0];
+          PairProbeLowMma low_mma;
+          PairProbeHighMma high_mma;
+          low_mma(low_accum[row_tile][n_tile], low_a, weights,
+                  low_accum[row_tile][n_tile]);
+          high_mma(high_accum[row_tile][n_tile], high_a, weights,
+                   high_accum[row_tile][n_tile]);
+        }
       }
       __syncthreads();
     }
@@ -1009,17 +1017,20 @@ __global__ void sm75_int4_pair_gemm_kernel(
       const int local_row = row_tile * 8 + (lane >> 2);
       const int local_channel_base = (lane & 3) * 2;
       const int row = row_base + local_row;
-      for (int register_index = 0; register_index < 2; ++register_index) {
-        const int channel = channel_base + warp * 8 + local_channel_base + register_index;
-        if (row < rows && channel < channels) {
-          const int correction = static_cast<int>(zero_int4[channel * groups + group]) *
-                                 row_sums[row_tile][lane >> 2];
-          const int accumulator = low_accum[row_tile][register_index] +
-                                   16 * high_accum[row_tile][register_index] - correction;
-          const float value = static_cast<float>(accumulator) *
-              __half2float(scale_act[group * rows + row]) *
-              __half2float(scale_int4[channel * groups + group]);
-          partial[row_tile][register_index] += value;
+      for (int n_tile = 0; n_tile < kPairNSubtiles; ++n_tile) {
+        for (int register_index = 0; register_index < 2; ++register_index) {
+          const int channel = channel_base + warp * 16 + n_tile * 8 +
+                              local_channel_base + register_index;
+          if (row < rows && channel < channels) {
+            const int correction = static_cast<int>(zero_int4[channel * groups + group]) *
+                                   row_sums[row_tile][lane >> 2];
+            const int accumulator = low_accum[row_tile][n_tile][register_index] +
+                                     16 * high_accum[row_tile][n_tile][register_index] - correction;
+            const float value = static_cast<float>(accumulator) *
+                __half2float(scale_act[group * rows + row]) *
+                __half2float(scale_int4[channel * groups + group]);
+            partial[row_tile][n_tile][register_index] += value;
+          }
         }
       }
     }
@@ -1029,10 +1040,14 @@ __global__ void sm75_int4_pair_gemm_kernel(
   const int local_channel_base = (lane & 3) * 2;
   for (int row_tile = 0; row_tile < kPairWarps; ++row_tile) {
     const int row = row_base + row_tile * 8 + (lane >> 2);
-    for (int register_index = 0; register_index < 2; ++register_index) {
-      const int channel = channel_base + warp * 8 + local_channel_base + register_index;
-      if (row < rows && channel < channels) {
-        output[row * output_width + indices_int4[channel]] = partial[row_tile][register_index];
+    for (int n_tile = 0; n_tile < kPairNSubtiles; ++n_tile) {
+      for (int register_index = 0; register_index < 2; ++register_index) {
+        const int channel = channel_base + warp * 16 + n_tile * 8 +
+                            local_channel_base + register_index;
+        if (row < rows && channel < channels) {
+          output[row * output_width + indices_int4[channel]] =
+              partial[row_tile][n_tile][register_index];
+        }
       }
     }
   }
@@ -1273,11 +1288,10 @@ at::Tensor three_level_linear_v2_core(
               "scale_act must have shape [K/128, rows]");
   TORCH_CHECK(weight_int4.size(0) == n4 && weight_int4.size(1) == width / 2,
               "invalid packed INT4 weight shape");
-  TORCH_CHECK(
-      (rows >= 32 && n4 > 0) || rows == 1 ||
-          (expanded_int4.dim() == 2 && expanded_int4.size(0) == n4 &&
-           expanded_int4.size(1) == width),
-      "expanded_int4 must have shape [n4, K] unless large-M native INT4 is active");
+  TORCH_CHECK(rows == 1 ||
+                  (expanded_int4.dim() == 2 && expanded_int4.size(0) == n4 &&
+                   expanded_int4.size(1) == width),
+              "expanded_int4 must have shape [n4, K] for prefill");
   TORCH_CHECK(weight_int8.size(0) == n8 && weight_int8.size(1) == width,
               "invalid INT8 weight shape");
   TORCH_CHECK(weight_fp16.size(0) == n16 && weight_fp16.size(1) == width,
