@@ -874,7 +874,7 @@ __global__ void sm75_int4_pair_gemm_kernel(
     const int8_t* input_int8, const uint8_t* weight_int4,
     const __half* scale_act, const __half* scale_int4,
     const uint8_t* zero_int4, const int32_t* indices_int4,
-    float* output, int rows, int width, int channels) {
+    float* output, int rows, int width, int channels, int output_width) {
 #if __CUDA_ARCH__ >= 750
   namespace precision = wmma::experimental::precision;
   constexpr int kPairWarps = 4;
@@ -1007,7 +1007,7 @@ __global__ void sm75_int4_pair_gemm_kernel(
     const int row = row_base + local_row;
     const int channel = channel_base + local_channel;
     if (row < rows && channel < channels) {
-      output[row * channels + indices_int4[channel]] = partial[item];
+      output[row * output_width + indices_int4[channel]] = partial[item];
     }
   }
 #endif
@@ -1029,13 +1029,14 @@ void run_int4_pair_partition(
   record_tensor_stream(indices_int4, stream);
   record_tensor_stream(output, stream);
   const int channels = static_cast<int>(indices_int4.numel());
+  const int output_width = static_cast<int>(output.size(1));
   const dim3 grid((channels + 31) / 32, (rows + 31) / 32);
   sm75_int4_pair_gemm_kernel<<<grid, 128, 0, stream>>>(
       input_int8.data_ptr<int8_t>(), weight_int4.data_ptr<uint8_t>(),
       reinterpret_cast<const __half*>(scale_act.data_ptr<at::Half>()),
       reinterpret_cast<const __half*>(scale_int4.data_ptr<at::Half>()),
       zero_int4.data_ptr<uint8_t>(), indices_int4.data_ptr<int32_t>(),
-      output.data_ptr<float>(), rows, width, channels);
+      output.data_ptr<float>(), rows, width, channels, output_width);
   C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 

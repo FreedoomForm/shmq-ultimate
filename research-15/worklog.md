@@ -1059,3 +1059,6 @@ Kaggle v229 compiled and ran the fused pure-INT4 dispatch. Native correctness pa
 
 ## v230 candidate — fused INT4 inside mixed prefill overlap
 The proven pair is now used for the INT4 auxiliary stream whenever `n4>0` and metadata is uncached, including mixed 4/8/16 prefill. INT8 remains on its own v228 CUTLASS stream and FP16 remains on the caller stream; pure INT4 keeps the direct fused branch. Cached metadata and all unsupported shapes retain the v228 path. Added a source contract for the seam. Local 82-test suite, CPU proof, Python checks, and diff checks pass. Kaggle validation pending.
+
+## v231 repair — mixed output stride
+Kaggle v230 proved the fused arithmetic but failed native correctness only in mixed rows=128: the INT4 kernel scattered with `row*n4+index`, while the shared output tensor stride is `row*(n4+n8+n16)+index`. Pure INT4 was unaffected because `n4==output_width`. Repaired the kernel to receive `output_width` and use the full output stride. Local 82-test suite, CPU proof, Python checks, and diff checks pass; Kaggle revalidation pending.
