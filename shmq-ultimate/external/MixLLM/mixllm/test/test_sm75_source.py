@@ -70,6 +70,14 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("OpClassTensorOp,2,cutlass::arch::OpMultiplyAddSaturate>", cutlass_compact)
         self.assertIn("usingInt8Runner=Runner<Core,2>", cutlass_compact)
 
+    def test_v224_index_fragment_hoist_contract(self):
+        cutlass_text = self.cutlass_testbed
+        self.assertIn("using IndexFragment = cutlass::Array<int", cutlass_text)
+        self.assertIn("index_fragment[fragment_index]", cutlass_text)
+        self.assertIn("index_fragment[fragment_index] >= 0", cutlass_text)
+        self.assertEqual(cutlass_text.count("indices[partition_channel]"), 1)
+        self.assertNotIn("ptr_C[global_row * ldc + indices[partition_channel]]", cutlass_text)
+
     def test_v200_integer_prefill_overlap_contract(self):
         source_compact = "".join(self.source.split())
         cutlass_compact = "".join(self.cutlass_testbed.split())

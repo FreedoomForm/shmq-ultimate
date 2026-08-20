@@ -83,6 +83,8 @@ __global__ void kernel(
   constexpr int kRowsPerTile = 8;
   constexpr int kAccumulatorRows = InstructionShape::kM / kRowsPerTile;
   auto const* converted = reinterpret_cast<typename Mma::AccumFragmentConvert const*>(accum.data());
+  using IndexFragment = cutlass::Array<int, MmaIterations::kColumn * kElementsPerAccess>;
+  IndexFragment index_fragment;
 
   int warp_m = warp_id % Mma::WarpCount::kM;
   int warp_n = warp_id / Mma::WarpCount::kM;
@@ -90,6 +92,17 @@ __global__ void kernel(
   int channel_tile = tb_tile.n() * Mma::Shape::kN + warp_n * Operator::Shape::kN;
   int quad = threadIdx.x >> 2;
   int lane_in_quad = threadIdx.x & 3;
+
+  for (int mma_n = 0; mma_n < MmaIterations::kColumn; ++mma_n) {
+    for (int col = 0; col < kElementsPerAccess; ++col) {
+      int local_channel =
+          mma_n * InstructionShape::kN * Operator::IteratorC::OpDelta::kColumn + col;
+      int partition_channel = channel_tile + local_channel;
+      int fragment_index = mma_n * kElementsPerAccess + col;
+      index_fragment[fragment_index] =
+          partition_channel < problem_size.n() ? indices[partition_channel] : -1;
+    }
+  }
 
   for (int mma_n = 0; mma_n < MmaIterations::kColumn; ++mma_n) {
     for (int mma_m = 0; mma_m < MmaIterations::kRow; ++mma_m) {
@@ -104,9 +117,10 @@ __global__ void kernel(
                               mma_n * InstructionShape::kN * Operator::IteratorC::OpDelta::kColumn + col;
           int global_row = row_tile + local_row;
           int partition_channel = channel_tile + local_channel;
+          int fragment_index = mma_n * kElementsPerAccess + col;
           int index = start + row * kElementsPerAccess + col;
-          if (global_row < problem_size.m() && partition_channel < problem_size.n()) {
-            ptr_C[global_row * ldc + indices[partition_channel]] = (*converted)[index];
+          if (global_row < problem_size.m() && index_fragment[fragment_index] >= 0) {
+            ptr_C[global_row * ldc + index_fragment[fragment_index]] = (*converted)[index];
           }
         }
       }
