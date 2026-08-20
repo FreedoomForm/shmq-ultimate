@@ -1206,3 +1206,11 @@ C++ shape validation now permits the empty placeholder only when `rows>=32 && n4
 Kaggle v252 (server 247) rejected the lazy expanded-INT4 bypass: mixed Qwen rows=128 remained 10.97x slower than dense FP16 and timing integrity failed. The v252 cache behavior was restored exactly to v251. The v253 candidate follows the upstream legal `32x64x64` family while avoiding v244's eight-warp geometry: the native pair CTA keeps four warps, widens channels from 32 to 64, gives each warp two 8-column N subtiles, packs the 64-channel B panel once per K chunk, and accumulates/scatters `[row_tile][n_tile][register]` with the same low/high MMA arithmetic and indexed output ABI.
 
 Local validation: focused source/backend tests passed (38 tests, 6 CUDA-only skips), full MixLLM suite passed (85 tests, 6 CUDA-only skips), and native INT4 CPU proof passed. Kaggle has not yet been run for v253.
+
+## v254 — M=128,N=64 stage-2 CUTLASS tuner candidate (local validation complete)
+
+Kaggle v253 (server 248) compiled and passed native correctness, mixed-stride correctness, timing integrity, and all non-performance gates, but the four-warp N=64 native pair tile measured Qwen mixed rows=128 at 12.954x slower than dense FP16. It is rejected; the native pair remains probe-only and the v241 mixed staged CUTLASS overlap is restored.
+
+Deep research found the original MixLLM configuration family includes the transposed large-M `M=128,N=64,K=64` shape. v254 adds a matching SM75 stage-2 `DefaultMmaCore`/runner with the existing legal `8x8x16` instruction, exposes it as a third exact-shape tuner candidate, accepts it in the disk cache, and bumps the tuning ABI to 254. N=128 and N=64 remain fallbacks. No arithmetic, quantization, metadata, stream/event, output ABI, model, benchmark, or quality setting changed.
+
+Local validation: focused source/backend tests passed (38 tests, 6 CUDA-only skips), full MixLLM suite passed (85 tests, 6 CUDA-only skips), and native INT4 CPU proof passed. Kaggle has not yet been run for v254.
