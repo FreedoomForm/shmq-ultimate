@@ -1098,3 +1098,10 @@ Kaggle v235 (v237 source) proved that source-digest compilation was fresh, but t
 v238 keeps the legal SM75 `u4*u4` and `s4*u4` m8n8k32 instructions, exact packed-weight arithmetic, zero correction, scales, output ABI, grid, model, and benchmark settings. It changes the fused kernel to assign each warp one 8-column channel tile and iterate all four 8-row subtiles, maintaining four two-register accumulator fragments and scattering all 32 rows × 32 channels exactly once. This is a correctness/completeness repair; the increased per-thread accumulator state will be measured honestly on T4.
 
 Local verification: 79 repository tests passed, 6 CUDA-only tests skipped, 3 subtests passed, and `verify_v230_native_int4_reference.py` passed. Kaggle v235 is rejected at the mixed-stride probe; v238 is not yet submitted.
+
+
+## v239 — Restore warp-N channel offset in complete fused tile (local, Kaggle pending)
+
+Kaggle v238 (server version 236) compiled the current complete-tile source and still failed the mixed-stride probe. Original MixLLM’s warp decomposition confirmed the remaining discrepancy: the output-channel mapping must include both the block channel base and the warp-N tile coordinate. v238 loaded B for warp 0/1/2/3 from channels 0–7/8–15/16–23/24–31, but scattered every warp to channels 0–7 because the final `channel` expression omitted `warp * 8`; the correction and scale lookup used the same incomplete index. This caused the diagonal-only tensor and sentinel columns.
+
+v239 adds `warp * 8` to the channel mapping consistently for correction, scales, and final scatter. No arithmetic, model, quality, grid, or benchmark setting changed. Local verification: 79 repository tests passed, 6 CUDA-only tests skipped, 3 subtests passed, and the native INT4 CPU proof passed. v239 requires one Kaggle T4 validation before acceptance.

@@ -123,6 +123,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("constexprintkPairWarps=4", source_compact)
         self.assertIn("floatpartial[kPairWarps][2]", source_compact)
         self.assertIn("wmma::load_matrix_sync(b_u4,&b_packed[warp*8][0]", source_compact)
+        self.assertIn("channel_base+warp*8+local_channel_base+register_index", source_compact)
         self.assertIn("output[row*output_width+indices_int4[channel]]=partial[row_tile][register_index]", source_compact)
 
     def test_v229_fused_int4_dispatch_contract(self):

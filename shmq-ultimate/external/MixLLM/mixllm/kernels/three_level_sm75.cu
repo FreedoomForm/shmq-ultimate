@@ -1008,7 +1008,7 @@ __global__ void sm75_int4_pair_gemm_kernel(
       const int local_channel_base = (lane & 3) * 2;
       const int row = row_base + local_row;
       for (int register_index = 0; register_index < 2; ++register_index) {
-        const int channel = channel_base + local_channel_base + register_index;
+        const int channel = channel_base + warp * 8 + local_channel_base + register_index;
         if (row < rows && channel < channels) {
           const int correction = static_cast<int>(zero_int4[channel * groups + group]) *
                                  row_sums[row_tile][lane >> 2];
