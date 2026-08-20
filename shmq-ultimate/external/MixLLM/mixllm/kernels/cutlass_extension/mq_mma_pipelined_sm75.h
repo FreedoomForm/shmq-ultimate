@@ -420,11 +420,11 @@ public:
       typename IteratorScaleAct::AccessType const* gmem_scale_act_ptr = iterator_scale_act.get();
       typename IteratorZero::AccessType const* gmem_zero_ptr = iterator_zero.get();
 
-      static_assert(Shape::kK == 64 || Shape::kK == 128);
-      // Quantization metadata covers 128 input elements. K=64 consumes a
-      // group in two halves; K=128 consumes one complete group per tile.
-      // Preserve the validated K=64 behavior and advance the global metadata
-      // exactly once per logical group in either geometry.
+      static_assert(Shape::kK == 64);
+      // The threadblock K tile is 64 while quantization metadata covers 128
+      // elements. Both pipeline stages must therefore receive the same metadata
+      // for the two 64-element halves of one quantization group. Advance the
+      // global metadata iterator only after the second half.
       if (iterator_scale.valid()) {
         *smem_scale_ptr = *gmem_scale_ptr;
       }
@@ -436,19 +436,12 @@ public:
           *smem_zero_ptr = *gmem_zero_ptr;
         }
       }
-      if constexpr (Shape::kK == 64) {
-        if (iterator_scale.row_groupsize64_ & 0x1) {
-          iterator_scale.add_tile_offset({1, 0});
-          iterator_scale_act.add_tile_offset({1, 0});
-          iterator_zero.add_tile_offset({1, 0});
-        }
-        iterator_scale.row_groupsize64_++;
-      } else {
+      if (iterator_scale.row_groupsize64_ & 0x1) {
         iterator_scale.add_tile_offset({1, 0});
         iterator_scale_act.add_tile_offset({1, 0});
         iterator_zero.add_tile_offset({1, 0});
-        iterator_scale.row_groupsize64_ += 2;
       }
+      iterator_scale.row_groupsize64_++;
       smem_iterator_scale.add_tile_offset({1, 0});
       smem_iterator_scale_act.add_tile_offset({1, 0});
       smem_iterator_zero.add_tile_offset({1, 0});
@@ -812,14 +805,26 @@ public:
       pipe_state.tmp_accum_.clear();
     }
 
-      // The validated K=64 runner batches two 64-wide threadblock tiles per
-      // outer iteration. A K=128 runner already consumes a complete 128-wide
-      // tile in one mac_loop_iter, so a second call would skip K and corrupt
-      // the result. Keep the proven K=64 batching and make K=128 single-call.
-      CUTLASS_GEMM_LOOP
-      for (; gemm_k_iterations >= 0;) {
-        pipe_state.tmp_accum_.fill(1262485504);
+    // SM75 uses a two-stage synchronous pipeline. Each mac_loop_iter consumes
+    // exactly one 64-wide threadblock K tile; batching two iterations as in the
+    // SM80 cp.async path would issue one extra tile at the tail.
+    CUTLASS_GEMM_LOOP
+    for (; gemm_k_iterations >= 0;) {
+      pipe_state.tmp_accum_.fill(1262485504);
 
+      mac_loop_iter(
+        pipe_state,
+        accum,
+        iterator_A,
+        iterator_B,
+        iterator_scale,
+        iterator_scale_act,
+        iterator_zero,
+        gemm_k_iterations);
+
+      // Match the original two-call batching while retaining the final tile
+      // when the total number of 64-K tiles is odd.
+      if (gemm_k_iterations >= 0) {
         mac_loop_iter(
           pipe_state,
           accum,
@@ -829,20 +834,7 @@ public:
           iterator_scale_act,
           iterator_zero,
           gemm_k_iterations);
-
-        if constexpr (Shape::kK == 64) {
-          if (gemm_k_iterations >= 0) {
-            mac_loop_iter(
-              pipe_state,
-              accum,
-              iterator_A,
-              iterator_B,
-              iterator_scale,
-              iterator_scale_act,
-              iterator_zero,
-              gemm_k_iterations);
-          }
-        }
+      }
 
       warp_dequantizer_.apply_scale_accum(pipe_state.tmp_accum_, pipe_state.warp_frag_scales);
       warp_dequantizer_act_.apply_scale_accum_act(pipe_state.tmp_accum_, pipe_state.warp_frag_scales_act);

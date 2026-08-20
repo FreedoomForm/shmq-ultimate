@@ -308,19 +308,6 @@ def three_level_linear_prequantized(module, x, input_int8, scale_act, torch_modu
           for tensor in packed_tensors[1:]),
     )
     if _use_v188_mixed_prefill_path(module, x, torch_module):
-        # Preserve v200's unchecked two-stream execution, but feed its core the
-        # cached CUTLASS metadata layout so the hot path does not transpose
-        # scale/zero tensors on every invocation.  The public v3 ABI remains
-        # available for validated external callers; this private adapter is
-        # selected only after Python partition validation has succeeded.
-        cached_v2 = getattr(
-            torch_module.ops.mixllm_sm75,
-            "_three_level_linear_v2_cached_unchecked",
-            None,
-        )
-        if cached_v2 is not None and x.shape[0] >= 32:
-            metadata = _prefill_metadata_for_cutlass(module, x, torch_module)
-            return cached_v2(*arguments, *metadata[1:])
         return torch_module.ops.mixllm_sm75._three_level_linear_v2_unchecked(*arguments)
     if x.shape[0] >= 32 and (module.indices_4.numel() or module.indices_8.numel()):
         metadata = _prefill_metadata_for_cutlass(module, x, torch_module)
