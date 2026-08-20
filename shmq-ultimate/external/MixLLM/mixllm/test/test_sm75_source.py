@@ -54,6 +54,13 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("_three_level_linear_v2_unchecked(*arguments)", self.backend)
         self.assertIn("_use_v188_mixed_prefill_path(module, x, torch_module)", self.backend)
 
+    def test_v262_large_m_fp16_uses_cublas_scatter_contract(self):
+        source_compact = "".join(self.source.split())
+        self.assertIn("voidrun_fp16_partition_cublas(", source_compact)
+        self.assertIn("at::mm(input_fp16,weight_fp16.transpose(0,1).contiguous())", source_compact)
+        self.assertIn("scatter_fp16_partition_kernel<<<blocks,threads,0,stream>>>", source_compact)
+        self.assertIn("run_fp16_partition_cublas(input_fp16,weight_fp16,indices_fp16,output,rows,width,stream.stream())", source_compact)
+
     def test_v261_mixed_prefill_uses_cached_metadata_dispatch(self):
         selector = self.backend[self.backend.index("def _use_v188_mixed_prefill_path"):]
         self.assertIn("return False", selector)
@@ -160,7 +167,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("usingInt8RunnerM64N64=Runner<CoreM64N64,2>", cutlass_compact)
         self.assertIn("kM128N64=2", source_compact)
         self.assertIn("kM64N64=3", source_compact)
-        self.assertIn("kCutlassTuningAbi=260", source_compact)
+        self.assertIn("kCutlassTuningAbi=262", source_compact)
         self.assertNotIn("GemmShape<128,128,64>", cutlass_compact)
         self.assertNotIn("kM128N128", source_compact)
         self.assertIn("kM128N64", source_compact)
@@ -198,7 +205,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("expanded_int4, scale_int4, zero_int4", text)
         self.assertIn("weight_int8, scale_int8", text)
         self.assertIn("matrix_zero", text)
-        self.assertIn("output_width, 0, 0, n16", text)
+        self.assertIn("run_fp16_partition_cublas", text)
         cutlass_branch = text.index("} else if (rows >= 32 && (n4 > 0 || n8 > 0)) {")
         fallback_branch = text.index("} else {", cutlass_branch)
         self.assertLess(cutlass_branch, fallback_branch)

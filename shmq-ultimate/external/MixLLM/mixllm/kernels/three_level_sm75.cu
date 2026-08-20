@@ -74,7 +74,7 @@ enum class CutlassConfig : int {
   kM64N64 = 3,
 };
 
-constexpr int kCutlassTuningAbi = 260;
+constexpr int kCutlassTuningAbi = 262;
 constexpr int kCutlassTuningWarmup = 2;
 constexpr int kCutlassTuningIterations = 4;
 std::mutex g_cutlass_tuning_mutex;
@@ -304,6 +304,21 @@ __global__ void expand_int4_sm75_kernel(
   const int groups = width / kGroupSize;
   expanded[linear] = static_cast<int8_t>(
       code - static_cast<int>(zeros[channel * groups + k / kGroupSize]));
+}
+
+__global__ void scatter_fp16_partition_kernel(
+    const __half* partial, const int32_t* indices, __half* output,
+    int rows, int partition_channels, int output_width) {
+#if __CUDA_ARCH__ >= 750
+  const int linear = blockIdx.x * blockDim.x + threadIdx.x;
+  const int elements = rows * partition_channels;
+  if (linear >= elements) {
+    return;
+  }
+  const int row = linear / partition_channels;
+  const int channel = linear % partition_channels;
+  output[row * output_width + indices[channel]] = partial[linear];
+#endif
 }
 
 // SM75 has no Ampere mixed INT8 x INT4 MMA. Prefill reads a cached signed INT8
@@ -1126,8 +1141,30 @@ void run_cutlass_int_partition(
       input_int8, weight, scale_act, matrix_scale, matrix_zero, indices, output,
       stream, !stream_is_capturing(caller_stream));
   run_cutlass_config(
-      config, rows, static_cast<int>(indices.numel()), width, input_int8, weight,
-      scale_act, matrix_scale, matrix_zero, indices, output, stream);
+      config, rows, static_cast<int>(indices.numel()), width, input_int8, weight, scale_act,
+      matrix_scale, matrix_zero, indices, output, stream);
+}
+
+void run_fp16_partition_cublas(
+    const at::Tensor& input_fp16, const at::Tensor& weight_fp16,
+    const at::Tensor& indices_fp16, at::Tensor& output,
+    int rows, int width, cudaStream_t stream) {
+  if (indices_fp16.numel() == 0) {
+    return;
+  }
+  record_tensor_stream(input_fp16, stream);
+  record_tensor_stream(output, stream);
+  const auto partial = at::mm(
+      input_fp16, weight_fp16.transpose(0, 1).contiguous());
+  const int channels = static_cast<int>(indices_fp16.numel());
+  constexpr int threads = 256;
+  const int blocks = (rows * channels + threads - 1) / threads;
+  scatter_fp16_partition_kernel<<<blocks, threads, 0, stream>>>(
+      reinterpret_cast<const __half*>(partial.data_ptr<at::Half>()),
+      indices_fp16.data_ptr<int32_t>(),
+      reinterpret_cast<__half*>(output.data_ptr<at::Half>()),
+      rows, channels, static_cast<int>(output.size(1)));
+  C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 
 void begin_integer_prefill_overlap(
@@ -1373,23 +1410,9 @@ at::Tensor three_level_linear_v2_core(
         has_cached_metadata ? &cached_scale_int8 : nullptr,
         false);
     if (n16 > 0) {
-      const dim3 grid_fp16(
-          (n16 + kPrefillChannels - 1) / kPrefillChannels,
-          (rows + 15) / 16);
-      three_level_tensorcore_kernel<kPrefillWarps>
-          <<<grid_fp16, kPrefillWarps * kWarpSize, 0, stream>>>(
-        reinterpret_cast<const __half*>(input_fp16.data_ptr<at::Half>()),
-        input_int8.data_ptr<int8_t>(),
-        reinterpret_cast<const __half*>(scale_act.data_ptr<at::Half>()),
-        expanded_int4.data_ptr<int8_t>(),
-        reinterpret_cast<const __half*>(scale_int4.data_ptr<at::Half>()),
-        indices_int4.data_ptr<int32_t>(),
-        weight_int8.data_ptr<int8_t>(),
-        reinterpret_cast<const __half*>(scale_int8.data_ptr<at::Half>()),
-        indices_int8.data_ptr<int32_t>(),
-        reinterpret_cast<const __half*>(weight_fp16.data_ptr<at::Half>()),
-        indices_fp16.data_ptr<int32_t>(), reinterpret_cast<__half*>(output.data_ptr<at::Half>()), rows, width,
-        output_width, 0, 0, n16);
+      run_fp16_partition_cublas(
+          input_fp16, weight_fp16, indices_fp16, output, rows, width,
+          stream.stream());
     }
     finish_integer_prefill_overlap(
         n4, n8, stream.stream(), integer_streams);
