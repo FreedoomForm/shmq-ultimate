@@ -79,8 +79,9 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("cudaStreamWaitEvent(streams.int4,streams.fork,0)", source_compact)
         self.assertIn("cudaStreamWaitEvent(streams.int8,streams.fork,0)", source_compact)
         self.assertIn("usingInt8Runner=Runner<Core,2>", cutlass_compact)
-        self.assertNotIn("WideInt8Runner", source_compact)
-        self.assertNotIn("WideCore", cutlass_compact)
+        self.assertIn("usingKWideInt8Runner=Runner<KWideCore,2>", cutlass_compact)
+        self.assertIn("KWideInt8Runner::run", source_compact)
+        self.assertIn("channels>=128", source_compact)
 
     def test_v193_rejected_geometry_is_not_present(self):
         cutlass_compact = "".join(self.cutlass_testbed.split())

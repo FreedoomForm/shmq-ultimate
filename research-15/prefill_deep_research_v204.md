@@ -128,3 +128,13 @@ References: NVIDIA cuBLAS API Reference, cuBLASLt layout/heuristic reuse and lea
 
 [1]: https://docs.nvidia.com/cuda/cublas/index.html "NVIDIA cuBLAS API Reference"
 [2]: https://docs.nvidia.com/cuda/cuda-programming-guide/02-basics/asynchronous-execution.html "NVIDIA CUDA Programming Guide: Asynchronous Execution"
+
+## Post-v212 research: K-tile direction
+
+NVIDIA CUTLASS documentation confirms that `ThreadblockShape::{kM,kN,kK}` is a tunable geometry and that larger threadblock tiles reduce global-memory fetches but can hurt boundary efficiency and occupancy. It also states that the mainloop K tile is a pipeline stage, while larger warp tiles increase reuse/ILP but can reduce the number of resident warps. The documented design therefore supports testing a K=128 tile only as an isolated, shape-specific hypothesis; it is not automatically better than the v200 K=64 tile. The same documentation emphasizes that accumulator registers are a large part of the register budget and can lower occupancy, which is a direct risk for a larger K tile [1].
+
+The local original MixLLM row-major configuration table includes K=128 candidates such as `{128,128,128,32}`, `{128,128,128,64}`, `{256,128,128,32}`, and `{256,128,128,64}`. This supplies evidence that K=128 is an original design-space member, but not evidence that the local vendored SM75 custom dequantizing pipeline can instantiate it correctly. v212 already showed that importing a different N tile (`32x256`) regressed both large-M speed and timing-integrity, so the next K=128 test must keep v200’s independent INT4/INT8 streams and all fallbacks unchanged.
+
+Candidate hypothesis for v213: add a separate `32x128x128 / 32x64x64 / 8x8x16 / stage=2` runner, selected per partition only when `rows>=32` and `channels>=128`; otherwise use the exact v200 `32x128x64` runner. This reduces mainloop K iterations while increasing per-stage shared-memory and register pressure. It must be rejected on any compile, correctness, timing-integrity, decode, or prefill regression. Primary external reference: NVIDIA CUTLASS Efficient GEMM documentation [1].
+
+[1]: https://docs.nvidia.com/cutlass/latest/media/docs/cpp/efficient_gemm.html "NVIDIA CUTLASS Efficient GEMM in CUDA"
