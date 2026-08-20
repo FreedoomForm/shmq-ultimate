@@ -193,4 +193,16 @@ using Core = cutlass::gemm::threadblock::DefaultMmaCore<
 
 using Int8Runner = Runner<Core, 2>;
 
+// cuBLAS-style geometry selection for large-N partitions.  This remains a
+// separate per-partition runner: INT4 and INT8 are still launched on their
+// independent v200 auxiliary streams, never concatenated into one work queue.
+using WideCore = cutlass::gemm::threadblock::DefaultMmaCore<
+    cutlass::gemm::GemmShape<32, 256, 64>,
+    cutlass::gemm::GemmShape<32, 64, 64>,
+    cutlass::gemm::GemmShape<8, 8, 16>,
+    ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC,
+    cutlass::arch::OpClassTensorOp, 2, cutlass::arch::OpMultiplyAddSaturate>;
+
+using WideInt8Runner = Runner<WideCore, 2>;
+
 }  // namespace shmq_cutlass_sm75
