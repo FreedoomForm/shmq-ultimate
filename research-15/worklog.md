@@ -962,3 +962,6 @@ Deep source comparison found that v200’s measured large mixed adapter preserve
 
 ## v216 candidate — cached v200 core plus guarded K=128 SM75 pipeline
 v216 combines the v215 private cached-metadata v2 adapter with the previously audited isolated K=128 per-partition runner. The K=64 metadata path remains unchanged; K=128 copies one metadata row and advances one 128-element group per tile. INT4 and INT8 remain independent auxiliary-stream launches and FP16 remains on the caller stream. Local source contracts (13/13), Python compilation, and diff checks pass. The full backend tests are blocked only by the sandbox Python environment lacking `torch`; no Kaggle execution has been performed during repair.
+
+## v217 candidate — contract correction for isolated K=128 plus cached v2
+The first v216 source-contract run correctly exposed a test mistake: the legacy v200 overlap contract forbade every `WideInt8Runner` symbol, which conflicts with the intentionally isolated per-partition K=128 candidate. The contract now forbids only combined/cublas execution while explicitly requiring independent K=64/K=128 runners and both auxiliary-stream waits. Source contracts (13/13), Python compilation, and diff checks pass. The backend runtime suite remains unavailable locally because `torch` is not installed; no Kaggle run has been made.
