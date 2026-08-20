@@ -53,13 +53,11 @@ class ThreeLevelLinear(nn.Module):
         self._sm75_fp16_placeholders = None
         self._sm75_int4_expanded = None
         self._sm75_prefill_metadata = None
-        self._sm75_combined_native = None
 
     def _apply(self, fn, recurse=True):
         self._sm75_fp16_placeholders = None
         self._sm75_int4_expanded = None
         self._sm75_prefill_metadata = None
-        self._sm75_combined_native = None
         return super()._apply(fn, recurse)
 
     @classmethod
@@ -122,7 +120,6 @@ class ThreeLevelLinear(nn.Module):
         self._sm75_fp16_placeholders = None
         self._sm75_int4_expanded = None
         self._sm75_prefill_metadata = None
-        self._sm75_combined_native = None
         # Two-level checkpoints predate the FP16 partition. Treat its omitted
         # tensors as an empty partition while preserving strict loading for all
         # other packed state.

@@ -603,16 +603,10 @@ void run_cutlass_int_partition(
   record_tensor_stream(matrix_zero, stream);
   record_tensor_stream(indices, stream);
   record_tensor_stream(output, stream);
-  const int channels = static_cast<int>(indices.numel());
-  if (rows >= 32 && channels >= 256) {
-    shmq_cutlass_sm75::WideInt8Runner::run(
-        rows, channels, width, input_int8, weight, scale_act, matrix_scale,
-        matrix_zero, indices, output, stream);
-  } else {
-    shmq_cutlass_sm75::Int8Runner::run(
-        rows, channels, width, input_int8, weight, scale_act, matrix_scale,
-        matrix_zero, indices, output, stream);
-  }
+  shmq_cutlass_sm75::Int8Runner::run(
+      rows, static_cast<int>(indices.numel()), width,
+      input_int8, weight, scale_act, matrix_scale,
+      matrix_zero, indices, output, stream);
 }
 
 void begin_integer_prefill_overlap(
