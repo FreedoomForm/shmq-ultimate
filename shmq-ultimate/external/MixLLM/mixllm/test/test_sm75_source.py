@@ -86,6 +86,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("static_assert(Shape::kK==64||Shape::kK==128)", pipeline_compact)
         self.assertIn("ifconstexpr(Shape::kK==64)", pipeline_compact)
         self.assertIn("row_groupsize64_+=2", pipeline_compact)
+        self.assertIn("ifconstexpr(Shape::kK==64){if(gemm_k_iterations>=0){mac_loop_iter", pipeline_compact)
         self.assertIn("usingKWideInt8Runner=Runner<KWideCore,2>", cutlass_compact)
         self.assertIn("KWideInt8Runner::run", source_compact)
         self.assertIn("rows>=32&&channels>=128", source_compact)
