@@ -22,7 +22,9 @@ using LayoutA = cutlass::layout::RowMajor;
 using ElementB = int8_t;
 using LayoutB = cutlass::layout::ColumnMajor;
 using ElementC = int;
-using LayoutC = cutlass::layout::ColumnMajor;
+// SHMQ’s native ABI is a row-major [rows, output_width] destination.
+// The original MixLLM row-major runner uses the same accumulator layout.
+using LayoutC = cutlass::layout::RowMajor;
 
 struct Problem {
   cutlass::gemm::GemmCoord size;

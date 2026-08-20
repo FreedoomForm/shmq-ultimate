@@ -42,6 +42,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("DefaultMmaCore<", cutlass_compact)
         self.assertIn("GemmShape<8,8,16>", cutlass_compact)
         self.assertIn("MQMmaPipelinedSm75", cutlass_compact)
+        self.assertIn("usingLayoutC=cutlass::layout::RowMajor", cutlass_compact)
         self.assertIn("GemmShape<32,128,64>", cutlass_compact)
         self.assertIn("typenameCore::MmaPolicy,Stages>", cutlass_compact)
         self.assertIn("sync_copy", pipeline_compact)
@@ -104,6 +105,15 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("output_width=static_cast<int>(output.size(1))", source_compact)
         self.assertIn("output[row*output_width+indices_int4[channel]]", source_compact)
 
+    def test_v235_direct_sm75_accumulator_mapping_contract(self):
+        source_compact = "".join(self.source.split())
+        self.assertIn("floatpartial[2]", source_compact)
+        self.assertIn("constintlocal_row=warp*8+(lane>>2)", source_compact)
+        self.assertIn("constintlocal_channel_base=(lane&3)*2", source_compact)
+        self.assertIn("low_accum[register_index]+16*high_accum[register_index]", source_compact)
+        self.assertNotIn("low_tile[warp][item]", source_compact)
+        self.assertNotIn("wmma::store_matrix_sync(low_tile", self.source)
+
     def test_v229_fused_int4_dispatch_contract(self):
         source_compact = "".join(self.source.split())
         self.assertIn("__global__voidsm75_int4_pair_gemm_kernel", source_compact)
@@ -114,7 +124,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("has_cached_metadata?&cached_scale_int8:nullptr,false)", source_compact)
         self.assertIn("low_mma(low_accum,low_a,weights,low_accum)", source_compact)
         self.assertIn("high_mma(high_accum,high_a,weights,high_accum)", source_compact)
-        self.assertIn("16*high_tile[warp][item]-correction", source_compact)
+        self.assertIn("16*high_accum[register_index]-correction", source_compact)
 
     def test_v226_legal_sm75_candidate_tuner_contract(self):
         source_compact = "".join(self.source.split())

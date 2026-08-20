@@ -1071,3 +1071,12 @@ Because the historical v228 report already contains the same mixed rows=128 erro
 
 ## v234 repair — fused warp output mapping
 Kaggle v232 isolated the remaining probe failure: rows 0–7 were correct but later rows stayed at the sentinel because writeback used `local_channel=warp*8+...` while the per-warp tile was already selected in `low_tile[warp]`; each warp therefore overwrote the same first eight rows. Corrected mapping to `local_row=warp*8+item/8`, `local_channel=item%8` in both accumulation and final scatter. Local 83-test suite, CPU proof, Python checks, and diff checks pass; Kaggle revalidation pending.
+
+
+## v235/v236 — Direct SM75 INT4 accumulator mapping and original row-major CUTLASS alignment (local, Kaggle pending)
+
+Deep research compared the original Microsoft MixLLM `gemm_rm` runner with SHMQ. The original mixed row-major path constructs `matrix_C_computed` as `[M, N]`, uses `LayoutC = cutlass::layout::RowMajor`, and writes through the standard CUTLASS accumulator/output iterator. SHMQ’s `sm75_cutlass_testbed.h` had selected `LayoutC = cutlass::layout::ColumnMajor` while its destination tensor and global scatter ABI were row-major `[rows, output_width]`. This is a concrete original-vs-SHMQ discrepancy and the leading explanation for the historical mixed rows=128 error.
+
+The v234 T4 log also showed the mixed-stride probe still failing despite the corrected `item/8` warp mapping. NVIDIA’s PTX ISA specifies that `mma.m8n8k32` gives each lane two accumulator registers with `row = laneid >> 2` and `col = (laneid % 4) * 2 + register_index`. The fused kernel was incorrectly fabricating a larger WMMA accumulator and initializing only two registers before calling `wmma::store_matrix_sync`. v235 replaced that conversion with direct two-register CUTLASS scatter using the PTX-defined mapping and reduced the per-thread partial accumulator to two values. v236 aligned the CUTLASS runner’s `LayoutC` with the original row-major runner.
+
+Local verification after the changes: 78 repository tests passed, 6 CUDA-only tests skipped, the two expected CUDA integration tests were excluded because the sandbox PyTorch build has no CUDA, and `verify_v230_native_int4_reference.py` passed. No new Kaggle run has been launched after these repairs. The changes remain pending T4 validation and are not accepted until the mixed-stride probe, native correctness, timing integrity, and both end-to-end performance gates pass.

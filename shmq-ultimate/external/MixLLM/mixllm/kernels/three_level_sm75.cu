@@ -911,8 +911,6 @@ __global__ void sm75_int4_pair_gemm_kernel(
   __shared__ __align__(16) uint8_t a_low_packed[kPairRows][kPairBytes];
   __shared__ __align__(16) uint8_t a_high_packed[kPairRows][kPairBytes];
   __shared__ __align__(16) uint8_t b_packed[kPairChannels][kPairBytes];
-  __shared__ __align__(16) int low_tile[kPairWarps][64];
-  __shared__ __align__(16) int high_tile[kPairWarps][64];
   __shared__ int row_sums[kPairWarps][8];
 
   const int warp = threadIdx.x / kWarpSize;
@@ -921,7 +919,9 @@ __global__ void sm75_int4_pair_gemm_kernel(
   const int channel_base = blockIdx.x * kPairChannels;
   const int groups = width / kGroupSize;
   const int weight_bytes_per_channel = width / 2;
-  float partial[64] = {};
+  // PTX m8n8k32 accumulator mapping: each lane owns two adjacent columns
+  // in one row, with row = lane >> 2 and col = (lane & 3) * 2 + r.
+  float partial[2] = {};
 
   for (int group = 0; group < groups; ++group) {
     if (lane < 8) {
@@ -999,41 +999,34 @@ __global__ void sm75_int4_pair_gemm_kernel(
       __syncthreads();
     }
 
-    wmma::fragment<wmma::accumulator, 8, 8, 32, int> low_wmma;
-    wmma::fragment<wmma::accumulator, 8, 8, 32, int> high_wmma;
-    low_wmma.x[0] = low_accum[0];
-    low_wmma.x[1] = low_accum[1];
-    high_wmma.x[0] = high_accum[0];
-    high_wmma.x[1] = high_accum[1];
-    wmma::store_matrix_sync(low_tile[warp], low_wmma, 8, wmma::mem_row_major);
-    wmma::store_matrix_sync(high_tile[warp], high_wmma, 8, wmma::mem_row_major);
-    __syncwarp();
-
-    for (int item = lane; item < 64; item += kWarpSize) {
-      const int local_row = warp * 8 + item / 8;
-      const int local_channel = item % 8;
-      const int row = row_base + local_row;
-      const int channel = channel_base + local_channel;
+    // FragmentC has exactly two registers per lane. Do not copy only those
+    // registers into a larger WMMA accumulator fragment: its internal mapping
+    // is unspecified and that would leave the rest of the tile undefined.
+    const int local_row = warp * 8 + (lane >> 2);
+    const int local_channel_base = (lane & 3) * 2;
+    const int row = row_base + local_row;
+    for (int register_index = 0; register_index < 2; ++register_index) {
+      const int channel = channel_base + local_channel_base + register_index;
       if (row < rows && channel < channels) {
         const int correction = static_cast<int>(zero_int4[channel * groups + group]) *
-                               row_sums[warp][local_row];
-        const int accumulator = low_tile[warp][item] +
-                                 16 * high_tile[warp][item] - correction;
+                               row_sums[warp][lane >> 2];
+        const int accumulator = low_accum[register_index] +
+                                 16 * high_accum[register_index] - correction;
         const float value = static_cast<float>(accumulator) *
             __half2float(scale_act[group * rows + row]) *
             __half2float(scale_int4[channel * groups + group]);
-        partial[item] += value;
+        partial[register_index] += value;
       }
     }
     __syncthreads();
   }
-  for (int item = lane; item < 64; item += kWarpSize) {
-    const int local_row = warp * 8 + item / 8;
-    const int local_channel = item % 8;
-    const int row = row_base + local_row;
-    const int channel = channel_base + local_channel;
+  const int local_row = warp * 8 + (lane >> 2);
+  const int local_channel_base = (lane & 3) * 2;
+  const int row = row_base + local_row;
+  for (int register_index = 0; register_index < 2; ++register_index) {
+    const int channel = channel_base + local_channel_base + register_index;
     if (row < rows && channel < channels) {
-      output[row * output_width + indices_int4[channel]] = partial[item];
+      output[row * output_width + indices_int4[channel]] = partial[register_index];
     }
   }
 #endif
