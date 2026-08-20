@@ -1,0 +1,9 @@
+# v264 deep research: test ATen index-copy for the FP16 partition epilogue
+
+The v263 T4 run passed correctness and timing-integrity and measured Qwen mixed rows=128 at `0.410643x` E2E, a small improvement over v262's `0.388131x`. The remaining FP16 helper path performs a dense `at::mm`, allocates a partial `[M,n16]` tensor, then launches a custom scatter kernel that maps local FP16 channels through sorted global `indices_fp16`.
+
+The original MixLLM output epilogue performs the index mapping inside the same staged kernel, so it has no separate partial tensor or post-GEMM scatter launch. SHMQ cannot safely fuse an arbitrary cuBLAS epilogue in this seam without changing the existing integer stream structure. The closest no-quality-change experiment is to replace the custom scatter launch with PyTorch's existing `index_copy_` implementation: `output.index_copy_(1, indices_fp16, partial)`. This keeps the same source rows, destination columns, dtype, and exact local-to-global mapping, but lets the ATen/CUDA backend select its established indexed-copy kernel and avoids maintaining a second bespoke scatter kernel.
+
+This candidate is not assumed to be faster. The custom kernel may win because `indices_fp16` is sorted; `index_copy_` may have more dispatch overhead. The experiment is useful because it isolates the epilogue cost after v263 already established that transpose materialization was avoidable. The helper remains caller-stream ordered after the integer fork, and all quantized arithmetic and model partitioning remain unchanged. If v264 regresses, the custom scatter from v263 remains the measured component.
+
+Primary local sources: original `mma_multistage_testbed.h` epilogue mapping lines 217-260, original `mix_mma_multistage.cuh` overlap lines 240-258, SHMQ `three_level_sm75.cu` v263 helper and scatter kernel, and `quantization/three_level.py` lines 140-149 proving that allocated indices are sorted.

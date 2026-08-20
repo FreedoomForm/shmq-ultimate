@@ -54,11 +54,12 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("_three_level_linear_v2_unchecked(*arguments)", self.backend)
         self.assertIn("_use_v188_mixed_prefill_path(module, x, torch_module)", self.backend)
 
-    def test_v263_large_m_fp16_uses_cublas_scatter_contract(self):
+    def test_v264_large_m_fp16_uses_index_copy_epilogue_contract(self):
         source_compact = "".join(self.source.split())
         self.assertIn("voidrun_fp16_partition_cublas(", source_compact)
         self.assertIn("at::mm(input_fp16,weight_fp16.transpose(0,1))", source_compact)
-        self.assertIn("scatter_fp16_partition_kernel<<<blocks,threads,0,stream>>>", source_compact)
+        self.assertIn("output.index_copy_(1,indices_fp16,partial)", source_compact)
+        self.assertNotIn("scatter_fp16_partition_kernel", source_compact)
         self.assertIn("run_fp16_partition_cublas(input_fp16,weight_fp16,indices_fp16,output,rows,width,stream.stream())", source_compact)
 
     def test_v261_mixed_prefill_uses_cached_metadata_dispatch(self):
@@ -167,7 +168,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("usingInt8RunnerM64N64=Runner<CoreM64N64,2>", cutlass_compact)
         self.assertIn("kM128N64=2", source_compact)
         self.assertIn("kM64N64=3", source_compact)
-        self.assertIn("kCutlassTuningAbi=263", source_compact)
+        self.assertIn("kCutlassTuningAbi=264", source_compact)
         self.assertNotIn("GemmShape<128,128,64>", cutlass_compact)
         self.assertNotIn("kM128N128", source_compact)
         self.assertIn("kM128N64", source_compact)
