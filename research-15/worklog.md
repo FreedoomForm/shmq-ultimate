@@ -1144,3 +1144,11 @@ Local validation: source contracts passed (19 tests), full MixLLM suite passed (
 
 ### v244 dispatch addendum
 After the wider 8-warp/64-channel kernel passed the local source suite and full repository tests, the mixed rows>=32 overlap call was switched from `false` to `n4 > 0`, so the candidate is now actually exercised for mixed INT4 while INT8/FP16 stream overlap and the v241 fallback structure remain unchanged. The native CPU proof still passes. This is the final v244 tree to submit; no Kaggle run has been made from the earlier unenabled intermediate tree.
+
+## v245 — Reject v244 wider native pair tile and restore v241
+
+Kaggle server version 241 (v244) passed compilation, mixed-stride probe, embedded contracts, SM75 native correctness, mixed decode GEMM, and timing integrity, but failed both end-to-end gates. Qwen mixed QKV rows=128 measured 13.49x dense end-to-end, improving over v242's 16.62x but regressing sharply from v241's approximately 3.24x. The wider pair candidate is rejected and is not retained in production.
+
+Deep research attributes the residual failure to the unchanged small-pair dataflow: widening CTA-N reduces block count but still reloads A/B panels and serializes four row subtiles, unlike upstream staged CUTLASS threadblock dataflow and autotuned families. v245 restores the 32-channel pair geometry and `use_fused_int4=false` mixed dispatch; the native pair path remains only in the pure-INT4 candidate and probes, exactly as in the last measured v241 baseline.
+
+Local validation after rollback: full MixLLM suite passed (85 tests, 6 CUDA-only skips), and the v230 native INT4 proof passed.
