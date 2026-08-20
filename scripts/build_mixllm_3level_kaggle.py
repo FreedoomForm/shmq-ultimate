@@ -30,6 +30,13 @@ SOURCE_FILES = (
 # before torch.utils.cpp_extension.load() runs on Kaggle.
 def git(args, cwd):
     return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
+def git_dirty(cwd, ignored=()):
+    ignored = {path.resolve() for path in ignored}
+    for line in git(["status", "--porcelain"], cwd).splitlines():
+        relative = line[3:].split(" -> ")[-1]
+        if (cwd / relative).resolve() not in ignored:
+            return True
+    return False
 def provenance(sources):
     hashes = {n: hashlib.sha256(t.encode()).hexdigest() for n, t in sources.items()}
     digest = hashlib.sha256()
@@ -38,8 +45,8 @@ def provenance(sources):
     return {"algorithm": "sha256", "source_sha256": digest.hexdigest(), "files": hashes,
             "workspace_commit": git(["rev-parse", "HEAD"], ROOT),
             "mixllm_commit": git(["rev-parse", "HEAD"], FORK),
-            "workspace_dirty": bool(git(["status", "--porcelain"], ROOT)),
-            "mixllm_dirty": bool(git(["status", "--porcelain"], FORK))}
+            "workspace_dirty": git_dirty(ROOT, (NOTEBOOK,)),
+            "mixllm_dirty": git_dirty(FORK)}
 def cell(kind, source):
     result = {"cell_type": kind, "id": hashlib.sha256((kind+"\0"+source).encode()).hexdigest()[:12],
               "metadata": {}, "source": source.splitlines(True)}
