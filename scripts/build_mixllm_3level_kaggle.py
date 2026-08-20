@@ -304,7 +304,15 @@ if capability == (7, 5):
     assert torch.equal(fused_probe, expected_fused.expand_as(fused_probe)), (fused_probe, expected_fused)
     print('SM75_INT4_PAIR_FUSED_PROBE_PASS', fused_probe[0].tolist(), flush=True)
     stride_probe = torch.ops.mixllm_sm75.sm75_int4_pair_mixed_stride_probe(torch.empty(0, device='cuda'))
-    assert torch.equal(stride_probe[:, :32], torch.full((32, 32), 128.0, device='cuda')), stride_probe
+    stride_values, stride_counts = torch.unique(stride_probe, sorted=True, return_counts=True)
+    print('SM75_INT4_PAIR_MIXED_STRIDE_STATS', list(zip(stride_values.detach().cpu().tolist(), stride_counts.detach().cpu().tolist())), flush=True)
+    expected_stride = torch.full((32, 32), 128.0, device='cuda')
+    mismatch = torch.nonzero(stride_probe[:, :32] != expected_stride, as_tuple=False)
+    print('SM75_INT4_PAIR_MIXED_STRIDE_MISMATCH_COUNT', int(mismatch.size(0)), flush=True)
+    if mismatch.numel():
+        sample = mismatch[:32]
+        print('SM75_INT4_PAIR_MIXED_STRIDE_MISMATCH_SAMPLE', [(int(r), int(c), float(stride_probe[r, c])) for r, c in sample.tolist()], flush=True)
+    assert torch.equal(stride_probe[:, :32], expected_stride), stride_probe
     assert torch.equal(stride_probe[:, 32:], torch.full((32, 32), -999.0, device='cuda')), stride_probe
     print('SM75_INT4_PAIR_MIXED_STRIDE_PROBE_PASS', stride_probe[0, :4].tolist(), flush=True)
     def make_case(n, width, counts, rows):

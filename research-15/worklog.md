@@ -1105,3 +1105,10 @@ Local verification: 79 repository tests passed, 6 CUDA-only tests skipped, 3 sub
 Kaggle v238 (server version 236) compiled the current complete-tile source and still failed the mixed-stride probe. Original MixLLM’s warp decomposition confirmed the remaining discrepancy: the output-channel mapping must include both the block channel base and the warp-N tile coordinate. v238 loaded B for warp 0/1/2/3 from channels 0–7/8–15/16–23/24–31, but scattered every warp to channels 0–7 because the final `channel` expression omitted `warp * 8`; the correction and scale lookup used the same incomplete index. This caused the diagonal-only tensor and sentinel columns.
 
 v239 adds `warp * 8` to the channel mapping consistently for correction, scales, and final scatter. No arithmetic, model, quality, grid, or benchmark setting changed. Local verification: 79 repository tests passed, 6 CUDA-only tests skipped, 3 subtests passed, and the native INT4 CPU proof passed. v239 requires one Kaggle T4 validation before acceptance.
+
+
+## v240 — Mixed-stride mismatch diagnostics (local, Kaggle pending)
+
+The terminal v239 Kaggle run used the current source and failed at the strict mixed-stride probe before native correctness or performance gates. Because Kaggle abbreviated the tensor repr, v240 adds only diagnostic output before the unchanged assertions: sorted unique values/counts, mismatch count, and the first mismatch coordinates and values. No CUDA source, arithmetic, model, quality path, benchmark shape, timing method, or gate threshold changed.
+
+Local notebook build and `--check` passed with 30 embedded files. This diagnostic run is needed to identify the remaining v239 mapping error without making another speculative kernel repair.
