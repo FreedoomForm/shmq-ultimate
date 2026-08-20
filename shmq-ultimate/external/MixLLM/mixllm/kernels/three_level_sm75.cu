@@ -870,6 +870,175 @@ at::Tensor sm75_int4_pair_wmma_load_probe_cuda(const at::Tensor& device_tensor) 
   return output;
 }
 
+__global__ void sm75_int4_pair_gemm_kernel(
+    const int8_t* input_int8, const uint8_t* weight_int4,
+    const __half* scale_act, const __half* scale_int4,
+    const uint8_t* zero_int4, const int32_t* indices_int4,
+    float* output, int rows, int width, int channels) {
+#if __CUDA_ARCH__ >= 750
+  namespace precision = wmma::experimental::precision;
+  constexpr int kPairWarps = 4;
+  constexpr int kPairRows = 32;
+  constexpr int kPairChannels = 32;
+  constexpr int kPairK = 32;
+  constexpr int kPairBytes = kPairK / 2;
+  __shared__ __align__(16) uint8_t a_low_packed[kPairRows][kPairBytes];
+  __shared__ __align__(16) uint8_t a_high_packed[kPairRows][kPairBytes];
+  __shared__ __align__(16) uint8_t b_packed[kPairChannels][kPairBytes];
+  __shared__ __align__(16) int low_tile[kPairWarps][64];
+  __shared__ __align__(16) int high_tile[kPairWarps][64];
+  __shared__ int row_sums[kPairWarps][8];
+
+  const int warp = threadIdx.x / kWarpSize;
+  const int lane = threadIdx.x % kWarpSize;
+  const int row_base = blockIdx.y * kPairRows;
+  const int channel_base = blockIdx.x * kPairChannels;
+  const int groups = width / kGroupSize;
+  const int weight_bytes_per_channel = width / 2;
+  float partial[64] = {};
+
+  for (int group = 0; group < groups; ++group) {
+    if (lane < 8) {
+      int sum = 0;
+      const int row = row_base + warp * 8 + lane;
+      if (row < rows) {
+#pragma unroll 4
+        for (int k = 0; k < kGroupSize; ++k) {
+          sum += static_cast<int>(input_int8[row * width + group * kGroupSize + k]);
+        }
+      }
+      row_sums[warp][lane] = sum;
+    }
+    __syncthreads();
+
+    PairProbeLowMma::FragmentC low_accum;
+    PairProbeHighMma::FragmentC high_accum;
+    low_accum.clear();
+    high_accum.clear();
+
+    for (int chunk = 0; chunk < kGroupSize / kPairK; ++chunk) {
+      const int k_base = group * kGroupSize + chunk * kPairK;
+      for (int item = threadIdx.x; item < kPairRows * kPairBytes;
+           item += blockDim.x) {
+        const int row = item / kPairBytes;
+        const int pair = item % kPairBytes;
+        const int global_row = row_base + row;
+        const int k = k_base + pair * 2;
+        int8_t a0 = 0;
+        int8_t a1 = 0;
+        if (global_row < rows) {
+          a0 = input_int8[global_row * width + k];
+          a1 = input_int8[global_row * width + k + 1];
+        }
+        const uint8_t low0 = static_cast<uint8_t>(a0) & 0x0f;
+        const uint8_t low1 = static_cast<uint8_t>(a1) & 0x0f;
+        const uint8_t high0 = static_cast<uint8_t>(static_cast<int>(a0) >> 4) & 0x0f;
+        const uint8_t high1 = static_cast<uint8_t>(static_cast<int>(a1) >> 4) & 0x0f;
+        a_low_packed[row][pair] = low0 | (low1 << 4);
+        a_high_packed[row][pair] = high0 | (high1 << 4);
+      }
+      for (int item = threadIdx.x; item < kPairChannels * kPairBytes;
+           item += blockDim.x) {
+        const int local_channel = item / kPairBytes;
+        const int pair = item % kPairBytes;
+        const int channel = channel_base + local_channel;
+        const int source = channel * weight_bytes_per_channel + k_base / 2 + pair;
+        b_packed[local_channel][pair] = channel < channels ? weight_int4[source] : 0;
+      }
+      __syncthreads();
+
+      wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::u4,
+                     wmma::row_major> a_low_u4;
+      wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::u4,
+                     wmma::row_major> a_high_u4;
+      wmma::fragment<wmma::matrix_b, 8, 8, 32, precision::u4,
+                     wmma::col_major> b_u4;
+      wmma::load_matrix_sync(a_low_u4, &a_low_packed[warp * 8][0], kPairK);
+      wmma::load_matrix_sync(a_high_u4, &a_high_packed[warp * 8][0], kPairK);
+      wmma::load_matrix_sync(b_u4, &b_packed[warp * 8][0], kPairK);
+
+      PairProbeLowMma::FragmentA low_a;
+      PairProbeHighMma::FragmentA high_a;
+      PairProbeLowMma::FragmentB weights;
+      low_a.clear();
+      high_a.clear();
+      weights.clear();
+      reinterpret_cast<unsigned&>(low_a) = a_low_u4.x[0];
+      reinterpret_cast<unsigned&>(high_a) = a_high_u4.x[0];
+      reinterpret_cast<unsigned&>(weights) = b_u4.x[0];
+      PairProbeLowMma low_mma;
+      PairProbeHighMma high_mma;
+      low_mma(low_accum, low_a, weights, low_accum);
+      high_mma(high_accum, high_a, weights, high_accum);
+      __syncthreads();
+    }
+
+    wmma::fragment<wmma::accumulator, 8, 8, 32, int> low_wmma;
+    wmma::fragment<wmma::accumulator, 8, 8, 32, int> high_wmma;
+    low_wmma.x[0] = low_accum[0];
+    low_wmma.x[1] = low_accum[1];
+    high_wmma.x[0] = high_accum[0];
+    high_wmma.x[1] = high_accum[1];
+    wmma::store_matrix_sync(low_tile[warp], low_wmma, 8, wmma::mem_row_major);
+    wmma::store_matrix_sync(high_tile[warp], high_wmma, 8, wmma::mem_row_major);
+    __syncwarp();
+
+    for (int item = lane; item < 64; item += kWarpSize) {
+      const int local_row = item / 8;
+      const int local_channel = warp * 8 + item % 8;
+      const int row = row_base + local_row;
+      const int channel = channel_base + local_channel;
+      if (row < rows && channel < channels) {
+        const int correction = static_cast<int>(zero_int4[channel * groups + group]) *
+                               row_sums[warp][local_row];
+        const int accumulator = low_tile[warp][item] +
+                                 16 * high_tile[warp][item] - correction;
+        const float value = static_cast<float>(accumulator) *
+            __half2float(scale_act[group * rows + row]) *
+            __half2float(scale_int4[channel * groups + group]);
+        partial[item] += value;
+      }
+    }
+    __syncthreads();
+  }
+  for (int item = lane; item < 64; item += kWarpSize) {
+    const int local_row = item / 8;
+    const int local_channel = warp * 8 + item % 8;
+    const int row = row_base + local_row;
+    const int channel = channel_base + local_channel;
+    if (row < rows && channel < channels) {
+      output[row * channels + indices_int4[channel]] = partial[item];
+    }
+  }
+#endif
+}
+
+void run_int4_pair_partition(
+    const at::Tensor& input_int8, const at::Tensor& scale_act,
+    const at::Tensor& weight_int4, const at::Tensor& scale_int4,
+    const at::Tensor& zero_int4, const at::Tensor& indices_int4,
+    at::Tensor& output, int rows, int width, cudaStream_t stream) {
+  if (indices_int4.numel() == 0) {
+    return;
+  }
+  record_tensor_stream(input_int8, stream);
+  record_tensor_stream(scale_act, stream);
+  record_tensor_stream(weight_int4, stream);
+  record_tensor_stream(scale_int4, stream);
+  record_tensor_stream(zero_int4, stream);
+  record_tensor_stream(indices_int4, stream);
+  record_tensor_stream(output, stream);
+  const int channels = static_cast<int>(indices_int4.numel());
+  const dim3 grid((channels + 31) / 32, (rows + 31) / 32);
+  sm75_int4_pair_gemm_kernel<<<grid, 128, 0, stream>>>(
+      input_int8.data_ptr<int8_t>(), weight_int4.data_ptr<uint8_t>(),
+      reinterpret_cast<const __half*>(scale_act.data_ptr<at::Half>()),
+      reinterpret_cast<const __half*>(scale_int4.data_ptr<at::Half>()),
+      zero_int4.data_ptr<uint8_t>(), indices_int4.data_ptr<int32_t>(),
+      output.data_ptr<float>(), rows, width, channels);
+  C10_CUDA_KERNEL_LAUNCH_CHECK();
+}
+
 void check_cuda_contiguous(const at::Tensor& tensor, const char* name) {
   TORCH_CHECK(tensor.is_cuda(), name, " must be a CUDA tensor");
   TORCH_CHECK(tensor.is_contiguous(), name, " must be contiguous");
@@ -1117,6 +1286,12 @@ at::Tensor three_level_linear_v2_core(
         reinterpret_cast<const __half*>(weight_fp16.data_ptr<at::Half>()),
         indices_fp16.data_ptr<int32_t>(), output.data_ptr<float>(), width,
         output_width, n4, n8, n16);
+  } else if (rows >= 32 && n4 > 0 && n8 == 0 && n16 == 0 && !has_cached_metadata) {
+    // v229 candidate: pure INT4 uses one packed-B fused pair; all mixed,
+    // cached, and unsupported shapes stay on the accepted v228 overlap path.
+    run_int4_pair_partition(
+        input_int8, scale_act, weight_int4, scale_int4, zero_int4,
+        indices_int4, output, rows, width, stream.stream());
   } else if (rows >= 32 && (n4 > 0 || n8 > 0)) {
     // The original MixLLM relies on iterator-based, staged Tensor Core GEMMs
     // for larger M. The helper is deliberately selected only for rows>=32:

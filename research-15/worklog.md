@@ -1050,3 +1050,6 @@ Built a standalone fused probe that stages one shared packed B tile, loads low/h
 
 ## v228 Kaggle result — fused packed pair passes on T4
 Kaggle v228 compiled and executed the first true fused packed pair on Tesla T4. All three markers passed: instruction probe `[0, 0]`, packed WMMA layout `[32, 64, 96, 128, 160, 192, 224, 256]`, and fused low/high result `[64, 64, -64, -64]`. This proves one staged packed B tile can feed both legal SM75 MMA paths with exact signed high-nibble arithmetic. Production dispatch remains unchanged; next work is an adapter/runner with real tile iteration and zero correction behind the v200 fallback.
+
+## v229 candidate — pure INT4 fused dispatch behind v228 fallback
+The fused packed pair now has a host seam and is selected only for `rows>=32`, `n4>0`, `n8==0`, `n16==0`, and uncached metadata. Mixed precision, cached metadata, decode, and unsupported shapes remain on the accepted v228 path. The candidate performs raw packed INT4 B loading, low/high activation nibble decomposition, two legal SM75 MMA calls, post-MMA zero correction, scale application, group accumulation, and indexed scatter. Local 81-test suite, CPU proof, Python checks, and diff checks pass; Kaggle T4 validation pending.
