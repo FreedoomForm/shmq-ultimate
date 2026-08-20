@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from statistics import median
+import hashlib
 from typing import Dict, Iterable, Optional
 
 
@@ -81,8 +82,12 @@ def load_sm75_backend(torch_module, build_directory: Optional[str | Path] = None
         directory = Path(build_directory)
         directory.mkdir(parents=True, exist_ok=True)
         kwargs["build_directory"] = str(directory)
+    source_digest = hashlib.sha256(source.read_bytes()).hexdigest()[:16]
+    # PyTorch’s default extension cache is keyed by the fixed module name and
+    # can survive across Kaggle notebook versions. Include the exact source
+    # digest so the gate always compiles the source embedded in this notebook.
     load(
-        name="mixllm_sm75_backend",
+        name=f"mixllm_sm75_backend_{source_digest}",
         sources=[str(source)],
         extra_cuda_cflags=["-O3", "-lineinfo", "-gencode=arch=compute_75,code=sm_75"],
         extra_cflags=["-O3"],

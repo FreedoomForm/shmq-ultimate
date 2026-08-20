@@ -78,6 +78,8 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("prepare_sm75_prefill_metadata", linear_text)
         self.assertIn("prepare_sm75_packed_tensors", linear_text)
         self.assertIn("prepare_sm75_packed_tensors", backend_compact)
+        self.assertIn("hashlib.sha256(source.read_bytes())", self.backend)
+        self.assertIn("mixllm_sm75_backend_{source_digest}", self.backend)
         self.assertIn("is_current_stream_capturing", self.backend)
 
     def test_v228_epilogue_index_fragment_contract(self):

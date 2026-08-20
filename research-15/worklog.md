@@ -1080,3 +1080,12 @@ Deep research compared the original Microsoft MixLLM `gemm_rm` runner with SHMQ.
 The v234 T4 log also showed the mixed-stride probe still failing despite the corrected `item/8` warp mapping. NVIDIA’s PTX ISA specifies that `mma.m8n8k32` gives each lane two accumulator registers with `row = laneid >> 2` and `col = (laneid % 4) * 2 + register_index`. The fused kernel was incorrectly fabricating a larger WMMA accumulator and initializing only two registers before calling `wmma::store_matrix_sync`. v235 replaced that conversion with direct two-register CUTLASS scatter using the PTX-defined mapping and reduced the per-thread partial accumulator to two values. v236 aligned the CUTLASS runner’s `LayoutC` with the original row-major runner.
 
 Local verification after the changes: 78 repository tests passed, 6 CUDA-only tests skipped, the two expected CUDA integration tests were excluded because the sandbox PyTorch build has no CUDA, and `verify_v230_native_int4_reference.py` passed. No new Kaggle run has been launched after these repairs. The changes remain pending T4 validation and are not accepted until the mixed-stride probe, native correctness, timing integrity, and both end-to-end performance gates pass.
+
+
+## v237 — Force compilation of the exact embedded CUDA source (local, Kaggle pending)
+
+The v236 Kaggle run reached T4, ran 79 embedded contract tests successfully, and passed the instruction, packed-load, and fused arithmetic probes. It failed the mixed-stride probe before native correctness and performance gates, so v236 is rejected.
+
+Deep research of the original-vs-SHMQ build seam found that SHMQ’s loader used a fixed `torch.utils.cpp_extension.load(name="mixllm_sm75_backend")` with the default persistent PyTorch extension cache. The Kaggle execution log repeatedly reported `ninja: no work to do` across source-changing notebook versions. The original MixLLM builds its extension in its normal clean source environment; SHMQ’s repeated Kaggle notebook versions can instead reuse a stale object. v237 now hashes the exact embedded `three_level_sm75.cu` source and includes the digest in the extension name, while preserving the registered `mixllm_sm75` operator namespace. This is a build-provenance fix only; arithmetic, model, quality checks, and benchmark settings are unchanged.
+
+Local verification: 78 repository tests passed, 6 CUDA-only tests skipped, and `verify_v230_native_int4_reference.py` passed. Kaggle has not yet been run for v237.

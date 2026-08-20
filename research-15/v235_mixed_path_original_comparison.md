@@ -64,3 +64,9 @@ const int local_channel = (lane & 3) * 2 + register_index;
 This is the legal replacement for the invalid partial WMMA-accumulator conversion. It also explains why the v234 `item / 8` mapping was directionally wrong for the CUTLASS two-register fragment: `item` was indexing a fabricated row-major tile rather than the actual per-lane PTX fragment ownership.
 
 8. NVIDIA, *PTX ISA 8.2*, section “Matrix Fragments for mma.m8n8k32,” lines around 32288–32408 in the extracted page: https://docs.nvidia.com/cuda/archive/12.2.0/parallel-thread-execution/index.html.
+
+## v236 T4 outcome and build-cache audit
+
+The post-repair Kaggle run compiled the current embedded source manifest and ran 79 contract tests successfully. The three existing SM75 instruction probes passed. The mixed-stride probe still failed at the first exact-value assertion, so no correctness or performance gate result is admissible and the version is rejected.
+
+A further differential audit found a validation risk in SHMQ’s loader: it calls `torch.utils.cpp_extension.load(name="mixllm_sm75_backend", sources=[three_level_sm75.cu])` with a fixed extension name and no source-versioned build directory. Kaggle logs repeatedly showed `ninja: no work to do` across notebook versions even when the embedded CUDA source hash changed. Original MixLLM also uses a fixed extension namespace, but its normal build runs in a clean source/build environment; the SHMQ gate’s persistent PyTorch extension cache can therefore reuse stale objects across notebook versions. The next safe repair is to version the JIT extension name from the SHA-256 of the exact embedded CUDA source, preserving the registered `mixllm_sm75` operator namespace while forcing the tested source to compile. This change affects only build provenance, not arithmetic, model quality, or benchmark settings.
