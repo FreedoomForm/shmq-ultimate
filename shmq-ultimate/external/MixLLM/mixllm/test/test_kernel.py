@@ -13,7 +13,7 @@ parser.add_argument('-k', type=int, default=2048)
 parser.add_argument('-r', type=float, default=0.25)
 parser.add_argument('--n_iter', type=int, default=100)
 parser.add_argument('--warm_up', type=int, default=10)
-args = parser.parse_args()
+args, _unknown = parser.parse_known_args()
 print(args)
 
 

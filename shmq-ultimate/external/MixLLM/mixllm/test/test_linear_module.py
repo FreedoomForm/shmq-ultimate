@@ -11,7 +11,7 @@ parser.add_argument('-m', type=int, default=512)
 parser.add_argument('-n', type=int, default=4096)
 parser.add_argument('-k', type=int, default=4096)
 parser.add_argument('-r', type=float, default=0.25)
-args = parser.parse_args()
+args, _unknown = parser.parse_known_args()
 
 
 def test_linear_module():

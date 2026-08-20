@@ -66,7 +66,17 @@ def mixllm_three_level_gemm(a, scale_act, zero_int4, scale_int8,
     return output
 
 
-@torch.library.register_fake("kernels_mixllm::quantize")
+def _register_fake_if_defined(qualified_name):
+    """Register a fake implementation only when the optional op exists."""
+    namespace, name = qualified_name.split("::", 1)
+    try:
+        getattr(getattr(torch.ops, namespace), name)
+    except AttributeError:
+        return lambda function: function
+    return torch.library.register_fake(qualified_name)
+
+
+@_register_fake_if_defined("kernels_mixllm::quantize")
 def quantize_abstract(a):
     torch._check(a.dim() == 2, "Input must be a 2D tensor")
     m = a.shape[0]
@@ -85,7 +95,7 @@ def quantize_abstract(a):
                         device="cuda:0"))
 
 
-@torch.library.register_fake("kernels_mixllm::transpose")
+@_register_fake_if_defined("kernels_mixllm::transpose")
 def transpose_abstract(a):
     torch._check(a.dim() == 2, "Input must be a 2D tensor")
     m = a.shape[0]
@@ -95,7 +105,7 @@ def transpose_abstract(a):
     return torch.empty((n, m), dtype=torch.float16, device="cuda:0")
 
 
-@torch.library.register_fake("kernels_mixllm::gemm")
+@_register_fake_if_defined("kernels_mixllm::gemm")
 def mixllm_gemm_abstract(a, scale_act, zero, scale_int8, scale_int4,
                          indices_int8, indices_int4, b_int8, b_int4):
     torch._check(a.is_cuda, "Input tensor A must be on CUDA device")

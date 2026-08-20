@@ -11,7 +11,7 @@ parser.add_argument('-m', type=int, default=512)
 parser.add_argument('-n', type=int, default=4096)
 parser.add_argument('--n_iter', type=int, default=100)
 parser.add_argument('--warm_up', type=int, default=10)
-args = parser.parse_args()
+args, _unknown = parser.parse_known_args()
 print(args)
 
 if __name__ == "__main__":
