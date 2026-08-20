@@ -74,7 +74,7 @@ enum class CutlassConfig : int {
   kM64N64 = 3,
 };
 
-constexpr int kCutlassTuningAbi = 262;
+constexpr int kCutlassTuningAbi = 263;
 constexpr int kCutlassTuningWarmup = 2;
 constexpr int kCutlassTuningIterations = 4;
 std::mutex g_cutlass_tuning_mutex;
@@ -1155,7 +1155,7 @@ void run_fp16_partition_cublas(
   record_tensor_stream(input_fp16, stream);
   record_tensor_stream(output, stream);
   const auto partial = at::mm(
-      input_fp16, weight_fp16.transpose(0, 1).contiguous());
+      input_fp16, weight_fp16.transpose(0, 1));
   const int channels = static_cast<int>(indices_fp16.numel());
   constexpr int threads = 256;
   const int blocks = (rows * channels + threads - 1) / threads;
