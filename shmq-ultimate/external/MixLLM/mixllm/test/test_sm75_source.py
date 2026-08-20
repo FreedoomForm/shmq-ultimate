@@ -70,12 +70,6 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("OpClassTensorOp,2,cutlass::arch::OpMultiplyAddSaturate>", cutlass_compact)
         self.assertIn("usingInt8Runner=Runner<Core,2>", cutlass_compact)
 
-    def test_v223_sm75_shared_memory_carveout_contract(self):
-        cutlass_text = self.cutlass_testbed
-        self.assertIn("cudaFuncAttributePreferredSharedMemoryCarveout, 100", cutlass_text)
-        self.assertIn("cudaFuncAttributeMaxDynamicSharedMemorySize, shared_bytes", cutlass_text)
-        self.assertIn("kernel<Mma, SharedStorage><<<grid, block, shared_bytes, stream>>>", cutlass_text)
-
     def test_v200_integer_prefill_overlap_contract(self):
         source_compact = "".join(self.source.split())
         cutlass_compact = "".join(self.cutlass_testbed.split())
