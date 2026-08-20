@@ -1180,3 +1180,9 @@ Local validation: source contracts passed (19 tests), full MixLLM suite passed (
 Deep research found a concrete dataflow defect in the native pair kernel: for every 32-element K chunk it repacked the complete 32-row A tile and 32-channel B tile once per each of four row subtiles, with a barrier after every reload. Upstream staged CUTLASS makes a CTA tile resident while multiple warp-level row/column MMA operations consume it. v249 packs A and B once per K chunk, synchronizes, executes all four row-subtile low/high MMAs from the resident shared tile, then synchronizes before overwrite. Arithmetic, zero correction, scales, output indices, grid, ABI, and dispatch policy are unchanged.
 
 Local validation: source contracts passed (19 tests), full MixLLM suite passed (85 tests, 6 CUDA-only skips), and the native INT4 CPU proof passed. Kaggle has not yet been run for v249.
+
+## v250 — Enable load-hoisted native pair in mixed INT4 prefill (local validation complete)
+
+Deep research clarified that v249's mixed Qwen measurement still used `use_fused_int4=false`; the load-hoisted pair was not exercised in the mixed scenario. v250 therefore enables `n4 > 0` only for the mixed rows>=32 overlap call. INT8 remains on the staged CUTLASS auxiliary stream, FP16 remains on the caller stream, and the v249 pair kernel now packs A/B once per K chunk before its four row-subtile MMAs.
+
+No arithmetic, quantization, metadata layout, stream/event ordering, output ABI, model, benchmark setting, or quality threshold changed. Local validation: source contracts passed (19 tests), full MixLLM suite passed (85 tests, 6 CUDA-only skips), and the native INT4 CPU proof passed. Kaggle has not yet been run for v250.
