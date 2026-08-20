@@ -1,0 +1,1060 @@
+{
+  "allocator_check": {
+    "achieved_average_bits": 8.0,
+    "achieved_bit_budget": 32,
+    "achieved_channel_counts": {
+      "16": 0,
+      "4": 0,
+      "8": 8
+    },
+    "alignment": 1,
+    "allocator": "marginal_benefit_bit_budget",
+    "channel_counts": {
+      "16": 0,
+      "4": 0,
+      "8": 8
+    },
+    "requested_bit_budget": 32,
+    "target_average_bits": 8.0,
+    "total_channels": 8,
+    "unused_bit_budget": 0
+  },
+  "benchmarks": {
+    "baseline": "torch_fp16_linear",
+    "scenarios": {
+      "qwen_qkv_mixed_4_8_16": {
+        "average_weight_bits": 5.964285714285714,
+        "in_features": 3584,
+        "out_features": 3584,
+        "partition_counts": {
+          "4": 2400,
+          "8": 896,
+          "16": 288
+        },
+        "shapes": [
+          {
+            "activation_quantization": {
+              "p50_ms": 0.030719999223947525,
+              "p95_ms": 0.04809600114822388
+            },
+            "dense_fp16": {
+              "p50_ms": 0.11468800157308578,
+              "p95_ms": 0.11593600362539291
+            },
+            "end_to_end_p50_ratio_vs_dense": 0.9741908469363963,
+            "end_to_end_p50_speedup_vs_dense": 1.026492912702647,
+            "gemm_p50_ratio_vs_dense": 0.7862723210297975,
+            "gemm_p50_speedup_vs_dense": 1.27182398928946,
+            "max_abs_error": 0.0642852783203125,
+            "max_abs_error_vs_dense_fp16": 1.394369125366211,
+            "memory": {
+              "activation_fp16_bytes": 7168,
+              "activation_quantized_bytes": 3584,
+              "activation_scale_bytes": 56,
+              "dense_weight_bytes": 25690112,
+              "expanded_int4_bytes": 0,
+              "output_bytes": 14336,
+              "packed_storage_bytes": {
+                "indices_16": 1152,
+                "indices_4": 9600,
+                "indices_8": 3584,
+                "scale_int4": 134400,
+                "scale_int8": 50176,
+                "weight_fp16": 2064384,
+                "weight_int4": 4300800,
+                "weight_int8": 3211264,
+                "zero_int4": 67200
+              },
+              "packed_storage_total_bytes": 9842560,
+              "peak_cuda_memory": {
+                "dense_peak_allocated_bytes": 44114944,
+                "end_to_end_peak_allocated_bytes": 44126208,
+                "gemm_peak_allocated_bytes": 44122112,
+                "quantization_peak_allocated_bytes": 44111872
+              },
+              "prefill_metadata_bytes": 0
+            },
+            "rows": 1,
+            "sm75_end_to_end": {
+              "p50_ms": 0.1117280013859272,
+              "p95_ms": 0.1454080045223236
+            },
+            "sm75_gemm": {
+              "p50_ms": 0.09017600119113922,
+              "p95_ms": 0.09228800237178802
+            },
+            "timing_integrity": true,
+            "timing_integrity_ratio": 0.8071029649913475
+          },
+          {
+            "activation_quantization": {
+              "p50_ms": 0.0313919996842742,
+              "p95_ms": 0.06355199962854385
+            },
+            "dense_fp16": {
+              "p50_ms": 0.12831999361515045,
+              "p95_ms": 0.13007999956607819
+            },
+            "end_to_end_p50_ratio_vs_dense": 3.508354323897518,
+            "end_to_end_p50_speedup_vs_dense": 0.2850339240789896,
+            "gemm_p50_ratio_vs_dense": 3.5544889343892505,
+            "gemm_p50_speedup_vs_dense": 0.2813343967187859,
+            "max_abs_error": 0.0950927734375,
+            "max_abs_error_vs_dense_fp16": 1.70574951171875,
+            "memory": {
+              "activation_fp16_bytes": 114688,
+              "activation_quantized_bytes": 57344,
+              "activation_scale_bytes": 896,
+              "dense_weight_bytes": 25690112,
+              "expanded_int4_bytes": 8601600,
+              "output_bytes": 229376,
+              "packed_storage_bytes": {
+                "indices_16": 1152,
+                "indices_4": 9600,
+                "indices_8": 3584,
+                "scale_int4": 134400,
+                "scale_int8": 50176,
+                "weight_fp16": 2064384,
+                "weight_int4": 4300800,
+                "weight_int8": 3211264,
+                "zero_int4": 67200
+              },
+              "packed_storage_total_bytes": 9842560,
+              "peak_cuda_memory": {
+                "dense_peak_allocated_bytes": 53630976,
+                "end_to_end_peak_allocated_bytes": 53804032,
+                "gemm_peak_allocated_bytes": 53745664,
+                "quantization_peak_allocated_bytes": 53574656
+              },
+              "prefill_metadata_bytes": 0
+            },
+            "rows": 16,
+            "sm75_end_to_end": {
+              "p50_ms": 0.45019200444221497,
+              "p95_ms": 0.45209598541259766
+            },
+            "sm75_gemm": {
+              "p50_ms": 0.45611199736595154,
+              "p95_ms": 0.45868799090385437
+            },
+            "timing_integrity": true,
+            "timing_integrity_ratio": 1.0131499290643142
+          },
+          {
+            "activation_quantization": {
+              "p50_ms": 0.030704000033438206,
+              "p95_ms": 0.045951999723911285
+            },
+            "dense_fp16": {
+              "p50_ms": 0.16382399946451187,
+              "p95_ms": 0.1658879965543747
+            },
+            "end_to_end_p50_ratio_vs_dense": 15.238402070939784,
+            "end_to_end_p50_speedup_vs_dense": 0.06562367860781403,
+            "gemm_p50_ratio_vs_dense": 15.058110972374356,
+            "gemm_p50_speedup_vs_dense": 0.06640939237561751,
+            "max_abs_error": 0.1025390625,
+            "max_abs_error_vs_dense_fp16": 1.8373336791992188,
+            "memory": {
+              "activation_fp16_bytes": 917504,
+              "activation_quantized_bytes": 458752,
+              "activation_scale_bytes": 7168,
+              "dense_weight_bytes": 25690112,
+              "expanded_int4_bytes": 8601600,
+              "output_bytes": 1835008,
+              "packed_storage_bytes": {
+                "indices_16": 1152,
+                "indices_4": 9600,
+                "indices_8": 3584,
+                "scale_int4": 134400,
+                "scale_int8": 50176,
+                "weight_fp16": 2064384,
+                "weight_int4": 4300800,
+                "weight_int8": 3211264,
+                "zero_int4": 67200
+              },
+              "packed_storage_total_bytes": 9842560,
+              "peak_cuda_memory": {
+                "dense_peak_allocated_bytes": 60461056,
+                "end_to_end_peak_allocated_bytes": 62519296,
+                "gemm_peak_allocated_bytes": 62053376,
+                "quantization_peak_allocated_bytes": 60009472
+              },
+              "prefill_metadata_bytes": 0
+            },
+            "rows": 128,
+            "sm75_end_to_end": {
+              "p50_ms": 2.4964159727096558,
+              "p95_ms": 2.5357439517974854
+            },
+            "sm75_gemm": {
+              "p50_ms": 2.466879963874817,
+              "p95_ms": 5.386655807495117
+            },
+            "timing_integrity": true,
+            "timing_integrity_ratio": 0.9881686348918927
+          }
+        ],
+        "status": "measured",
+        "weight_bandwidth_upper_bound_vs_fp16": 2.682634730538922
+      },
+      "qwen_qkv_pure_fp16": {
+        "average_weight_bits": 16.0,
+        "in_features": 3584,
+        "out_features": 3584,
+        "partition_counts": {
+          "4": 0,
+          "8": 0,
+          "16": 3584
+        },
+        "shapes": [
+          {
+            "activation_quantization": {
+              "p50_ms": 0.029872000217437744,
+              "p95_ms": 0.04416000097990036
+            },
+            "dense_fp16": {
+              "p50_ms": 0.10452799871563911,
+              "p95_ms": 0.10633599758148193
+            },
+            "end_to_end_p50_ratio_vs_dense": 1.0575539681159938,
+            "end_to_end_p50_speedup_vs_dense": 0.9455782212055572,
+            "gemm_p50_ratio_vs_dense": 1.056329406503527,
+            "gemm_p50_speedup_vs_dense": 0.946674393274747,
+            "max_abs_error": 0.07965087890625,
+            "max_abs_error_vs_dense_fp16": 0.07965087890625,
+            "memory": {
+              "activation_fp16_bytes": 7168,
+              "activation_quantized_bytes": 3584,
+              "activation_scale_bytes": 56,
+              "dense_weight_bytes": 25690112,
+              "expanded_int4_bytes": 0,
+              "output_bytes": 14336,
+              "packed_storage_bytes": {
+                "indices_16": 14336,
+                "indices_4": 0,
+                "indices_8": 0,
+                "scale_int4": 0,
+                "scale_int8": 0,
+                "weight_fp16": 25690112,
+                "weight_int4": 0,
+                "weight_int8": 0,
+                "zero_int4": 0
+              },
+              "packed_storage_total_bytes": 25704448,
+              "peak_cuda_memory": {
+                "dense_peak_allocated_bytes": 59979776,
+                "end_to_end_peak_allocated_bytes": 59986944,
+                "gemm_peak_allocated_bytes": 59986944,
+                "quantization_peak_allocated_bytes": 59976704
+              },
+              "prefill_metadata_bytes": 0
+            },
+            "rows": 1,
+            "sm75_end_to_end": {
+              "p50_ms": 0.11054399982094765,
+              "p95_ms": 0.11878400295972824
+            },
+            "sm75_gemm": {
+              "p50_ms": 0.1104159988462925,
+              "p95_ms": 0.1117440015077591
+            },
+            "timing_integrity": true,
+            "timing_integrity_ratio": 0.998842081208727
+          },
+          {
+            "activation_quantization": {
+              "p50_ms": 0.03009600006043911,
+              "p95_ms": 0.04323200136423111
+            },
+            "dense_fp16": {
+              "p50_ms": 0.11638399958610535,
+              "p95_ms": 0.11673600226640701
+            },
+            "end_to_end_p50_ratio_vs_dense": 2.792411347027386,
+            "end_to_end_p50_speedup_vs_dense": 0.35811342804652796,
+            "gemm_p50_ratio_vs_dense": 2.837091016360498,
+            "gemm_p50_speedup_vs_dense": 0.3524737113590486,
+            "max_abs_error": 0.0624847412109375,
+            "max_abs_error_vs_dense_fp16": 0.0624847412109375,
+            "memory": {
+              "activation_fp16_bytes": 114688,
+              "activation_quantized_bytes": 57344,
+              "activation_scale_bytes": 896,
+              "dense_weight_bytes": 25690112,
+              "expanded_int4_bytes": 0,
+              "output_bytes": 229376,
+              "packed_storage_bytes": {
+                "indices_16": 14336,
+                "indices_4": 0,
+                "indices_8": 0,
+                "scale_int4": 0,
+                "scale_int8": 0,
+                "weight_fp16": 25690112,
+                "weight_int4": 0,
+                "weight_int8": 0,
+                "zero_int4": 0
+              },
+              "packed_storage_total_bytes": 25704448,
+              "peak_cuda_memory": {
+                "dense_peak_allocated_bytes": 60948480,
+                "end_to_end_peak_allocated_bytes": 61063168,
+                "gemm_peak_allocated_bytes": 61063168,
+                "quantization_peak_allocated_bytes": 60892160
+              },
+              "prefill_metadata_bytes": 0
+            },
+            "rows": 16,
+            "sm75_end_to_end": {
+              "p50_ms": 0.32499200105667114,
+              "p95_ms": 0.3312320113182068
+            },
+            "sm75_gemm": {
+              "p50_ms": 0.3301919996738434,
+              "p95_ms": 0.3399679958820343
+            },
+            "timing_integrity": true,
+            "timing_integrity_ratio": 1.016000389548866
+          },
+          {
+            "activation_quantization": {
+              "p50_ms": 0.030719999223947525,
+              "p95_ms": 0.04745600000023842
+            },
+            "dense_fp16": {
+              "p50_ms": 0.16383999586105347,
+              "p95_ms": 0.1658879965543747
+            },
+            "end_to_end_p50_ratio_vs_dense": 7.034863479384847,
+            "end_to_end_p50_speedup_vs_dense": 0.14214916933788793,
+            "gemm_p50_ratio_vs_dense": 6.931250202362576,
+            "gemm_p50_speedup_vs_dense": 0.14427411661739487,
+            "max_abs_error": 0.124847412109375,
+            "max_abs_error_vs_dense_fp16": 0.124847412109375,
+            "memory": {
+              "activation_fp16_bytes": 917504,
+              "activation_quantized_bytes": 458752,
+              "activation_scale_bytes": 7168,
+              "dense_weight_bytes": 25690112,
+              "expanded_int4_bytes": 0,
+              "output_bytes": 1835008,
+              "packed_storage_bytes": {
+                "indices_16": 14336,
+                "indices_4": 0,
+                "indices_8": 0,
+                "scale_int4": 0,
+                "scale_int8": 0,
+                "weight_fp16": 25690112,
+                "weight_int4": 0,
+                "weight_int8": 0,
+                "zero_int4": 0
+              },
+              "packed_storage_total_bytes": 25704448,
+              "peak_cuda_memory": {
+                "dense_peak_allocated_bytes": 68186112,
+                "end_to_end_peak_allocated_bytes": 69103616,
+                "gemm_peak_allocated_bytes": 69103616,
+                "quantization_peak_allocated_bytes": 67734528
+              },
+              "prefill_metadata_bytes": 0
+            },
+            "rows": 128,
+            "sm75_end_to_end": {
+              "p50_ms": 1.1525920033454895,
+              "p95_ms": 1.196128010749817
+            },
+            "sm75_gemm": {
+              "p50_ms": 1.1356160044670105,
+              "p95_ms": 1.1960320472717285
+            },
+            "timing_integrity": true,
+            "timing_integrity_ratio": 0.9852714587389078
+          }
+        ],
+        "status": "measured",
+        "weight_bandwidth_upper_bound_vs_fp16": 1.0
+      },
+      "qwen_qkv_pure_int4": {
+        "average_weight_bits": 4.0,
+        "in_features": 3584,
+        "out_features": 3584,
+        "partition_counts": {
+          "4": 3584,
+          "8": 0,
+          "16": 0
+        },
+        "shapes": [
+          {
+            "activation_quantization": {
+              "p50_ms": 0.031088000163435936,
+              "p95_ms": 0.05491200089454651
+            },
+            "dense_fp16": {
+              "p50_ms": 0.1034879982471466,
+              "p95_ms": 0.10444799810647964
+            },
+            "end_to_end_p50_ratio_vs_dense": 1.1018862306230042,
+            "end_to_end_p50_speedup_vs_dense": 0.9075347093089657,
+            "gemm_p50_ratio_vs_dense": 0.7289734270684275,
+            "gemm_p50_speedup_vs_dense": 1.371792115964375,
+            "max_abs_error": 4.57763671875e-05,
+            "max_abs_error_vs_dense_fp16": 1.4177970886230469,
+            "memory": {
+              "activation_fp16_bytes": 7168,
+              "activation_quantized_bytes": 3584,
+              "activation_scale_bytes": 56,
+              "dense_weight_bytes": 25690112,
+              "expanded_int4_bytes": 0,
+              "output_bytes": 14336,
+              "packed_storage_bytes": {
+                "indices_16": 0,
+                "indices_4": 14336,
+                "indices_8": 0,
+                "scale_int4": 200704,
+                "scale_int8": 0,
+                "weight_fp16": 0,
+                "weight_int4": 6422528,
+                "weight_int8": 0,
+                "zero_int4": 100352
+              },
+              "packed_storage_total_bytes": 6737920,
+              "peak_cuda_memory": {
+                "dense_peak_allocated_bytes": 41009152,
+                "end_to_end_peak_allocated_bytes": 41020416,
+                "gemm_peak_allocated_bytes": 41016320,
+                "quantization_peak_allocated_bytes": 41006080
+              },
+              "prefill_metadata_bytes": 0
+            },
+            "rows": 1,
+            "sm75_end_to_end": {
+              "p50_ms": 0.11403200030326843,
+              "p95_ms": 0.14803199470043182
+            },
+            "sm75_gemm": {
+              "p50_ms": 0.07544000074267387,
+              "p95_ms": 0.10099200159311295
+            },
+            "timing_integrity": true,
+            "timing_integrity_ratio": 0.6615686872285058
+          },
+          {
+            "activation_quantization": {
+              "p50_ms": 0.0307839997112751,
+              "p95_ms": 0.04387199878692627
+            },
+            "dense_fp16": {
+              "p50_ms": 0.1165120005607605,
+              "p95_ms": 0.11686400324106216
+            },
+            "end_to_end_p50_ratio_vs_dense": 1.5819829880797873,
+            "end_to_end_p50_speedup_vs_dense": 0.6321180490150536,
+            "gemm_p50_ratio_vs_dense": 1.5907717213531982,
+            "gemm_p50_speedup_vs_dense": 0.6286257082501724,
+            "max_abs_error": 8.7738037109375e-05,
+            "max_abs_error_vs_dense_fp16": 1.6556415557861328,
+            "memory": {
+              "activation_fp16_bytes": 114688,
+              "activation_quantized_bytes": 57344,
+              "activation_scale_bytes": 896,
+              "dense_weight_bytes": 25690112,
+              "expanded_int4_bytes": 12845056,
+              "output_bytes": 229376,
+              "packed_storage_bytes": {
+                "indices_16": 0,
+                "indices_4": 14336,
+                "indices_8": 0,
+                "scale_int4": 200704,
+                "scale_int8": 0,
+                "weight_fp16": 0,
+                "weight_int4": 6422528,
+                "weight_int8": 0,
+                "zero_int4": 100352
+              },
+              "packed_storage_total_bytes": 6737920,
+              "peak_cuda_memory": {
+                "dense_peak_allocated_bytes": 54768640,
+                "end_to_end_peak_allocated_bytes": 54941696,
+                "gemm_peak_allocated_bytes": 54883328,
+                "quantization_peak_allocated_bytes": 54712320
+              },
+              "prefill_metadata_bytes": 0
+            },
+            "rows": 16,
+            "sm75_end_to_end": {
+              "p50_ms": 0.18432000279426575,
+              "p95_ms": 0.18636800348758698
+            },
+            "sm75_gemm": {
+              "p50_ms": 0.18534399569034576,
+              "p95_ms": 0.18646399676799774
+            },
+            "timing_integrity": true,
+            "timing_integrity_ratio": 1.005555516930102
+          },
+          {
+            "activation_quantization": {
+              "p50_ms": 0.030719999223947525,
+              "p95_ms": 0.049056001007556915
+            },
+            "dense_fp16": {
+              "p50_ms": 0.16657599806785583,
+              "p95_ms": 0.16969600319862366
+            },
+            "end_to_end_p50_ratio_vs_dense": 1.3278263551678429,
+            "end_to_end_p50_speedup_vs_dense": 0.7531105224023029,
+            "gemm_p50_ratio_vs_dense": 1.2815291295269247,
+            "gemm_p50_speedup_vs_dense": 0.7803178070319393,
+            "max_abs_error": 0.0001926422119140625,
+            "max_abs_error_vs_dense_fp16": 2.130603790283203,
+            "memory": {
+              "activation_fp16_bytes": 917504,
+              "activation_quantized_bytes": 458752,
+              "activation_scale_bytes": 7168,
+              "dense_weight_bytes": 25690112,
+              "expanded_int4_bytes": 12845056,
+              "output_bytes": 1835008,
+              "packed_storage_bytes": {
+                "indices_16": 0,
+                "indices_4": 14336,
+                "indices_8": 0,
+                "scale_int4": 200704,
+                "scale_int8": 0,
+                "weight_fp16": 0,
+                "weight_int4": 6422528,
+                "weight_int8": 0,
+                "zero_int4": 100352
+              },
+              "packed_storage_total_bytes": 6737920,
+              "peak_cuda_memory": {
+                "dense_peak_allocated_bytes": 61899776,
+                "end_to_end_peak_allocated_bytes": 63283200,
+                "gemm_peak_allocated_bytes": 62817280,
+                "quantization_peak_allocated_bytes": 61448192
+              },
+              "prefill_metadata_bytes": 301056
+            },
+            "rows": 128,
+            "sm75_end_to_end": {
+              "p50_ms": 0.22118400037288666,
+              "p95_ms": 0.25910401344299316
+            },
+            "sm75_gemm": {
+              "p50_ms": 0.21347199380397797,
+              "p95_ms": 0.21500800549983978
+            },
+            "timing_integrity": true,
+            "timing_integrity_ratio": 0.9651330722117907
+          }
+        ],
+        "status": "measured",
+        "weight_bandwidth_upper_bound_vs_fp16": 4.0
+      },
+      "qwen_qkv_pure_int8": {
+        "average_weight_bits": 8.0,
+        "in_features": 3584,
+        "out_features": 3584,
+        "partition_counts": {
+          "4": 0,
+          "8": 3584,
+          "16": 0
+        },
+        "shapes": [
+          {
+            "activation_quantization": {
+              "p50_ms": 0.0306560005992651,
+              "p95_ms": 0.04499199986457825
+            },
+            "dense_fp16": {
+              "p50_ms": 0.10475200042128563,
+              "p95_ms": 0.1058880016207695
+            },
+            "end_to_end_p50_ratio_vs_dense": 1.0948526148602424,
+            "end_to_end_p50_speedup_vs_dense": 0.913364946502548,
+            "gemm_p50_ratio_vs_dense": 0.7250648854938757,
+            "gemm_p50_speedup_vs_dense": 1.3791869114153186,
+            "max_abs_error": 5.030632019042969e-05,
+            "max_abs_error_vs_dense_fp16": 1.3958702087402344,
+            "memory": {
+              "activation_fp16_bytes": 7168,
+              "activation_quantized_bytes": 3584,
+              "activation_scale_bytes": 56,
+              "dense_weight_bytes": 25690112,
+              "expanded_int4_bytes": 0,
+              "output_bytes": 14336,
+              "packed_storage_bytes": {
+                "indices_16": 0,
+                "indices_4": 0,
+                "indices_8": 14336,
+                "scale_int4": 0,
+                "scale_int8": 200704,
+                "weight_fp16": 0,
+                "weight_int4": 0,
+                "weight_int8": 12845056,
+                "zero_int4": 0
+              },
+              "packed_storage_total_bytes": 13060096,
+              "peak_cuda_memory": {
+                "dense_peak_allocated_bytes": 47331328,
+                "end_to_end_peak_allocated_bytes": 47342592,
+                "gemm_peak_allocated_bytes": 47338496,
+                "quantization_peak_allocated_bytes": 47328256
+              },
+              "prefill_metadata_bytes": 0
+            },
+            "rows": 1,
+            "sm75_end_to_end": {
+              "p50_ms": 0.11468800157308578,
+              "p95_ms": 0.14230400323867798
+            },
+            "sm75_gemm": {
+              "p50_ms": 0.07595199719071388,
+              "p95_ms": 0.10035199671983719
+            },
+            "timing_integrity": true,
+            "timing_integrity_ratio": 0.6622488503499898
+          },
+          {
+            "activation_quantization": {
+              "p50_ms": 0.030719999223947525,
+              "p95_ms": 0.04739199951291084
+            },
+            "dense_fp16": {
+              "p50_ms": 0.11630399897694588,
+              "p95_ms": 0.11673600226640701
+            },
+            "end_to_end_p50_ratio_vs_dense": 1.7182556362617092,
+            "end_to_end_p50_speedup_vs_dense": 0.581985578220265,
+            "gemm_p50_ratio_vs_dense": 1.7007841450434027,
+            "gemm_p50_speedup_vs_dense": 0.5879640887494755,
+            "max_abs_error": 9.1552734375e-05,
+            "max_abs_error_vs_dense_fp16": 1.7460441589355469,
+            "memory": {
+              "activation_fp16_bytes": 114688,
+              "activation_quantized_bytes": 57344,
+              "activation_scale_bytes": 896,
+              "dense_weight_bytes": 25690112,
+              "expanded_int4_bytes": 0,
+              "output_bytes": 229376,
+              "packed_storage_bytes": {
+                "indices_16": 0,
+                "indices_4": 0,
+                "indices_8": 14336,
+                "scale_int4": 0,
+                "scale_int8": 200704,
+                "weight_fp16": 0,
+                "weight_int4": 0,
+                "weight_int8": 12845056,
+                "zero_int4": 0
+              },
+              "packed_storage_total_bytes": 13060096,
+              "peak_cuda_memory": {
+                "dense_peak_allocated_bytes": 48245760,
+                "end_to_end_peak_allocated_bytes": 48418816,
+                "gemm_peak_allocated_bytes": 48360448,
+                "quantization_peak_allocated_bytes": 48189440
+              },
+              "prefill_metadata_bytes": 0
+            },
+            "rows": 16,
+            "sm75_end_to_end": {
+              "p50_ms": 0.1998400017619133,
+              "p95_ms": 0.2027519941329956
+            },
+            "sm75_gemm": {
+              "p50_ms": 0.19780799746513367,
+              "p95_ms": 0.21724799275398254
+            },
+            "timing_integrity": true,
+            "timing_integrity_ratio": 0.9898318440809436
+          },
+          {
+            "activation_quantization": {
+              "p50_ms": 0.0302559994161129,
+              "p95_ms": 0.04646399989724159
+            },
+            "dense_fp16": {
+              "p50_ms": 0.16683200001716614,
+              "p95_ms": 0.16998399794101715
+            },
+            "end_to_end_p50_ratio_vs_dense": 1.360410492906961,
+            "end_to_end_p50_speedup_vs_dense": 0.7350722485704839,
+            "gemm_p50_ratio_vs_dense": 1.3148556713498667,
+            "gemm_p50_speedup_vs_dense": 0.7605397472814432,
+            "max_abs_error": 0.0001983642578125,
+            "max_abs_error_vs_dense_fp16": 1.7257022857666016,
+            "memory": {
+              "activation_fp16_bytes": 917504,
+              "activation_quantized_bytes": 458752,
+              "activation_scale_bytes": 7168,
+              "dense_weight_bytes": 25690112,
+              "expanded_int4_bytes": 0,
+              "output_bytes": 1835008,
+              "packed_storage_bytes": {
+                "indices_16": 0,
+                "indices_4": 0,
+                "indices_8": 14336,
+                "scale_int4": 0,
+                "scale_int8": 200704,
+                "weight_fp16": 0,
+                "weight_int4": 0,
+                "weight_int8": 12845056,
+                "zero_int4": 0
+              },
+              "packed_storage_total_bytes": 13060096,
+              "peak_cuda_memory": {
+                "dense_peak_allocated_bytes": 55800832,
+                "end_to_end_peak_allocated_bytes": 57184256,
+                "gemm_peak_allocated_bytes": 56718336,
+                "quantization_peak_allocated_bytes": 55349248
+              },
+              "prefill_metadata_bytes": 200704
+            },
+            "rows": 128,
+            "sm75_end_to_end": {
+              "p50_ms": 0.22696000337600708,
+              "p95_ms": 0.23996800184249878
+            },
+            "sm75_gemm": {
+              "p50_ms": 0.21936000138521194,
+              "p95_ms": 0.2268799990415573
+            },
+            "timing_integrity": true,
+            "timing_integrity_ratio": 0.9665139148847997
+          }
+        ],
+        "status": "measured",
+        "weight_bandwidth_upper_bound_vs_fp16": 2.0
+      },
+      "smoke_mixed_4_8_16": {
+        "average_weight_bits": 6.0,
+        "in_features": 512,
+        "out_features": 96,
+        "partition_counts": {
+          "4": 64,
+          "8": 24,
+          "16": 8
+        },
+        "shapes": [
+          {
+            "activation_quantization": {
+              "p50_ms": 0.035391999408602715,
+              "p95_ms": 0.12495999783277512
+            },
+            "dense_fp16": {
+              "p50_ms": 0.03667199984192848,
+              "p95_ms": 0.0655359998345375
+            },
+            "end_to_end_p50_ratio_vs_dense": 2.64703311081347,
+            "end_to_end_p50_speedup_vs_dense": 0.3777814474306618,
+            "gemm_p50_ratio_vs_dense": 1.739092539514926,
+            "gemm_p50_speedup_vs_dense": 0.5750125293958903,
+            "max_abs_error": 0.010498046875,
+            "max_abs_error_vs_dense_fp16": 0.3921276330947876,
+            "memory": {
+              "activation_fp16_bytes": 1024,
+              "activation_quantized_bytes": 512,
+              "activation_scale_bytes": 8,
+              "dense_weight_bytes": 98304,
+              "expanded_int4_bytes": 0,
+              "output_bytes": 384,
+              "packed_storage_bytes": {
+                "indices_16": 32,
+                "indices_4": 256,
+                "indices_8": 96,
+                "scale_int4": 512,
+                "scale_int8": 192,
+                "weight_fp16": 8192,
+                "weight_int4": 16384,
+                "weight_int8": 12288,
+                "zero_int4": 256
+              },
+              "packed_storage_total_bytes": 38208,
+              "peak_cuda_memory": {
+                "dense_peak_allocated_bytes": 8662016,
+                "end_to_end_peak_allocated_bytes": 8663040,
+                "gemm_peak_allocated_bytes": 8662016,
+                "quantization_peak_allocated_bytes": 8662528
+              },
+              "prefill_metadata_bytes": 0
+            },
+            "rows": 1,
+            "sm75_end_to_end": {
+              "p50_ms": 0.09707199782133102,
+              "p95_ms": 0.12211199849843979
+            },
+            "sm75_gemm": {
+              "p50_ms": 0.06377600133419037,
+              "p95_ms": 0.0828159973025322
+            },
+            "timing_integrity": true,
+            "timing_integrity_ratio": 0.6569968967938141
+          },
+          {
+            "activation_quantization": {
+              "p50_ms": 0.031136000528931618,
+              "p95_ms": 0.05027199909090996
+            },
+            "dense_fp16": {
+              "p50_ms": 0.041840000078082085,
+              "p95_ms": 0.06620799750089645
+            },
+            "end_to_end_p50_ratio_vs_dense": 2.51586999039607,
+            "end_to_end_p50_speedup_vs_dense": 0.39747681868194285,
+            "gemm_p50_ratio_vs_dense": 1.6210325580488418,
+            "gemm_p50_speedup_vs_dense": 0.6168907558548061,
+            "max_abs_error": 0.02848052978515625,
+            "max_abs_error_vs_dense_fp16": 0.40606212615966797,
+            "memory": {
+              "activation_fp16_bytes": 8192,
+              "activation_quantized_bytes": 4096,
+              "activation_scale_bytes": 64,
+              "dense_weight_bytes": 98304,
+              "expanded_int4_bytes": 32768,
+              "output_bytes": 3072,
+              "packed_storage_bytes": {
+                "indices_16": 32,
+                "indices_4": 256,
+                "indices_8": 96,
+                "scale_int4": 512,
+                "scale_int8": 192,
+                "weight_fp16": 8192,
+                "weight_int4": 16384,
+                "weight_int8": 12288,
+                "zero_int4": 256
+              },
+              "packed_storage_total_bytes": 38208,
+              "peak_cuda_memory": {
+                "dense_peak_allocated_bytes": 8714240,
+                "end_to_end_peak_allocated_bytes": 8720384,
+                "gemm_peak_allocated_bytes": 8715776,
+                "quantization_peak_allocated_bytes": 8717312
+              },
+              "prefill_metadata_bytes": 0
+            },
+            "rows": 8,
+            "sm75_end_to_end": {
+              "p50_ms": 0.10526400059461594,
+              "p95_ms": 0.13702400028705597
+            },
+            "sm75_gemm": {
+              "p50_ms": 0.06782400235533714,
+              "p95_ms": 0.08806400001049042
+            },
+            "timing_integrity": true,
+            "timing_integrity_ratio": 0.6443228641531055
+          },
+          {
+            "activation_quantization": {
+              "p50_ms": 0.03215999901294708,
+              "p95_ms": 0.0878399983048439
+            },
+            "dense_fp16": {
+              "p50_ms": 0.0392800010740757,
+              "p95_ms": 0.07702399790287018
+            },
+            "end_to_end_p50_ratio_vs_dense": 5.593075209037812,
+            "end_to_end_p50_speedup_vs_dense": 0.1787925180022802,
+            "gemm_p50_ratio_vs_dense": 4.33930754935559,
+            "gemm_p50_speedup_vs_dense": 0.23045151527655724,
+            "max_abs_error": 0.02967071533203125,
+            "max_abs_error_vs_dense_fp16": 0.5167551040649414,
+            "memory": {
+              "activation_fp16_bytes": 32768,
+              "activation_quantized_bytes": 16384,
+              "activation_scale_bytes": 256,
+              "dense_weight_bytes": 98304,
+              "expanded_int4_bytes": 32768,
+              "output_bytes": 12288,
+              "packed_storage_bytes": {
+                "indices_16": 32,
+                "indices_4": 256,
+                "indices_8": 96,
+                "scale_int4": 512,
+                "scale_int8": 192,
+                "weight_fp16": 8192,
+                "weight_int4": 16384,
+                "weight_int8": 12288,
+                "zero_int4": 256
+              },
+              "packed_storage_total_bytes": 38208,
+              "peak_cuda_memory": {
+                "dense_peak_allocated_bytes": 8783360,
+                "end_to_end_peak_allocated_bytes": 8807424,
+                "gemm_peak_allocated_bytes": 8790528,
+                "quantization_peak_allocated_bytes": 8794112
+              },
+              "prefill_metadata_bytes": 0
+            },
+            "rows": 32,
+            "sm75_end_to_end": {
+              "p50_ms": 0.21969600021839142,
+              "p95_ms": 0.2586880028247833
+            },
+            "sm75_gemm": {
+              "p50_ms": 0.17044800519943237,
+              "p95_ms": 0.2396160066127777
+            },
+            "timing_integrity": true,
+            "timing_integrity_ratio": 0.7758357231355897
+          },
+          {
+            "activation_quantization": {
+              "p50_ms": 0.030767999589443207,
+              "p95_ms": 0.04649600014090538
+            },
+            "dense_fp16": {
+              "p50_ms": 0.03694400005042553,
+              "p95_ms": 0.056352000683546066
+            },
+            "end_to_end_p50_ratio_vs_dense": 5.967085370244335,
+            "end_to_end_p50_speedup_vs_dense": 0.1675860052190024,
+            "gemm_p50_ratio_vs_dense": 4.5049805237519776,
+            "gemm_p50_speedup_vs_dense": 0.22197654234632494,
+            "max_abs_error": 0.0278778076171875,
+            "max_abs_error_vs_dense_fp16": 0.6250076293945312,
+            "memory": {
+              "activation_fp16_bytes": 131072,
+              "activation_quantized_bytes": 65536,
+              "activation_scale_bytes": 1024,
+              "dense_weight_bytes": 98304,
+              "expanded_int4_bytes": 32768,
+              "output_bytes": 49152,
+              "packed_storage_bytes": {
+                "indices_16": 32,
+                "indices_4": 256,
+                "indices_8": 96,
+                "scale_int4": 512,
+                "scale_int8": 192,
+                "weight_fp16": 8192,
+                "weight_int4": 16384,
+                "weight_int8": 12288,
+                "zero_int4": 256
+              },
+              "packed_storage_total_bytes": 38208,
+              "peak_cuda_memory": {
+                "dense_peak_allocated_bytes": 9060352,
+                "end_to_end_peak_allocated_bytes": 9152512,
+                "gemm_peak_allocated_bytes": 9085952,
+                "quantization_peak_allocated_bytes": 9102336
+              },
+              "prefill_metadata_bytes": 0
+            },
+            "rows": 128,
+            "sm75_end_to_end": {
+              "p50_ms": 0.22044800221920013,
+              "p95_ms": 0.2619200050830841
+            },
+            "sm75_gemm": {
+              "p50_ms": 0.1664320006966591,
+              "p95_ms": 0.20604799687862396
+            },
+            "timing_integrity": true,
+            "timing_integrity_ratio": 0.7549716895650032
+          }
+        ],
+        "status": "measured",
+        "weight_bandwidth_upper_bound_vs_fp16": 2.6666666666666665
+      }
+    },
+    "status": "measured"
+  },
+  "claims": {
+    "benchmark_scope": "native_operator_microbenchmark",
+    "full_model_qwen_quality_claimed": false
+  },
+  "environment": {
+    "capability": [
+      7,
+      5
+    ],
+    "cuda_available": true,
+    "gpu_name": "Tesla T4",
+    "python_version": "3.12.13",
+    "torch_version": "2.13.0+cu130"
+  },
+  "full_model_quality": {
+    "backend": "not_run",
+    "model_candidates": [],
+    "model_id": "Qwen/Qwen2.5-0.5B",
+    "reason": "exact Qwen2.5-0.5B config fingerprint not found under /kaggle/input",
+    "status": "unavailable_environment"
+  },
+  "gate_status": {
+    "execution": "passed",
+    "model_vllm_production": "failed",
+    "operator_production": "failed",
+    "reason": "gate evaluation complete",
+    "t4_production": "failed",
+    "terminal_decision": "no_go"
+  },
+  "gates": {
+    "auto_allocator": "passed",
+    "embedded_contract_tests": "passed",
+    "fixed_allocator": "passed",
+    "full_model_qwen_quality": "unavailable_environment",
+    "full_model_qwen_throughput": "unavailable_environment",
+    "mixed_decode_end_to_end_performance": "passed",
+    "mixed_decode_gemm_performance": "passed",
+    "mixed_prefill_end_to_end_performance": "failed",
+    "model_gate_import": "passed",
+    "model_vllm_production": "failed",
+    "operator_production": "failed",
+    "sm75_native_benchmarks": "passed",
+    "sm75_native_correctness": "passed",
+    "t4_hardware": "passed",
+    "timing_integrity": "passed",
+    "vllm_apply_path": "unavailable_environment"
+  },
+  "provenance": {
+    "algorithm": "sha256",
+    "embedded_file_count": 29,
+    "files": {
+      "mixllm/__init__.py": "f603b78d313e22c460c3d53eea26d010b78a2ef56715b6aac73976be082989c0",
+      "mixllm/kernels/cutlass_extension/mq_fine_grained_scale_zero_iterator.h": "249f2a52dcb16a5c87881c90bd92fed9ddb1cd806f55189ef476b44f9d0008ae",
+      "mixllm/kernels/cutlass_extension/mq_mma_base.h": "b3e33b9ecb47ac278ac74496d0b9647a9ac6c73ba2fcaf399feff84490f3b119",
+      "mixllm/kernels/cutlass_extension/mq_mma_pipelined_sm75.h": "6ea049fab794d9d0ff78fd209f94a13ffc9a7ed9e08293e9e496957fdbfca9d3",
+      "mixllm/kernels/cutlass_extension/mq_mma_tensor_op_dequantizer.h": "6561e623ff8e9b71052cc626158c1e9c4f248785de5b9452a6857da498ff07d1",
+      "mixllm/kernels/cutlass_extension/mq_numeric_conversion.h": "85e4203b405fdce39b0953b4ba0a7f2c93c40e034e08aa14e100a474646d6a98",
+      "mixllm/kernels/cutlass_sm75_vendor.b64": "a0a07f7fa78ba76e54742aa704c728a547fd3216f86d4c322e3f809d136a9dd4",
+      "mixllm/kernels/sm75_cutlass_testbed.h": "5a3de7e142d55c107bdeddc0b95dac5233f8bf78456957c8e3f9f2da902a398c",
+      "mixllm/kernels/three_level_sm75.cu": "ac36e1ffad7b497b05c5832eca9bb6755d6902925bb7116605d4f87e262d5c45",
+      "mixllm/model_gate.py": "be9ab1d4ee220a7707e24a80031bd47509c4fd6f2a127b9597d8daefdeea3579",
+      "mixllm/nn/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mixllm/nn/modules/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mixllm/nn/modules/mixllm_config.py": "9b9d498fa7b0ca60ccaf687999e797df4aa72a99db4fd5e2df0f21af9f77e73e",
+      "mixllm/nn/modules/ops.py": "cb24d8c8dbc600550bfde3b3299eb6e7962eb11ff5124581cae53d11ea161b72",
+      "mixllm/nn/modules/three_level_linear.py": "f62ad46e4bb0eae29d25a4876edf73e693778ae63976a13207f1c1b1ed5f03ea",
+      "mixllm/quantization/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mixllm/quantization/three_level.py": "1f618fa6a8a19989c0e4c2438431cba3032eb1bc6193c4aafcc99af6420864a8",
+      "mixllm/runtime_capability.py": "b812981827869ddd84763000c121767515668eeaf8618b0c894f3e5f7426c997",
+      "mixllm/sm75_backend.py": "7499c183436e3bc8f1b19d67592e0e14bdc94152e207a8e7817923d310a945d9",
+      "mixllm/test/test_model_gate.py": "2c34de198083b2d27f4b703e16c128a6dc5f1bd2e2f8b9b9a87fae726879f5e8",
+      "mixllm/test/test_runtime_capability.py": "344d9193b1af345aeb47d2ada0600613d5ee779f831d4b1f776a1ef241d01bcd",
+      "mixllm/test/test_sm75_backend.py": "cca511e40c630ba4a5004b7117cded1f8259baa151e7dfce3cb4f91074768cb0",
+      "mixllm/test/test_sm75_source.py": "610ad2470abd82124db335ef38df28a7af78936f4808f78893fbafc39480db7b",
+      "mixllm/test/test_three_level.py": "5f86e1ab1c9c9be49121ea56d2380483e7105cb114c81e92b6c5e564847afaa3",
+      "mixllm/test/test_v51_audit_contract.py": "cb19f7e8808ca09cfb79377da2a32a15cf2e9293f2ebe3e61dd3f02543a93a65",
+      "mixllm/test/test_vllm_three_level.py": "7bc58095c58639546622210a4f7337bca2dd6b64f0216b471da37b7b25670efc",
+      "mixllm/vllm_three_level.py": "a31a60e5837bab401501a2b21dccb70de8c95323caa201e1c7fc96fb14fde3ce",
+      "vllm_v0.9.0_patch/0002-add-mixllm-three-level-support.patch": "e9b300a6c1b5b378613ba4feddff337670f4fdfff7d113de659aae2a4cbfe810",
+      "vllm_v0.9.0_patch/THREE_LEVEL_MANIFEST.md": "319d7eac3b0da48d79c3015b13fef60ac658b9e62e8af2e559652815f9557060"
+    },
+    "mixllm_commit": "5ecc946010ab08ff1e61380a62a71a4dd830276f",
+    "mixllm_dirty": true,
+    "source_sha256": "3caeb7996eddf6c1ef9b80318c96e05b0aa638dd0b0b84f357863521dc92e0b4",
+    "workspace_commit": "5ecc946010ab08ff1e61380a62a71a4dd830276f",
+    "workspace_dirty": true
+  },
+  "schema_version": 4,
+  "target": "NVIDIA T4 / SM75",
+  "tests": {
+    "model_gate_test_embedded": true,
+    "returncode": 0
+  },
+  "vllm_apply": {
+    "patch_contract": "passed",
+    "reason": "expected vLLM 0.9.0, got '0.27.1'",
+    "status": "unavailable_environment"
+  }
+}
