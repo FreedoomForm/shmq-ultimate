@@ -123,18 +123,35 @@ __global__ void quantize_activation_sm75_kernel(
 __global__ void expand_int4_sm75_kernel(
     const uint8_t* packed, const uint8_t* zeros, int8_t* expanded,
     int channels, int width) {
-  const int linear = blockIdx.x * blockDim.x + threadIdx.x;
+  // Each thread expands eight consecutive nibbles. The checkpoint layout has
+  // an even, 128-aligned K dimension, so every word load is naturally aligned
+  // and remains inside one output channel and one zero-point group boundary.
+  constexpr int kOutputsPerThread = 8;
+  const int chunk = blockIdx.x * blockDim.x + threadIdx.x;
+  const int output_base = chunk * kOutputsPerThread;
   const int elements = channels * width;
-  if (linear >= elements) {
+  if (output_base >= elements) {
     return;
   }
-  const int channel = linear / width;
-  const int k = linear % width;
-  const uint8_t byte = packed[channel * (width / 2) + k / 2];
-  const int code = k & 1 ? byte >> 4 : byte & 0x0f;
+  const int channel = output_base / width;
+  const int k = output_base % width;
+  const uint8_t* packed_row = packed + channel * (width / 2);
+  const uint32_t word = *reinterpret_cast<const uint32_t*>(packed_row + k / 2);
+  const uint32_t low_nibbles = word & 0x0f0f0f0fu;
+  const uint32_t high_nibbles = (word >> 4) & 0x0f0f0f0fu;
   const int groups = width / kGroupSize;
-  expanded[linear] = static_cast<int8_t>(
-      code - static_cast<int>(zeros[channel * groups + k / kGroupSize]));
+  const uint32_t zero = static_cast<uint32_t>(
+      zeros[channel * groups + k / kGroupSize]);
+  const uint32_t zero_bytes = zero * 0x01010101u;
+  // __byte_perm interleaves low/high nibbles into four signed-int8 output
+  // values per word. __vsub4 is exact here because both operands are in
+  // [0,15], so the result lies in [-15,15] and cannot saturate or overflow.
+  const uint32_t first_four = __byte_perm(low_nibbles, high_nibbles, 0x5140);
+  const uint32_t last_four = __byte_perm(low_nibbles, high_nibbles, 0x7362);
+  *reinterpret_cast<uint32_t*>(expanded + output_base) =
+      __vsub4(first_four, zero_bytes);
+  *reinterpret_cast<uint32_t*>(expanded + output_base + 4) =
+      __vsub4(last_four, zero_bytes);
 }
 
 // SM75 has no Ampere mixed INT8 x INT4 MMA. Prefill reads a cached signed INT8
@@ -609,37 +626,9 @@ void run_cutlass_int_partition(
       matrix_zero, indices, output, stream);
 }
 
-void run_packed_cutlass_int4_partition(
-    const at::Tensor& input_int8, const at::Tensor& packed_int4,
-    const at::Tensor& scale_act, const at::Tensor& scale_int4,
-    const at::Tensor& zero_int4, const at::Tensor& indices_int4,
-    at::Tensor& output, int rows, int width, cudaStream_t stream) {
-  if (indices_int4.numel() == 0) {
-    return;
-  }
-  auto matrix_scale = scale_int4.transpose(0, 1).contiguous();
-  auto matrix_zero = zero_int4.transpose(0, 1).contiguous();
-  record_tensor_stream(input_int8, stream);
-  record_tensor_stream(packed_int4, stream);
-  record_tensor_stream(scale_act, stream);
-  record_tensor_stream(scale_int4, stream);
-  record_tensor_stream(zero_int4, stream);
-  record_tensor_stream(matrix_scale, stream);
-  record_tensor_stream(matrix_zero, stream);
-  record_tensor_stream(indices_int4, stream);
-  record_tensor_stream(output, stream);
-  shmq_cutlass_sm75::PackedInt4Runner::run(
-      rows, static_cast<int>(indices_int4.numel()), width,
-      const_cast<at::Tensor&>(input_int8),
-      const_cast<at::Tensor&>(packed_int4),
-      const_cast<at::Tensor&>(scale_act), matrix_scale, matrix_zero,
-      const_cast<at::Tensor&>(indices_int4), output, stream, &zero_int4);
-}
-
 void begin_integer_prefill_overlap(
-    const at::Tensor& input_int8, const at::Tensor& weight_int4,
-    const at::Tensor& scale_act, const at::Tensor& expanded_int4,
-    const at::Tensor& scale_int4,
+    const at::Tensor& input_int8, const at::Tensor& scale_act,
+    const at::Tensor& expanded_int4, const at::Tensor& scale_int4,
     const at::Tensor& zero_int4, const at::Tensor& indices_int4,
     const at::Tensor& weight_int8, const at::Tensor& scale_int8,
     const at::Tensor& indices_int8, at::Tensor& output,
@@ -660,15 +649,9 @@ void begin_integer_prefill_overlap(
   C10_CUDA_CHECK(cudaEventRecord(streams.fork, caller_stream));
   if (indices_int4.numel()) {
     C10_CUDA_CHECK(cudaStreamWaitEvent(streams.int4, streams.fork, 0));
-    if (expanded_int4.numel()) {
-      run_cutlass_int_partition(
-          input_int8, scale_act, expanded_int4, matrix_scale4, matrix_zero,
-          indices_int4, output, rows, width, streams.int4);
-    } else {
-      run_packed_cutlass_int4_partition(
-          input_int8, weight_int4, scale_act, scale_int4, zero_int4,
-          indices_int4, output, rows, width, streams.int4);
-    }
+    run_cutlass_int_partition(
+        input_int8, scale_act, expanded_int4, matrix_scale4, matrix_zero,
+        indices_int4, output, rows, width, streams.int4);
     C10_CUDA_CHECK(cudaEventRecord(streams.done_int4, streams.int4));
   }
   if (indices_int8.numel()) {
@@ -861,8 +844,8 @@ at::Tensor three_level_linear_v2_core(
     // and rows==16 remains on the validated direct-WMMA control path.
     auto& integer_streams = integer_prefill_streams(input_fp16.device().index());
     begin_integer_prefill_overlap(
-        input_int8, weight_int4, scale_act, expanded_int4, scale_int4,
-        zero_int4, indices_int4, weight_int8, scale_int8, indices_int8, output,
+        input_int8, scale_act, expanded_int4, scale_int4, zero_int4,
+        indices_int4, weight_int8, scale_int8, indices_int8, output,
         rows, width, stream.stream(), integer_streams,
         has_cached_metadata ? &cached_scale_int4 : nullptr,
         has_cached_metadata ? &cached_zero_int4 : nullptr,
@@ -1013,9 +996,12 @@ at::Tensor three_level_linear_legacy_cuda(
       : at::empty({weight_int4.size(0), input_fp16.size(1)},
                   weight_int8.options());
   const int elements = expanded_int4.numel();
-  if (input_fp16.size(0) > 1 && elements > 0) {
+  if (elements) {
+    constexpr int outputs_per_thread = 8;
     constexpr int threads = 256;
-    expand_int4_sm75_kernel<<<(elements + threads - 1) / threads, threads, 0,
+    const int chunks = (elements + outputs_per_thread - 1) /
+        outputs_per_thread;
+    expand_int4_sm75_kernel<<<(chunks + threads - 1) / threads, threads, 0,
         at::cuda::getCurrentCUDAStream()>>>(
         weight_int4.data_ptr<uint8_t>(), zero_int4.data_ptr<uint8_t>(),
         expanded_int4.data_ptr<int8_t>(), weight_int4.size(0), input_fp16.size(1));

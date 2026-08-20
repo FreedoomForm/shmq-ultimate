@@ -59,7 +59,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("timing_integrity", self.source)
 
     def test_v197_sm75_three_stage_runner_contract(self):
-        self.assertIn("template <typename Core, int Stages, bool PackedInt4 = false>", self.cutlass_testbed)
+        self.assertIn("template <typename Core, int Stages>", self.cutlass_testbed)
         self.assertIn("MQMmaPipelinedSm75<", self.cutlass_testbed)
         self.assertIn("Stages>", self.cutlass_testbed)
         self.assertIn("DefaultMmaCore<", self.cutlass_testbed)
@@ -68,7 +68,7 @@ class SM75SourceContractTest(unittest.TestCase):
     def test_v198_supported_core_three_stage_pipeline_contract(self):
         cutlass_compact = "".join(self.cutlass_testbed.split())
         self.assertIn("OpClassTensorOp,2,cutlass::arch::OpMultiplyAddSaturate>", cutlass_compact)
-        self.assertIn("usingInt8Runner=Runner<Core,2,false>", cutlass_compact)
+        self.assertIn("usingInt8Runner=Runner<Core,2>", cutlass_compact)
 
     def test_v200_integer_prefill_overlap_contract(self):
         source_compact = "".join(self.source.split())
@@ -78,21 +78,19 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("finish_integer_prefill_overlap", source_compact)
         self.assertIn("cudaStreamWaitEvent(streams.int4,streams.fork,0)", source_compact)
         self.assertIn("cudaStreamWaitEvent(streams.int8,streams.fork,0)", source_compact)
-        self.assertIn("usingInt8Runner=Runner<Core,2,false>", cutlass_compact)
+        self.assertIn("usingInt8Runner=Runner<Core,2>", cutlass_compact)
         self.assertNotIn("WideInt8Runner", source_compact)
         self.assertNotIn("WideCore", cutlass_compact)
 
-    def test_v202_pipelined_packed_int4_iterator_contract(self):
+    def test_v203_vectorized_int4_expansion_contract(self):
         source_compact = "".join(self.source.split())
-        cutlass_compact = "".join(self.cutlass_testbed.split())
-        self.assertIn("classPackedInt4Iterator", cutlass_compact)
-        self.assertIn("usingPackedInt4Runner=Runner<Core,2,true>", cutlass_compact)
-        self.assertIn("run_packed_cutlass_int4_partition", source_compact)
-        self.assertIn("PackedInt4Runner::run", source_compact)
-        self.assertIn("matrix_B.data_ptr<uint8_t>()", cutlass_compact)
-        self.assertIn("packed_zero->data_ptr<uint8_t>()", cutlass_compact)
-        self.assertIn("expanded_int4.numel()", source_compact)
-        self.assertNotIn("packed_int4_prefill_kernel", source_compact)
+        self.assertIn("constexprintkOutputsPerThread=8", source_compact)
+        self.assertIn("__byte_perm", source_compact)
+        self.assertIn("__vsub4", source_compact)
+        self.assertIn("constuint32_tword=*reinterpret_cast<constuint32_t*>", source_compact)
+        self.assertIn("constintchunks=(elements+outputs_per_thread-1)/outputs_per_thread", source_compact)
+        self.assertNotIn("classPackedInt4Iterator", self.cutlass_testbed)
+        self.assertNotIn("PackedInt4Runner", self.cutlass_testbed)
 
     def test_v193_rejected_geometry_is_not_present(self):
         cutlass_compact = "".join(self.cutlass_testbed.split())
