@@ -105,6 +105,19 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("three_level_tensorcore_kernel<kPrefillWarps>", text[cutlass_branch:])
         self.assertNotIn("kPrefillWideWarps", text)
 
+    def test_v208_cublas_mixed_int8_control_contract(self):
+        source = self.source
+        compact = "".join(source.split())
+        self.assertIn("#include <cublas_v2.h>", source)
+        self.assertIn("cublasGemmStridedBatchedEx", source)
+        self.assertIn("cublas_integer_epilogue_kernel", source)
+        self.assertIn("_three_level_linear_cublas_unchecked", source)
+        self.assertIn("combined_int8", source)
+        self.assertIn("extra_ldflags", self.backend)
+        self.assertIn("-lcublas", self.backend)
+        self.assertIn("_combined_int8_for_cublas", self.backend)
+        self.assertIn("if(combined_int8&&combined_int8->defined()", compact)
+
     def test_native_three_level_linear_forward_is_present(self):
         text = self.linear
         self.assertIn("get_device_capability", text)

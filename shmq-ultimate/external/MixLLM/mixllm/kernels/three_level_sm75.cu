@@ -11,6 +11,7 @@
 
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
+#include <cublas_v2.h>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -577,6 +578,36 @@ __global__ void three_level_decode_kernel(
 #endif
 }
 
+__global__ void cublas_integer_epilogue_kernel(
+    const int32_t* accum, const __half* scale_act,
+    const __half* scale_int4, const int32_t* indices_int4,
+    const __half* scale_int8, const int32_t* indices_int8,
+    float* output, int rows, int n4, int n8, int groups, int output_width) {
+  const int linear = blockIdx.x * blockDim.x + threadIdx.x;
+  const int nint = n4 + n8;
+  const int total = rows * nint;
+  if (linear >= total) {
+    return;
+  }
+  const int row = linear / nint;
+  const int channel = linear % nint;
+  const bool is_int4 = channel < n4;
+  const int local_channel = is_int4 ? channel : channel - n4;
+  float result = 0.0f;
+  for (int group = 0; group < groups; ++group) {
+    const int32_t dot = accum[group * total + linear];
+    const __half weight_scale = is_int4
+        ? scale_int4[local_channel * groups + group]
+        : scale_int8[local_channel * groups + group];
+    result += static_cast<float>(dot) *
+        __half2float(scale_act[group * rows + row]) *
+        __half2float(weight_scale);
+  }
+  const int output_channel = is_int4
+      ? indices_int4[local_channel] : indices_int8[local_channel];
+  output[row * output_width + output_channel] = result;
+}
+
 void check_cuda_contiguous(const at::Tensor& tensor, const char* name) {
   TORCH_CHECK(tensor.is_cuda(), name, " must be a CUDA tensor");
   TORCH_CHECK(tensor.is_contiguous(), name, " must be contiguous");
@@ -609,6 +640,55 @@ void run_cutlass_int_partition(
       matrix_zero, indices, output, stream);
 }
 
+void run_cublas_mixed_int8_prefill(
+    const at::Tensor& input_int8, const at::Tensor& combined_int8,
+    const at::Tensor& scale_act, const at::Tensor& scale_int4,
+    const at::Tensor& indices_int4, const at::Tensor& scale_int8,
+    const at::Tensor& indices_int8, at::Tensor& output, int rows, int width,
+    cudaStream_t stream) {
+  const int n4 = static_cast<int>(indices_int4.numel());
+  const int n8 = static_cast<int>(indices_int8.numel());
+  const int nint = n4 + n8;
+  const int groups = width / kGroupSize;
+  TORCH_CHECK(n4 > 0 && n8 > 0 && combined_int8.defined(),
+              "cuBLAS mixed INT8 path requires both integer partitions");
+  TORCH_CHECK(combined_int8.sizes() == at::IntArrayRef({nint, width}) &&
+                  combined_int8.scalar_type() == at::kChar,
+              "combined INT8 weights must have shape [n4+n8, K]");
+  record_tensor_stream(input_int8, stream);
+  record_tensor_stream(combined_int8, stream);
+  record_tensor_stream(scale_act, stream);
+  record_tensor_stream(scale_int4, stream);
+  record_tensor_stream(indices_int4, stream);
+  record_tensor_stream(scale_int8, stream);
+  record_tensor_stream(indices_int8, stream);
+  record_tensor_stream(output, stream);
+  auto accum = at::empty({groups, rows * nint},
+                         input_int8.options().dtype(at::kInt));
+  const int32_t alpha = 1;
+  const int32_t beta = 0;
+  cublasHandle_t handle = at::cuda::getCurrentCUDABlasHandle();
+  const cublasStatus_t status = cublasGemmStridedBatchedEx(
+      handle, CUBLAS_OP_T, CUBLAS_OP_N, nint, rows, width, &alpha,
+      combined_int8.data_ptr<int8_t>(), CUDA_R_8I, width, 0,
+      input_int8.data_ptr<int8_t>(), CUDA_R_8I, width, kGroupSize,
+      &beta, accum.data_ptr<int32_t>(), CUDA_R_32I, nint, rows * nint,
+      groups, CUBLAS_COMPUTE_32I, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
+  TORCH_CHECK(status == CUBLAS_STATUS_SUCCESS,
+              "cublasGemmStridedBatchedEx failed with status ",
+              static_cast<int>(status));
+  const int total = rows * nint;
+  cublas_integer_epilogue_kernel<<<(total + 255) / 256, 256, 0, stream>>>(
+      accum.data_ptr<int32_t>(),
+      reinterpret_cast<const __half*>(scale_act.data_ptr<at::Half>()),
+      reinterpret_cast<const __half*>(scale_int4.data_ptr<at::Half>()),
+      indices_int4.data_ptr<int32_t>(),
+      reinterpret_cast<const __half*>(scale_int8.data_ptr<at::Half>()),
+      indices_int8.data_ptr<int32_t>(), output.data_ptr<float>(), rows, n4, n8,
+      groups, static_cast<int>(output.size(1)));
+  C10_CUDA_KERNEL_LAUNCH_CHECK();
+}
+
 void begin_integer_prefill_overlap(
     const at::Tensor& input_int8, const at::Tensor& scale_act,
     const at::Tensor& expanded_int4, const at::Tensor& scale_int4,
@@ -617,9 +697,17 @@ void begin_integer_prefill_overlap(
     const at::Tensor& indices_int8, at::Tensor& output,
     int rows, int width, cudaStream_t caller_stream,
     IntegerPrefillStreams& streams,
+    const at::Tensor* combined_int8,
     const at::Tensor* cached_scale_int4,
     const at::Tensor* cached_zero_int4,
     const at::Tensor* cached_scale_int8) {
+  if (combined_int8 && combined_int8->defined() &&
+      indices_int4.numel() && indices_int8.numel()) {
+    run_cublas_mixed_int8_prefill(
+        input_int8, *combined_int8, scale_act, scale_int4, indices_int4,
+        scale_int8, indices_int8, output, rows, width, caller_stream);
+    return;
+  }
   auto matrix_scale4 = cached_scale_int4
       ? *cached_scale_int4 : scale_int4.transpose(0, 1).contiguous();
   auto matrix_scale8 = cached_scale_int8
@@ -696,7 +784,8 @@ at::Tensor three_level_linear_v2_core(
     const at::Tensor& weight_fp16, const at::Tensor& indices_fp16,
     const at::Tensor& cached_scale_int4,
     const at::Tensor& cached_zero_int4,
-    const at::Tensor& cached_scale_int8) {
+    const at::Tensor& cached_scale_int8,
+    const at::Tensor& combined_int8 = at::Tensor()) {
   const at::Tensor* tensors[] = {&input_int8, &scale_act, &weight_int4,
       &expanded_int4, &scale_int4, &zero_int4, &indices_int4, &weight_int8,
       &scale_int8, &indices_int8, &weight_fp16, &indices_fp16};
@@ -727,6 +816,14 @@ at::Tensor three_level_linear_v2_core(
           (cached_scale_int4.defined() && cached_zero_int4.defined() &&
            cached_scale_int8.defined()),
       "CUTLASS metadata cache must provide all three tensors");
+  const bool has_combined_int8 = combined_int8.defined();
+  if (has_combined_int8) {
+    check_cuda_contiguous(combined_int8, "combined_int8");
+    check_same_device(input_fp16, combined_int8, "combined_int8");
+    TORCH_CHECK(combined_int8.scalar_type() == at::kChar &&
+                    combined_int8.sizes() == at::IntArrayRef({n4 + n8, width}),
+                "combined_int8 must have shape [n4+n8, width] and dtype int8");
+  }
   if (has_cached_metadata) {
     check_cuda_contiguous(cached_scale_int4, "cached_scale_int4");
     check_cuda_contiguous(cached_zero_int4, "cached_zero_int4");
@@ -830,6 +927,7 @@ at::Tensor three_level_linear_v2_core(
         input_int8, scale_act, expanded_int4, scale_int4, zero_int4,
         indices_int4, weight_int8, scale_int8, indices_int8, output,
         rows, width, stream.stream(), integer_streams,
+        has_combined_int8 ? &combined_int8 : nullptr,
         has_cached_metadata ? &cached_scale_int4 : nullptr,
         has_cached_metadata ? &cached_zero_int4 : nullptr,
         has_cached_metadata ? &cached_scale_int8 : nullptr);
@@ -938,6 +1036,22 @@ at::Tensor three_level_linear_v3_unchecked_cuda(
       cached_scale_int8);
 }
 
+at::Tensor three_level_linear_cublas_unchecked_cuda(
+    const at::Tensor& input_fp16, const at::Tensor& input_int8,
+    const at::Tensor& scale_act, const at::Tensor& weight_int4,
+    const at::Tensor& expanded_int4, const at::Tensor& scale_int4,
+    const at::Tensor& zero_int4,
+    const at::Tensor& indices_int4, const at::Tensor& weight_int8,
+    const at::Tensor& scale_int8, const at::Tensor& indices_int8,
+    const at::Tensor& weight_fp16, const at::Tensor& indices_fp16,
+    const at::Tensor& combined_int8) {
+  return three_level_linear_v2_core(
+      input_fp16, input_int8, scale_act, weight_int4, expanded_int4, scale_int4,
+      zero_int4, indices_int4, weight_int8, scale_int8, indices_int8,
+      weight_fp16, indices_fp16, at::Tensor(), at::Tensor(), at::Tensor(),
+      combined_int8);
+}
+
 at::Tensor three_level_linear_v3_cuda(
     const at::Tensor& input_fp16, const at::Tensor& input_int8,
     const at::Tensor& scale_act, const at::Tensor& weight_int4,
@@ -1011,6 +1125,11 @@ TORCH_LIBRARY(mixllm_sm75, m) {
         "Tensor zero_int4, Tensor indices_int4, Tensor weight_int8, "
         "Tensor scale_int8, Tensor indices_int8, Tensor weight_fp16, "
         "Tensor indices_fp16) -> Tensor");
+  m.def("_three_level_linear_cublas_unchecked(Tensor input_fp16, Tensor input_int8, "
+        "Tensor scale_act, Tensor weight_int4, Tensor expanded_int4, "
+        "Tensor scale_int4, Tensor zero_int4, Tensor indices_int4, "
+        "Tensor weight_int8, Tensor scale_int8, Tensor indices_int8, "
+        "Tensor weight_fp16, Tensor indices_fp16, Tensor combined_int8) -> Tensor");
   m.def("_three_level_linear_v3_unchecked(Tensor input_fp16, Tensor input_int8, "
         "Tensor scale_act, Tensor weight_int4, Tensor expanded_int4, "
         "Tensor scale_int4, Tensor zero_int4, Tensor indices_int4, "
@@ -1035,6 +1154,7 @@ TORCH_LIBRARY_IMPL(mixllm_sm75, CUDA, m) {
   m.impl("quantize_activation", &quantize_activation_sm75);
   m.impl("_three_level_linear_v2_unchecked", &three_level_linear_v2_unchecked_cuda);
   m.impl("three_level_linear_v2", &three_level_linear_v2_cuda);
+  m.impl("_three_level_linear_cublas_unchecked", &three_level_linear_cublas_unchecked_cuda);
   m.impl("_three_level_linear_v3_unchecked", &three_level_linear_v3_unchecked_cuda);
   m.impl("three_level_linear_v3", &three_level_linear_v3_cuda);
   m.impl("three_level_linear", &three_level_linear_legacy_cuda);

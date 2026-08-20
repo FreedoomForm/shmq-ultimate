@@ -76,6 +76,7 @@ def load_sm75_backend(torch_module, build_directory: Optional[str | Path] = None
             )
     kwargs = {
         "extra_include_paths": [str(vendor_include)],
+        "extra_ldflags": ["-lcublas"],
     }
     if build_directory is not None:
         directory = Path(build_directory)
@@ -222,6 +223,33 @@ def _expanded_int4_for_prefill(module, x, torch_module):
     return expanded
 
 
+def _combined_int8_for_cublas(module, x, torch_module):
+    """Cache the zero-subtracted INT4 rows concatenated with INT8 rows."""
+    if (
+        x.shape[0] < 32
+        or not module.indices_4.numel()
+        or not module.indices_8.numel()
+    ):
+        return module.weight_int8[:0]
+    expanded = _expanded_int4_for_prefill(module, x, torch_module)
+    signature = (
+        x.device,
+        id(expanded), int(expanded._version), tuple(expanded.shape),
+        id(module.weight_int8), int(module.weight_int8._version),
+        tuple(module.weight_int8.shape),
+    )
+    cached = getattr(module, "_sm75_combined_int8", None)
+    if cached is not None and cached[0] == signature:
+        return cached[1]
+    if x.is_cuda and torch_module.cuda.is_current_stream_capturing():
+        raise RuntimeError(
+            "SM75 combined INT8 cache must be initialized before CUDA graph capture"
+        )
+    combined = torch_module.cat((expanded, module.weight_int8), dim=0).contiguous()
+    module._sm75_combined_int8 = (signature, combined)
+    return combined
+
+
 def _prefill_metadata_for_cutlass(module, x, torch_module):
     """Cache CUTLASS's [groups, channels] prefill metadata layout.
 
@@ -307,6 +335,14 @@ def three_level_linear_prequantized(module, x, input_int8, scale_act, torch_modu
         *(tensor if tensor.is_contiguous() else tensor.contiguous()
           for tensor in packed_tensors[1:]),
     )
+    combined_int8 = _combined_int8_for_cublas(module, x, torch_module)
+    native_cublas = getattr(
+        torch_module.ops.mixllm_sm75,
+        "_three_level_linear_cublas_unchecked",
+        None,
+    )
+    if combined_int8.numel() and native_cublas is not None:
+        return native_cublas(*arguments, combined_int8)
     if _use_v188_mixed_prefill_path(module, x, torch_module):
         return torch_module.ops.mixllm_sm75._three_level_linear_v2_unchecked(*arguments)
     if x.shape[0] >= 32 and (module.indices_4.numel() or module.indices_8.numel()):
@@ -447,6 +483,8 @@ def benchmark_sm75_backend(
         expanded_tensor = expanded_cache[1] if expanded_cache is not None else None
         metadata_cache = getattr(module, "_sm75_prefill_metadata", None)
         metadata_tensors = metadata_cache[1:] if metadata_cache is not None else ()
+        combined_cache = getattr(module, "_sm75_combined_int8", None)
+        combined_tensor = combined_cache[1] if combined_cache is not None else None
         operator_reference = quantized_reference_prequantized(
             module, x, input_int8, scale_act, torch_module,
         )
@@ -518,6 +556,9 @@ def benchmark_sm75_backend(
                 ),
                 "prefill_metadata_bytes": sum(
                     tensor_bytes(tensor) for tensor in metadata_tensors
+                ),
+                "combined_int8_bytes": (
+                    tensor_bytes(combined_tensor) if combined_tensor is not None else 0
                 ),
                 "output_bytes": tensor_bytes(actual),
                 "peak_cuda_memory": peak_memory,
