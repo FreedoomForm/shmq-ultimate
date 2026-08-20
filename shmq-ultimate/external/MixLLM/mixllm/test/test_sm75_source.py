@@ -53,6 +53,15 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("_three_level_linear_v2_unchecked(*arguments)", self.backend)
         self.assertIn("_use_v188_mixed_prefill_path(module, x, torch_module)", self.backend)
 
+    def test_cached_v2_metadata_adapter_contract(self):
+        compact = "".join(self.source.split())
+        backend_compact = "".join(self.backend.split())
+        self.assertIn("_three_level_linear_v2_cached_unchecked", compact)
+        self.assertIn("three_level_linear_v2_cached_unchecked_cuda", self.source)
+        self.assertIn("_prefill_metadata_for_cutlass(module,x,torch_module)", backend_compact)
+        self.assertIn("cached_v2(*arguments,*metadata[1:])", backend_compact)
+        self.assertIn("returntorch_module.ops.mixllm_sm75._three_level_linear_v2_unchecked(*arguments)", backend_compact)
+
     def test_v196_timing_integrity_contract(self):
         self.assertIn("timing_integrity_ratio", self.backend)
         self.assertIn("timing_integrity", self.backend)
@@ -70,13 +79,6 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("OpClassTensorOp,2,cutlass::arch::OpMultiplyAddSaturate>", cutlass_compact)
         self.assertIn("usingInt8Runner=Runner<Core,2>", cutlass_compact)
 
-    def test_v213_k128_metadata_contract(self):
-        pipeline = self.cutlass_pipeline
-        compact = "".join(pipeline.split())
-        self.assertIn("static_assert(Shape::kK==64||Shape::kK==128)", compact)
-        self.assertIn("ifconstexpr(Shape::kK==64)", compact)
-        self.assertIn("row_groupsize64_+=2", compact)
-
     def test_v200_integer_prefill_overlap_contract(self):
         source_compact = "".join(self.source.split())
         cutlass_compact = "".join(self.cutlass_testbed.split())
@@ -86,9 +88,8 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("cudaStreamWaitEvent(streams.int4,streams.fork,0)", source_compact)
         self.assertIn("cudaStreamWaitEvent(streams.int8,streams.fork,0)", source_compact)
         self.assertIn("usingInt8Runner=Runner<Core,2>", cutlass_compact)
-        self.assertIn("usingKWideInt8Runner=Runner<KWideCore,2>", cutlass_compact)
-        self.assertIn("KWideInt8Runner::run", source_compact)
-        self.assertIn("channels>=128", source_compact)
+        self.assertNotIn("WideInt8Runner", source_compact)
+        self.assertNotIn("WideCore", cutlass_compact)
 
     def test_v193_rejected_geometry_is_not_present(self):
         cutlass_compact = "".join(self.cutlass_testbed.split())
