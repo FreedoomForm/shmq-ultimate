@@ -29,3 +29,11 @@ The upstream `mma_multistage_testbed.h` defines `ElementA=int8_t`, `ElementB_INT
 ## Proof obligations
 
 The next candidate must prove (1) the permutation is an involution or has a deterministic inverse, (2) CPU reference output is identical after permuting and undoing the layout, (3) partition scatter and metadata group order remain unchanged, (4) cache invalidation tracks the transformed tensor, (5) no candidate is used during graph capture, and (6) all local tests pass before a single T4 run.
+
+## External primary-source cross-check
+
+NVIDIA's Turing architecture article confirms that Turing Tensor Cores introduced INT8 and INT4 precision modes for inference workloads, so the T4 hardware capability itself is real. The PTX ISA reference is the authoritative source for the exact `mma.sync` shapes and datatypes; the implementation decision remains restricted to forms documented for compute capability 7.5 rather than relying on secondary summaries.
+
+Sources: [NVIDIA Turing Architecture In-Depth](https://developer.nvidia.com/blog/nvidia-turing-architecture-in-depth/); [NVIDIA PTX ISA 9.3](https://docs.nvidia.com/cuda/parallel-thread-execution/index.html).
+
+The PTX ISA explicitly states that `.u4/.s4` integer `mma` with shape `m8n8k32` requires `sm_75` or higher, while the larger `m16n8k32` and `m16n8k64` 4-bit forms require `sm_80` or higher. Its documented SM75 example is `mma.sync.aligned.m8n8k32.row.col.satfinite.s32.u4.u4.s32`; the source-level CUTLASS audit separately enumerates the legal signed/unsigned operand combinations. This confirms the architectural boundary: use the SM75 `m8n8k32` family, never the upstream SM80 `m16n8k32` mixed-input internal operator.
