@@ -1214,3 +1214,11 @@ Kaggle v253 (server 248) compiled and passed native correctness, mixed-stride co
 Deep research found the original MixLLM configuration family includes the transposed large-M `M=128,N=64,K=64` shape. v254 adds a matching SM75 stage-2 `DefaultMmaCore`/runner with the existing legal `8x8x16` instruction, exposes it as a third exact-shape tuner candidate, accepts it in the disk cache, and bumps the tuning ABI to 254. N=128 and N=64 remain fallbacks. No arithmetic, quantization, metadata, stream/event, output ABI, model, benchmark, or quality setting changed.
 
 Local validation: focused source/backend tests passed (38 tests, 6 CUDA-only skips), full MixLLM suite passed (85 tests, 6 CUDA-only skips), and native INT4 CPU proof passed. Kaggle has not yet been run for v254.
+
+## v254 — Kaggle T4 result (kernel version 249)
+
+The v254 notebook was successfully pushed as Kaggle kernel version 249 after the initial wrapper invocation was diagnosed as having left the previous output unchanged. The final log's JIT extension digest matched the committed source exactly: `f5c2a7a975e5841c`.
+
+Compilation and functional checks passed: T4 hardware, embedded contracts, SM75 native benchmarks, native correctness, mixed-stride probe (`[128.0, 128.0, 128.0, 128.0]`), and timing integrity. The new M=128,N=64 tuner candidate compiled and executed, but the required performance gates still failed. On Qwen/Qwen2.5-0.5B mixed 4/8/16, end-to-end speedup versus the identical dense FP16 baseline was 0.768x at rows=1, 0.283x at rows=16, and 0.090x at rows=128; rows=128 end-to-end ratio was 11.148x. `terminal_decision` was `no_go`. The M=128,N=64 candidate is rejected as a production baseline; it improved rows=128 relative to v253's 0.077x but remains far from the 2.6x target and does not pass the gates.
+
+No benchmark settings, model, computation, or quality checks were changed. Next iteration must begin with deep source research focused on the original MixLLM's direct interleaved INT4 dataflow versus SHMQ's expanded signed-INT8 prefill cache and hot-path overhead, with no Kaggle run during repairs.
