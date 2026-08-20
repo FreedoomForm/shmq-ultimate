@@ -1160,3 +1160,9 @@ Deep research found that upstream MixLLM searches N=64/128/256 families, while S
 Repair: add `CoreN256 = GemmShape<32,256,64>` with the existing `WarpShape<32,32,64>`, instruction `<8,8,16>`, row-major accumulator, and matching stage-2 `Int8RunnerN256`. Extend the exact-shape tuner to test N=128/N=64/N=256 and bump the tuning ABI from 226 to 227 so stale disk choices cannot hide the new candidate. The existing N=128 path remains the deterministic fallback when tuning is unavailable. No arithmetic, quantization, output ABI, streams/events, benchmark settings, model, or quality thresholds changed.
 
 Local validation: source contracts passed (19 tests), full MixLLM suite passed (85 tests, 6 CUDA-only skips), and the native INT4 CPU proof passed. Kaggle has not yet been run for v246.
+
+## v247 — Reject N=256 CUTLASS candidate at compile time and restore v245
+
+Kaggle server version 242 (v246) failed before runtime. nvcc reported `pitch_linear_thread_map.h(298): static assertion failed with "Number of iterations must be non-zero"` for `DefaultMmaCore<GemmShape<32,256,64>, GemmShape<32,32,64>, ...>`, with the row-major SM75 A-side map instantiated as `PitchLinearShape<64,32>, Threads=256, WarpThreadArrangement=<4,8>, ElementsPerAccess=16`. The extra eight-warp N=256 shape collapses an iterator dimension to zero in the vendored SM75 specialization.
+
+Deep research also verified that upstream N=256 entries belong to its separate row-major configuration family and are not a drop-in equivalent of the generic N=128 family mirrored here. The N=256 alias, tuner choice, and ABI bump are therefore removed entirely. Local validation after rollback: source contracts passed (19 tests), full MixLLM suite passed (85 tests, 6 CUDA-only skips), and the native INT4 CPU proof passed. No replacement Kaggle run was submitted for the compile-failing candidate.
