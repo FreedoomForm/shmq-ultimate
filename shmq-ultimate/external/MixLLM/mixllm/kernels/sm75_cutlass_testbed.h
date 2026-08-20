@@ -223,4 +223,15 @@ using CoreN64 = cutlass::gemm::threadblock::DefaultMmaCore<
 
 using Int8RunnerN64 = Runner<CoreN64, 2>;
 
+// Upstream-compatible M=64,N=64,K=64 family. It keeps the supported
+// stage-2 SM75 core and four-warps-per-CTA contract.
+using CoreM64N64 = cutlass::gemm::threadblock::DefaultMmaCore<
+    cutlass::gemm::GemmShape<64, 64, 64>,
+    cutlass::gemm::GemmShape<32, 32, 64>,
+    cutlass::gemm::GemmShape<8, 8, 16>,
+    ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC,
+    cutlass::arch::OpClassTensorOp, 2, cutlass::arch::OpMultiplyAddSaturate>;
+
+using Int8RunnerM64N64 = Runner<CoreM64N64, 2>;
+
 }  // namespace shmq_cutlass_sm75

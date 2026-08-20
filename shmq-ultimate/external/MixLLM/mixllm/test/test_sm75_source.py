@@ -142,11 +142,15 @@ class SM75SourceContractTest(unittest.TestCase):
         source_compact = "".join(self.source.split())
         cutlass_compact = "".join(self.cutlass_testbed.split())
         self.assertIn("GemmShape<32,64,64>", cutlass_compact)
+        self.assertIn("GemmShape<64,64,64>", cutlass_compact)
         self.assertIn("usingInt8RunnerN64=Runner<CoreN64,2>", cutlass_compact)
+        self.assertIn("usingInt8RunnerM64N64=Runner<CoreM64N64,2>", cutlass_compact)
         self.assertIn("enumclassCutlassConfig", source_compact)
         self.assertIn("cutlass_tuning_key", source_compact)
         self.assertIn("cudaEventElapsedTime", source_compact)
         self.assertIn("SHMQ_SM75_TUNE_CACHE", source_compact)
+        self.assertIn("kCutlassTuningAbi=228", source_compact)
+        self.assertIn("kM64N64", source_compact)
         self.assertIn("cudaStreamIsCapturing", source_compact)
 
     def test_v200_integer_prefill_overlap_contract(self):

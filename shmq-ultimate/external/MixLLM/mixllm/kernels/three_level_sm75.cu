@@ -70,9 +70,10 @@ IntegerPrefillStreams& integer_prefill_streams(int device_index) {
 enum class CutlassConfig : int {
   kN128 = 0,
   kN64 = 1,
+  kM64N64 = 2,
 };
 
-constexpr int kCutlassTuningAbi = 226;
+constexpr int kCutlassTuningAbi = 228;
 constexpr int kCutlassTuningWarmup = 2;
 constexpr int kCutlassTuningIterations = 4;
 std::mutex g_cutlass_tuning_mutex;
@@ -106,7 +107,8 @@ bool load_cutlass_tuning_from_disk(
   while (input >> stored_key >> stored_config) {
     if (stored_key == key &&
         (stored_config == static_cast<int>(CutlassConfig::kN128) ||
-         stored_config == static_cast<int>(CutlassConfig::kN64))) {
+         stored_config == static_cast<int>(CutlassConfig::kN64) ||
+         stored_config == static_cast<int>(CutlassConfig::kM64N64))) {
       config = static_cast<CutlassConfig>(stored_config);
       return true;
     }
@@ -140,6 +142,10 @@ void run_cutlass_config(
     at::Tensor& output, cudaStream_t stream) {
   if (config == CutlassConfig::kN64) {
     shmq_cutlass_sm75::Int8RunnerN64::run(
+      rows, channels, width, input_int8, weight, scale_act, matrix_scale,
+      matrix_zero, indices, output, stream);
+  } else if (config == CutlassConfig::kM64N64) {
+    shmq_cutlass_sm75::Int8RunnerM64N64::run(
       rows, channels, width, input_int8, weight, scale_act, matrix_scale,
       matrix_zero, indices, output, stream);
   } else {
@@ -177,7 +183,7 @@ CutlassConfig select_cutlass_config(
 
   CutlassConfig best = CutlassConfig::kN128;
   float best_ms = std::numeric_limits<float>::infinity();
-  for (CutlassConfig candidate : {CutlassConfig::kN128, CutlassConfig::kN64}) {
+  for (CutlassConfig candidate : {CutlassConfig::kN128, CutlassConfig::kN64, CutlassConfig::kM64N64}) {
     cudaEvent_t begin = nullptr;
     cudaEvent_t end = nullptr;
     C10_CUDA_CHECK(cudaEventCreate(&begin));

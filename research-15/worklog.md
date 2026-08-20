@@ -1166,3 +1166,11 @@ Local validation: source contracts passed (19 tests), full MixLLM suite passed (
 Kaggle server version 242 (v246) failed before runtime. nvcc reported `pitch_linear_thread_map.h(298): static assertion failed with "Number of iterations must be non-zero"` for `DefaultMmaCore<GemmShape<32,256,64>, GemmShape<32,32,64>, ...>`, with the row-major SM75 A-side map instantiated as `PitchLinearShape<64,32>, Threads=256, WarpThreadArrangement=<4,8>, ElementsPerAccess=16`. The extra eight-warp N=256 shape collapses an iterator dimension to zero in the vendored SM75 specialization.
 
 Deep research also verified that upstream N=256 entries belong to its separate row-major configuration family and are not a drop-in equivalent of the generic N=128 family mirrored here. The N=256 alias, tuner choice, and ABI bump are therefore removed entirely. Local validation after rollback: source contracts passed (19 tests), full MixLLM suite passed (85 tests, 6 CUDA-only skips), and the native INT4 CPU proof passed. No replacement Kaggle run was submitted for the compile-failing candidate.
+
+## v248 — Add legal stage-2 M=64,N=64 CUTLASS tuner candidate (local validation complete)
+
+Deep research compared the v245/v247 baseline with upstream `gemm_configs` and `gemm_configs_rm`, which both include M=64,N=64,K=64 families. Unlike the rejected N=256 shape, M=64,N=64 with the existing 32x32 warp tile produces four warps per CTA and respects the vendored SM75 thread-map contract. The earlier M=64,N=128 experiment was rejected, but that result does not invalidate this smaller N family.
+
+Repair: add `CoreM64N64` and `Int8RunnerM64N64`, extend the exact-shape CUDA-event tuner to N=128/N=64/M64N64, and bump the tuning ABI to 228. The existing N=128 and N=64 runners remain deterministic fallbacks. No arithmetic, quantization, metadata ABI, streams/events, output mapping, benchmark settings, model, or quality thresholds changed.
+
+Local validation: source contracts passed (19 tests), full MixLLM suite passed (85 tests, 6 CUDA-only skips), and the native INT4 CPU proof passed. Kaggle has not yet been run for v248.
