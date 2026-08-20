@@ -1230,3 +1230,11 @@ Deep research against the official Microsoft MixLLM repository found that upstre
 v255 changes only that dispatch selector to `false` for the mixed large-M branch and adds a source contract requiring the false selector while retaining the native pair only for pure INT4. No arithmetic, model, benchmark, layout ABI, quality, or gate threshold changed. Deep-research note: research-15/v255_deep_research_original_vs_sm75.md.
 
 Local validation passed: focused source/backend tests 38 passed with 6 CUDA-only skips; full suite 85 passed with 6 CUDA-only skips; native INT4 CPU proof passed; git diff check passed. Kaggle has not been run for v255.
+
+## v255 — Kaggle T4 result (kernel version 250)
+
+The v255 notebook was pushed as Kaggle kernel version 250 and completed with an exact source-digest match (`2b0271651ba37071`). Compilation, embedded contracts, T4 hardware, native SM75 correctness, native benchmarks, and the mixed-stride probe passed. The dispatch correction successfully routed mixed large-M INT4 through staged CUTLASS rather than the native pair path.
+
+The required performance gates still failed, and timing integrity failed. Qwen/Qwen2.5-0.5B mixed 4/8/16 measured end-to-end speedups of 0.870x at rows=1, 0.282x at rows=16, and 0.401x at rows=128; rows=128 end-to-end ratio was 2.493x. The rows=128 end-to-end p50 was 0.408 ms while the reported staged integer GEMM p50 was 0.826 ms, triggering the timing-integrity failure. `terminal_decision` was `no_go`. v255 is rejected and cannot replace the accepted baseline.
+
+The result confirms that the dispatch inconsistency was real but correcting it did not satisfy the gates; it also exposed a timing/stream measurement issue in the restored staged overlap path that must be researched before further optimization. No benchmark or quality settings changed.
