@@ -126,11 +126,6 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertEqual(source_compact.count("channel_base+warp*8+local_channel_base+register_index"), 2)
         self.assertIn("output[row*output_width+indices_int4[channel]]=partial[row_tile][register_index]", source_compact)
 
-    def test_v242_mixed_prefill_uses_native_int4_pair_dispatch(self):
-        source_compact = "".join(self.source.split())
-        self.assertIn("has_cached_metadata?&cached_scale_int8:nullptr,n4>0)", source_compact)
-        self.assertIn("PreserveupstreamMixLLM'sstagedINT4/INT8overlap", source_compact)
-
     def test_v229_fused_int4_dispatch_contract(self):
         source_compact = "".join(self.source.split())
         self.assertIn("__global__voidsm75_int4_pair_gemm_kernel", source_compact)
@@ -138,8 +133,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("use_fused_int4", source_compact)
         self.assertIn("n4>0&&n8==0&&n16==0&&!has_cached_metadata", source_compact)
         self.assertIn("n4>0&&n8==0&&n16==0&&!has_cached_metadata", source_compact)
-        self.assertIn("has_cached_metadata?&cached_scale_int8:nullptr,n4>0)", source_compact)
-        self.assertIn("use_fused_int4=false", source_compact)
+        self.assertIn("has_cached_metadata?&cached_scale_int8:nullptr,false)", source_compact)
         self.assertIn("low_mma(low_accum,low_a,weights,low_accum)", source_compact)
         self.assertIn("high_mma(high_accum,high_a,weights,high_accum)", source_compact)
         self.assertIn("16*high_accum[row_tile][register_index]-correction", source_compact)

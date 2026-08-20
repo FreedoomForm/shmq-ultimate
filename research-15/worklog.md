@@ -1127,3 +1127,9 @@ Deep research compared the completed v241 Kaggle run with upstream `mix_mma_mult
 Repair: keep the upstream-style two auxiliary streams, INT8 CUTLASS branch, FP16 caller-stream branch, exact channel/index ABI, and all existing fallbacks, but pass `n4 > 0` as `use_fused_int4` for the rows>=32 mixed path so the T4-validated packed native INT4 pair kernel handles the INT4 branch. Cached metadata remains accepted by the ABI but is not needed by the fused INT4 branch. No weights, activations, quality checks, benchmark settings, or model selection changed.
 
 Local validation: full repository MixLLM suite passed (86 tests, 6 CUDA-only skips), the v230 native INT4 reference proof passed, and the added v242 source contract passed. Kaggle has not yet been run for v242; the candidate must be committed, notebook rebuilt, and submitted exactly once only after final local review.
+
+## v243 — Reject v242 fused mixed dispatch and restore v241
+
+Kaggle server version 240 (v242) compiled and passed the mixed-stride probe, embedded contracts, SM75 native correctness, mixed decode GEMM, and timing integrity. It failed both end-to-end gates. On Qwen mixed QKV `{4: 2400, 8: 896, 16: 288}`, rows=1 was 1.23x dense, rows=16 was 3.52x, and rows=128 was 16.62x end-to-end. The v241 measured path was approximately 1.28x, 3.55x, and 3.24x respectively. The v242 production switch is therefore rejected and is not retained.
+
+Deep research found the cause is architectural: the native pair kernel is a correctness-proven 32x32 small-tile path where each warp owns 8 channels and iterates four row subtiles. At Qwen K=3584, mixed large-M work repeatedly reloads small A/B panels and serializes row subtiles, unlike upstream MixLLM's shape-tuned staged CUTLASS threadblock dataflow. The fused kernel remains retained only for the pure-INT4 candidate and diagnostic probes. Mixed rows>=32 is restored to `use_fused_int4=false`, the last measured v241 behavior.
