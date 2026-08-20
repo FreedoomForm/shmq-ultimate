@@ -46,7 +46,7 @@ def provenance(sources):
             "workspace_commit": git(["rev-parse", "HEAD"], ROOT),
             "mixllm_commit": git(["rev-parse", "HEAD"], FORK),
             "workspace_dirty": git_dirty(ROOT, (NOTEBOOK,)),
-            "mixllm_dirty": git_dirty(FORK)}
+            "mixllm_dirty": git_dirty(FORK, (NOTEBOOK,))}
 def cell(kind, source):
     result = {"cell_type": kind, "id": hashlib.sha256((kind+"\0"+source).encode()).hexdigest()[:12],
               "metadata": {}, "source": source.splitlines(True)}
