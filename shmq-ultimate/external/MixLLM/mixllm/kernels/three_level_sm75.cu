@@ -137,6 +137,98 @@ __global__ void expand_int4_sm75_kernel(
       code - static_cast<int>(zeros[channel * groups + k / kGroupSize]));
 }
 
+// Expansion-free large-M INT4 path. SM75 still performs signed INT8 WMMA,
+// but decodes the packed nibble and subtracts its group zero while filling the
+// same shared-memory B tile that the expanded path consumes.
+template <int PrefillWarps = kPrefillWarps>
+__global__ void packed_int4_prefill_kernel(
+    const int8_t* input_int8, const uint8_t* packed_int4,
+    const __half* scale_act, const __half* scale_int4,
+    const uint8_t* zero_int4, const int32_t* indices_int4, float* output,
+    int rows, int width, int output_width, int n4) {
+#if __CUDA_ARCH__ >= 750
+  constexpr int prefill_channels = PrefillWarps * kTile;
+  const int tile_id = blockIdx.x;
+  const int row_base = blockIdx.y * kTile;
+  const int warp = threadIdx.x / kWarpSize;
+  const int lane = threadIdx.x % kWarpSize;
+  const int channel_base = tile_id * prefill_channels + warp * kTile;
+  const int groups = width / kGroupSize;
+
+  __shared__ __align__(16) int8_t a_int8[kTile * kTile];
+  __shared__ __align__(16) int8_t b_int8[PrefillWarps][kTile * kTile];
+  __shared__ __align__(16) int accumulator_int[PrefillWarps][kTile * kTile];
+  float scaled_accumulators[kTile * kTile / kWarpSize] = {};
+
+  for (int group = 0; group < groups; ++group) {
+    for (int group_k = 0; group_k < kGroupSize; group_k += kTile) {
+      const int k_base = group * kGroupSize + group_k;
+      for (int linear = threadIdx.x; linear < kTile * kTile;
+           linear += blockDim.x) {
+        const int tile_row = linear / kTile;
+        const int tile_col = linear % kTile;
+        const int row = row_base + tile_row;
+        a_int8[linear] = row < rows
+            ? input_int8[row * width + k_base + tile_col]
+            : int8_t{0};
+      }
+      __syncthreads();
+      for (int linear = lane; linear < kTile * kTile;
+           linear += kWarpSize) {
+        const int tile_row = linear / kTile;
+        const int tile_col = linear % kTile;
+        const int channel = channel_base + tile_col;
+        int8_t value = 0;
+        if (channel < n4) {
+          const int k = k_base + tile_row;
+          const uint8_t byte = packed_int4[channel * (width / 2) + k / 2];
+          const int code = k & 1 ? byte >> 4 : byte & 0x0f;
+          value = static_cast<int8_t>(
+              code - static_cast<int>(zero_int4[channel * groups + group]));
+        }
+        b_int8[warp][tile_col * kTile + tile_row] = value;
+      }
+      __syncthreads();
+      wmma::fragment<wmma::accumulator, kTile, kTile, kTile, int> accumulator;
+      wmma::fill_fragment(accumulator, 0);
+      wmma::fragment<wmma::matrix_a, kTile, kTile, kTile, signed char,
+                     wmma::row_major> a;
+      wmma::fragment<wmma::matrix_b, kTile, kTile, kTile, signed char,
+                     wmma::col_major> b;
+      wmma::load_matrix_sync(a, reinterpret_cast<signed char*>(a_int8), kTile);
+      wmma::load_matrix_sync(
+          b, reinterpret_cast<signed char*>(b_int8[warp]), kTile);
+      wmma::mma_sync(accumulator, a, b, accumulator);
+      __syncthreads();
+      wmma::store_matrix_sync(accumulator_int[warp], accumulator, kTile,
+                              wmma::mem_row_major);
+      __syncwarp();
+      for (int linear = lane, item = 0; linear < kTile * kTile;
+           linear += kWarpSize, ++item) {
+        const int row = row_base + linear / kTile;
+        const int channel = channel_base + linear % kTile;
+        if (row < rows && channel < n4) {
+          const float as = __half2float(scale_act[group * rows + row]);
+          const float ws = __half2float(scale_int4[channel * groups + group]);
+          scaled_accumulators[item] +=
+              static_cast<float>(accumulator_int[warp][linear]) * as * ws;
+        }
+      }
+      __syncthreads();
+    }
+  }
+  for (int linear = lane, item = 0; linear < kTile * kTile;
+       linear += kWarpSize, ++item) {
+    const int row = row_base + linear / kTile;
+    const int channel = channel_base + linear % kTile;
+    if (row < rows && channel < n4) {
+      output[row * output_width + indices_int4[channel]] =
+          scaled_accumulators[item];
+    }
+  }
+#endif
+}
+
 // SM75 has no Ampere mixed INT8 x INT4 MMA. Prefill reads a cached signed INT8
 // expansion while decode continues to consume the packed checkpoint weights.
 template <int PrefillWarps = kPrefillWarps>
@@ -609,19 +701,54 @@ void run_cutlass_int_partition(
       matrix_zero, indices, output, stream);
 }
 
-void begin_integer_prefill_overlap(
-    const at::Tensor& input_int8, const at::Tensor& scale_act,
-    const at::Tensor& expanded_int4, const at::Tensor& scale_int4,
+void run_packed_int4_partition(
+    const at::Tensor& input_int8, const at::Tensor& packed_int4,
+    const at::Tensor& scale_act, const at::Tensor& scale_int4,
     const at::Tensor& zero_int4, const at::Tensor& indices_int4,
-    const at::Tensor& weight_int8, const at::Tensor& scale_int8,
-    const at::Tensor& indices_int8, at::Tensor& output,
-    int rows, int width, cudaStream_t caller_stream,
-    IntegerPrefillStreams& streams,
+    at::Tensor& output, int rows, int width, int output_width,
+    cudaStream_t stream) {
+  if (indices_int4.numel() == 0) {
+    return;
+  }
+  record_tensor_stream(input_int8, stream);
+  record_tensor_stream(packed_int4, stream);
+  record_tensor_stream(scale_act, stream);
+  record_tensor_stream(scale_int4, stream);
+  record_tensor_stream(zero_int4, stream);
+  record_tensor_stream(indices_int4, stream);
+  record_tensor_stream(output, stream);
+  const dim3 grid(
+      (static_cast<int>(indices_int4.numel()) + kPrefillChannels - 1) /
+          kPrefillChannels,
+      (rows + kTile - 1) / kTile);
+  packed_int4_prefill_kernel<kPrefillWarps>
+      <<<grid, kPrefillWarps * kWarpSize, 0, stream>>>(
+          input_int8.data_ptr<int8_t>(), packed_int4.data_ptr<uint8_t>(),
+          reinterpret_cast<const __half*>(scale_act.data_ptr<at::Half>()),
+          reinterpret_cast<const __half*>(scale_int4.data_ptr<at::Half>()),
+          zero_int4.data_ptr<uint8_t>(), indices_int4.data_ptr<int32_t>(),
+          output.data_ptr<float>(), rows, width, output_width,
+          static_cast<int>(indices_int4.numel()));
+  C10_CUDA_KERNEL_LAUNCH_CHECK();
+}
+
+void begin_integer_prefill_overlap(
+    const at::Tensor& input_int8, const at::Tensor& packed_int4,
+    const at::Tensor& expanded_int4, const at::Tensor& scale_act,
+    const at::Tensor& scale_int4, const at::Tensor& zero_int4,
+    const at::Tensor& indices_int4, const at::Tensor& weight_int8,
+    const at::Tensor& scale_int8, const at::Tensor& indices_int8,
+    at::Tensor& output, int rows, int width, int output_width,
+    cudaStream_t caller_stream, IntegerPrefillStreams& streams,
     const at::Tensor* cached_scale_int4,
     const at::Tensor* cached_zero_int4,
     const at::Tensor* cached_scale_int8) {
-  auto matrix_scale4 = cached_scale_int4
-      ? *cached_scale_int4 : scale_int4.transpose(0, 1).contiguous();
+  // Packed INT4 uses the checkpoint [channels, groups] metadata directly;
+  // only the INT8 CUTLASS path needs its transposed layout.
+  auto matrix_scale4 = expanded_int4.numel()
+      ? (cached_scale_int4 ? *cached_scale_int4
+                           : scale_int4.transpose(0, 1).contiguous())
+      : scale_int4;
   auto matrix_scale8 = cached_scale_int8
       ? *cached_scale_int8 : scale_int8.transpose(0, 1).contiguous();
   auto matrix_zero = cached_zero_int4
@@ -632,9 +759,15 @@ void begin_integer_prefill_overlap(
   C10_CUDA_CHECK(cudaEventRecord(streams.fork, caller_stream));
   if (indices_int4.numel()) {
     C10_CUDA_CHECK(cudaStreamWaitEvent(streams.int4, streams.fork, 0));
-    run_cutlass_int_partition(
-        input_int8, scale_act, expanded_int4, matrix_scale4, matrix_zero,
-        indices_int4, output, rows, width, streams.int4);
+    if (expanded_int4.numel()) {
+      run_cutlass_int_partition(
+          input_int8, scale_act, expanded_int4, matrix_scale4, matrix_zero,
+          indices_int4, output, rows, width, streams.int4);
+    } else {
+      run_packed_int4_partition(
+          input_int8, packed_int4, scale_act, scale_int4, zero_int4,
+          indices_int4, output, rows, width, output_width, streams.int4);
+    }
     C10_CUDA_CHECK(cudaEventRecord(streams.done_int4, streams.int4));
   }
   if (indices_int8.numel()) {
@@ -772,10 +905,11 @@ at::Tensor three_level_linear_v2_core(
               "scale_act must have shape [K/128, rows]");
   TORCH_CHECK(weight_int4.size(0) == n4 && weight_int4.size(1) == width / 2,
               "invalid packed INT4 weight shape");
-  TORCH_CHECK(rows == 1 ||
-                  (expanded_int4.dim() == 2 && expanded_int4.size(0) == n4 &&
-                   expanded_int4.size(1) == width),
-              "expanded_int4 must have shape [n4, K] for prefill");
+  TORCH_CHECK(
+      rows == 1 || expanded_int4.numel() == 0 ||
+          (expanded_int4.dim() == 2 && expanded_int4.size(0) == n4 &&
+           expanded_int4.size(1) == width),
+      "expanded_int4 must have shape [n4, K] or be empty for packed large-M INT4");
   TORCH_CHECK(weight_int8.size(0) == n8 && weight_int8.size(1) == width,
               "invalid INT8 weight shape");
   TORCH_CHECK(weight_fp16.size(0) == n16 && weight_fp16.size(1) == width,
@@ -827,9 +961,9 @@ at::Tensor three_level_linear_v2_core(
     // and rows==16 remains on the validated direct-WMMA control path.
     auto& integer_streams = integer_prefill_streams(input_fp16.device().index());
     begin_integer_prefill_overlap(
-        input_int8, scale_act, expanded_int4, scale_int4, zero_int4,
-        indices_int4, weight_int8, scale_int8, indices_int8, output,
-        rows, width, stream.stream(), integer_streams,
+        input_int8, weight_int4, expanded_int4, scale_act, scale_int4,
+        zero_int4, indices_int4, weight_int8, scale_int8, indices_int8,
+        output, rows, width, output_width, stream.stream(), integer_streams,
         has_cached_metadata ? &cached_scale_int4 : nullptr,
         has_cached_metadata ? &cached_zero_int4 : nullptr,
         has_cached_metadata ? &cached_scale_int8 : nullptr);

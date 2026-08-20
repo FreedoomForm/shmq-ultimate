@@ -82,6 +82,16 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertNotIn("WideInt8Runner", source_compact)
         self.assertNotIn("WideCore", cutlass_compact)
 
+    def test_v201_packed_int4_prefill_contract(self):
+        source_compact = "".join(self.source.split())
+        self.assertIn("__global__voidpacked_int4_prefill_kernel", source_compact)
+        self.assertIn("run_packed_int4_partition", source_compact)
+        self.assertIn("packed_int4_prefill_kernel<kPrefillWarps>", source_compact)
+        self.assertIn("expanded_int4.numel()==0", source_compact)
+        self.assertIn("packed_int4.data_ptr<uint8_t>()", source_compact)
+        self.assertIn("def _use_v201_packed_int4_path(", self.backend)
+        self.assertIn("_use_v201_packed_int4_path(module, x)", self.backend)
+
     def test_v193_rejected_geometry_is_not_present(self):
         cutlass_compact = "".join(self.cutlass_testbed.split())
         self.assertIn("GemmShape<32,128,64>", cutlass_compact)

@@ -188,11 +188,24 @@ def _validate_partition(module, x, torch_module):
     module._sm75_partition_validation = signature
 
 
+def _use_v201_packed_int4_path(module, x):
+    """Use direct packed INT4 staging only for the measured mixed large-M shape."""
+    return (
+        x.shape[0] >= 32
+        and module.indices_4.numel() > 0
+        and module.indices_8.numel() > 0
+        and module.indices_16.numel() > 0
+    )
+
+
 def _expanded_int4_for_prefill(module, x, torch_module):
     """Expand packed INT4 once per packed state/device for the SM75 prefill path."""
     if x.shape[0] == 1 or not module.indices_4.numel():
         # Decode does not read this argument. Empty INT4 prefill still needs the
         # ABI-compatible [0, K] shape without allocating a separate tensor.
+        return module.weight_int8[:0]
+    if _use_v201_packed_int4_path(module, x):
+        # The large-M mixed path decodes packed nibbles inside the SM75 kernel.
         return module.weight_int8[:0]
     signature = (
         module.weight_int4.device,
