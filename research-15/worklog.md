@@ -1252,3 +1252,9 @@ Local validation passed: focused source/backend tests 38 passed with 6 CUDA-only
 The v256 notebook compiled with the exact committed source and reached the benchmark, but the new M=128,N=128 candidate failed on the T4 with `CUDA error: too many resources requested for launch` from the SM75 `three_level_linear_prequantized` path. The failure is consistent with the 16-warp/512-thread block and its shared/register resource footprint. No benchmark result is valid for v256; the candidate is rejected and must not remain selectable in production.
 
 The run did not modify model, quality, or benchmark settings. The next iteration must remove or strictly guard the oversized candidate and begin with deep research into a lower-resource legal geometry or a direct packed INT4 implementation before any new Kaggle submission.
+
+## v257 — replace oversized M=128,N=128 with resource-safe M=64,N=64 (local validation complete)
+
+Deep research after v256's Kaggle runtime error confirmed the M=128,N=128 candidate required 16 warps/512 threads and exceeded T4 launch resources. The official MixLLM configuration table includes a broad 64x64 family. v257 removes M=128,N=128 completely and adds only `GemmShape<64,64,64>` with `WarpShape<32,32,64>`, instruction `<8,8,16>`, stage 2, as cache ABI 257. Existing N=128, N=64, and M=128,N=64 candidates remain. The v255 staged mixed dispatch and timing gate remain unchanged.
+
+Local validation passed: focused source/backend tests 38 passed with 6 CUDA-only skips; full suite 85 passed with 6 CUDA-only skips; native INT4 proof passed; diff check passed. Kaggle has not been run for v257.
