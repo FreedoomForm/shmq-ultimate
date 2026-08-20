@@ -105,18 +105,22 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("three_level_tensorcore_kernel<kPrefillWarps>", text[cutlass_branch:])
         self.assertNotIn("kPrefillWideWarps", text)
 
-    def test_v208_cublas_mixed_int8_control_contract(self):
+    def test_native_combined_sm75_layout_contract(self):
         source = self.source
         compact = "".join(source.split())
-        self.assertIn("#include <cublas_v2.h>", source)
-        self.assertIn("cublasGemmStridedBatchedEx", source)
-        self.assertIn("cublas_integer_epilogue_kernel", source)
-        self.assertIn("_three_level_linear_cublas_unchecked", source)
-        self.assertIn("combined_int8", source)
-        self.assertIn("extra_ldflags", self.backend)
-        self.assertIn("-lcublas", self.backend)
-        self.assertIn("_combined_int8_for_cublas", self.backend)
-        self.assertIn("if(combined_int8&&combined_int8->defined()", compact)
+        self.assertNotIn("#include <cublas_v2.h>", source)
+        self.assertNotIn("cublasGemmStridedBatchedEx", source)
+        self.assertNotIn("cublas_integer_epilogue_kernel", source)
+        self.assertIn("_three_level_linear_native_mixed_unchecked", source)
+        self.assertIn("combined_native", source)
+        self.assertIn("combined_scale", source)
+        self.assertIn("combined_zero", source)
+        self.assertIn("combined_indices", source)
+        self.assertIn("_native_mixed_prefill_enabled", self.backend)
+        self.assertIn("_combined_native_layout", self.backend)
+        self.assertNotIn("-lcublas", self.backend)
+        self.assertIn("run_cutlass_int_partition(", compact)
+        self.assertIn("combined_scale", compact)
 
     def test_native_three_level_linear_forward_is_present(self):
         text = self.linear

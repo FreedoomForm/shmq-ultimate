@@ -82,6 +82,28 @@ class SM75PythonDispatchTest(unittest.TestCase):
         third = sm75_backend._prefill_metadata_for_cutlass(module, x, torch)
         self.assertIsNot(first, third)
 
+    def test_native_combined_layout_uses_legal_tile_heuristic_and_cache(self):
+        module = self._module((64, 64, 0))
+        x = torch.empty(32, 128, dtype=torch.float16)
+        self.assertTrue(sm75_backend._native_mixed_prefill_enabled(module, x))
+        first = sm75_backend._combined_native_layout(module, x, torch)
+        second = sm75_backend._combined_native_layout(module, x, torch)
+        self.assertIs(first, second)
+        self.assertEqual(first[1].shape, (128, 128))
+        self.assertEqual(first[2].shape, (1, 128))
+        self.assertEqual(first[3].shape, (1, 128))
+        self.assertEqual(first[4].shape, (128,))
+        self.assertTrue(torch.equal(first[3], torch.zeros_like(first[3])))
+        module.scale_int8[0, 0] += 1
+        third = sm75_backend._combined_native_layout(module, x, torch)
+        self.assertIsNot(first, third)
+
+    def test_native_combined_layout_rejects_underfilled_integer_tiles(self):
+        module = self._module((16, 64, 0))
+        x = torch.empty(32, 128, dtype=torch.float16)
+        self.assertFalse(sm75_backend._native_mixed_prefill_enabled(module, x))
+        self.assertIsNone(sm75_backend._combined_native_layout(module, x, torch))
+
     def test_decode_keeps_packed_int4_and_does_not_expand(self):
         module = self._module((2, 0, 0))
         placeholder = sm75_backend._expanded_int4_for_prefill(
