@@ -194,32 +194,12 @@ def _expanded_int4_for_prefill(module, x, torch_module):
         # Decode does not read this argument. Empty INT4 prefill still needs the
         # ABI-compatible [0, K] shape without allocating a separate tensor.
         return module.weight_int8[:0]
-    signature = (
-        module.weight_int4.device,
-        id(module.weight_int4), int(module.weight_int4._version),
-        id(module.zero_int4), int(module.zero_int4._version),
-        tuple(module.weight_int4.shape), tuple(module.zero_int4.shape),
-    )
-    cached = module._sm75_int4_expanded
-    if cached is not None and cached[0] == signature:
-        return cached[1]
-    if x.is_cuda and torch_module.cuda.is_current_stream_capturing():
+    if x.is_cuda and module._sm75_int4_expanded is None and torch_module.cuda.is_current_stream_capturing():
         raise RuntimeError("SM75 INT4 prefill cache must be initialized before CUDA graph capture")
-    packed = module.weight_int4
-    expanded = torch_module.empty(
-        packed.shape[0], packed.shape[1] * 2,
-        dtype=torch_module.uint8, device=packed.device,
-    )
-    expanded[:, 0::2] = packed & 0x0f
-    expanded[:, 1::2] = packed >> 4
-    zeros = module.zero_int4.repeat_interleave(
-        module.group_size, dim=1,
-    ).to(torch_module.int16)
-    expanded = (expanded.to(torch_module.int16) - zeros).to(
-        torch_module.int8,
-    ).contiguous()
-    module._sm75_int4_expanded = (signature, expanded)
-    return expanded
+    prepared = module.prepare_sm75_prefill_cache()
+    if prepared is None:
+        return module.weight_int8[:0]
+    return prepared
 
 
 def _prefill_metadata_for_cutlass(module, x, torch_module):
@@ -231,28 +211,13 @@ def _prefill_metadata_for_cutlass(module, x, torch_module):
     """
     if x.shape[0] < 32:
         raise ValueError("CUTLASS prefill metadata is only used for rows >= 32")
-    signature = (
-        x.device,
-        id(module.scale_int4), int(module.scale_int4._version),
-        id(module.zero_int4), int(module.zero_int4._version),
-        id(module.scale_int8), int(module.scale_int8._version),
-        tuple(module.scale_int4.shape), tuple(module.zero_int4.shape),
-        tuple(module.scale_int8.shape),
-    )
-    cached = module._sm75_prefill_metadata
-    if cached is not None and cached[0] == signature:
-        return cached
-    if x.is_cuda and torch_module.cuda.is_current_stream_capturing():
+    if x.is_cuda and module._sm75_prefill_metadata is None and torch_module.cuda.is_current_stream_capturing():
         raise RuntimeError(
             "SM75 CUTLASS metadata cache must be initialized before CUDA graph capture"
         )
-    cached = (
-        signature,
-        module.scale_int4.transpose(0, 1).contiguous(),
-        module.zero_int4.transpose(0, 1).contiguous(),
-        module.scale_int8.transpose(0, 1).contiguous(),
-    )
-    module._sm75_prefill_metadata = cached
+    cached = module.prepare_sm75_prefill_metadata()
+    if cached is None:
+        raise RuntimeError("SM75 CUTLASS metadata requires an integer partition")
     return cached
 
 
@@ -280,11 +245,13 @@ def three_level_linear_prequantized(module, x, input_int8, scale_act, torch_modu
         raise RuntimeError("call load_sm75_backend before using the SM75 operator")
     if x.dim() != 2:
         raise ValueError("SM75 correctness backend currently requires a 2D input")
-    packed_tensors = (
-        module.weight_int4, module.scale_int4, module.zero_int4, module.indices_4,
-        module.weight_int8, module.scale_int8, module.indices_8,
-        module.weight_fp16, module.indices_16,
-    )
+    packed_tensors = module.prepare_sm75_packed_tensors()
+    if packed_tensors is None:
+        packed_tensors = (
+            module.weight_int4, module.scale_int4, module.zero_int4, module.indices_4,
+            module.weight_int8, module.scale_int8, module.indices_8,
+            module.weight_fp16, module.indices_16,
+        )
     tensors = (input_int8, scale_act, *packed_tensors)
     if any(tensor.device != x.device for tensor in tensors):
         raise ValueError("input and all operator tensors must be on the same device")
@@ -342,11 +309,13 @@ def three_level_linear(module, x, torch_module):
         raise RuntimeError("call load_sm75_backend before using the SM75 operator")
     if x.dim() != 2:
         raise ValueError("SM75 correctness backend currently requires a 2D input")
-    packed_tensors = (
-        module.weight_int4, module.scale_int4, module.zero_int4, module.indices_4,
-        module.weight_int8, module.scale_int8, module.indices_8,
-        module.weight_fp16, module.indices_16,
-    )
+    packed_tensors = module.prepare_sm75_packed_tensors()
+    if packed_tensors is None:
+        packed_tensors = (
+            module.weight_int4, module.scale_int4, module.zero_int4, module.indices_4,
+            module.weight_int8, module.scale_int8, module.indices_8,
+            module.weight_fp16, module.indices_16,
+        )
     if any(tensor.device != x.device for tensor in packed_tensors):
         raise ValueError("input and all packed tensors must be on the same device")
     _validate_partition(module, x, torch_module)

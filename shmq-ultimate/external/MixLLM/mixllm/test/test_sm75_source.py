@@ -70,6 +70,34 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("OpClassTensorOp,2,cutlass::arch::OpMultiplyAddSaturate>", cutlass_compact)
         self.assertIn("usingInt8Runner=Runner<Core,2>", cutlass_compact)
 
+    def test_v227_persistent_runtime_cache_contract(self):
+        linear_text = self.linear
+        backend_compact = "".join(self.backend.split())
+        self.assertIn("prepare_sm75_prefill_cache", linear_text)
+        self.assertIn("prepare_sm75_prefill_metadata", linear_text)
+        self.assertIn("prepare_sm75_packed_tensors", linear_text)
+        self.assertIn("prepare_sm75_packed_tensors", backend_compact)
+        self.assertIn("is_current_stream_capturing", self.backend)
+
+    def test_v228_epilogue_index_fragment_contract(self):
+        cutlass_text = self.cutlass_testbed
+        self.assertIn("using IndexFragment = cutlass::Array<int", cutlass_text)
+        self.assertIn("index_fragment[fragment_index]", cutlass_text)
+        self.assertIn("index_fragment[fragment_index] >= 0", cutlass_text)
+        self.assertEqual(cutlass_text.count("indices[partition_channel]"), 1)
+        self.assertNotIn("ptr_C[global_row * ldc + indices[partition_channel]]", cutlass_text)
+
+    def test_v226_legal_sm75_candidate_tuner_contract(self):
+        source_compact = "".join(self.source.split())
+        cutlass_compact = "".join(self.cutlass_testbed.split())
+        self.assertIn("GemmShape<32,64,64>", cutlass_compact)
+        self.assertIn("usingInt8RunnerN64=Runner<CoreN64,2>", cutlass_compact)
+        self.assertIn("enumclassCutlassConfig", source_compact)
+        self.assertIn("cutlass_tuning_key", source_compact)
+        self.assertIn("cudaEventElapsedTime", source_compact)
+        self.assertIn("SHMQ_SM75_TUNE_CACHE", source_compact)
+        self.assertIn("cudaStreamIsCapturing", source_compact)
+
     def test_v200_integer_prefill_overlap_contract(self):
         source_compact = "".join(self.source.split())
         cutlass_compact = "".join(self.cutlass_testbed.split())

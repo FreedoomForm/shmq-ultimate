@@ -48,6 +48,16 @@ class SM75PythonDispatchTest(unittest.TestCase):
             self.assertEqual(quantized.shape, (0, 256))
             self.assertEqual(scales.shape, (2, 0))
 
+    def test_module_can_prepare_sm75_int4_prefill_cache_before_forward(self):
+        module = self._module((2, 0, 0))
+        first = module.prepare_sm75_prefill_cache()
+        self.assertIsNotNone(first)
+        second = module.prepare_sm75_prefill_cache()
+        self.assertIs(first, second)
+        module.weight_int4[0, 0] ^= 0x0f
+        third = module.prepare_sm75_prefill_cache()
+        self.assertIsNot(first, third)
+
     def test_prefill_int4_expansion_is_signed_cached_and_invalidated(self):
         module = self._module((2, 0, 0))
         x = torch.empty(2, 128, dtype=torch.float16)
@@ -68,6 +78,26 @@ class SM75PythonDispatchTest(unittest.TestCase):
         third = sm75_backend._expanded_int4_for_prefill(module, x, torch)
         self.assertIsNot(first, third)
 
+    def test_module_can_prepare_contiguous_packed_state_before_forward(self):
+        module = self._module((2, 2, 0))
+        first = module.prepare_sm75_packed_tensors()
+        self.assertIsNotNone(first)
+        second = module.prepare_sm75_packed_tensors()
+        self.assertIs(first, second)
+        module.weight_int8 = module.weight_int8.clone()
+        third = module.prepare_sm75_packed_tensors()
+        self.assertIsNot(first, third)
+
+    def test_module_can_prepare_sm75_metadata_before_forward(self):
+        module = self._module((2, 2, 0))
+        first = module.prepare_sm75_prefill_metadata()
+        self.assertIsNotNone(first)
+        second = module.prepare_sm75_prefill_metadata()
+        self.assertIs(first, second)
+        module.scale_int4[0, 0] += 1
+        third = module.prepare_sm75_prefill_metadata()
+        self.assertIsNot(first, third)
+
     def test_prefill_cutlass_metadata_is_cached_and_invalidated(self):
         module = self._module((2, 2, 0))
         x = torch.empty(32, 128, dtype=torch.float16)
@@ -82,15 +112,17 @@ class SM75PythonDispatchTest(unittest.TestCase):
         third = sm75_backend._prefill_metadata_for_cutlass(module, x, torch)
         self.assertIsNot(first, third)
 
-    def test_decode_keeps_packed_int4_and_does_not_expand(self):
+    def test_decode_keeps_packed_int4_and_does_not_expand_again(self):
         module = self._module((2, 0, 0))
+        module.prepare_sm75_prefill_cache()
+        prepared = module._sm75_int4_expanded[1]
         placeholder = sm75_backend._expanded_int4_for_prefill(
             module, torch.empty(1, 128, dtype=torch.float16), torch,
         )
 
         self.assertEqual(placeholder.shape, (0, 128))
         self.assertEqual(placeholder.data_ptr(), module.weight_int8.data_ptr())
-        self.assertIsNone(module._sm75_int4_expanded)
+        self.assertIs(module._sm75_int4_expanded[1], prepared)
 
     def test_rejects_malformed_partitions_and_invalidates_cache(self):
         module = self._module((1, 1, 1))

@@ -11,8 +11,13 @@
 
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
+#include <cstdlib>
+#include <fstream>
+#include <limits>
 #include <memory>
 #include <mutex>
+#include <sstream>
+#include <string>
 #include <unordered_map>
 #include <mma.h>
 #include "sm75_cutlass_testbed.h"
@@ -60,6 +65,156 @@ IntegerPrefillStreams& integer_prefill_streams(int device_index) {
     C10_CUDA_CHECK(cudaEventCreateWithFlags(&slot->done_int8, cudaEventDisableTiming));
   }
   return *slot;
+}
+
+enum class CutlassConfig : int {
+  kN128 = 0,
+  kN64 = 1,
+};
+
+constexpr int kCutlassTuningAbi = 226;
+constexpr int kCutlassTuningWarmup = 2;
+constexpr int kCutlassTuningIterations = 4;
+std::mutex g_cutlass_tuning_mutex;
+std::unordered_map<std::string, CutlassConfig> g_cutlass_tuning_cache;
+
+std::string cutlass_tuning_key(
+    int device_index, int rows, int channels, int width) {
+  std::ostringstream key;
+  key << "abi=" << kCutlassTuningAbi << ":device=" << device_index
+      << ":m=" << rows << ":n=" << channels << ":k=" << width;
+  return key.str();
+}
+
+std::string cutlass_tuning_cache_path() {
+  const char* configured = std::getenv("SHMQ_SM75_TUNE_CACHE");
+  if (configured) {
+    return std::string(configured);
+  }
+  return std::string("/tmp/shmq_sm75_tuning.cache");
+}
+
+bool load_cutlass_tuning_from_disk(
+    const std::string& key, CutlassConfig& config) {
+  const std::string path = cutlass_tuning_cache_path();
+  if (path.empty()) {
+    return false;
+  }
+  std::ifstream input(path);
+  std::string stored_key;
+  int stored_config = -1;
+  while (input >> stored_key >> stored_config) {
+    if (stored_key == key &&
+        (stored_config == static_cast<int>(CutlassConfig::kN128) ||
+         stored_config == static_cast<int>(CutlassConfig::kN64))) {
+      config = static_cast<CutlassConfig>(stored_config);
+      return true;
+    }
+  }
+  return false;
+}
+
+void save_cutlass_tuning_to_disk(
+    const std::string& key, CutlassConfig config) {
+  const std::string path = cutlass_tuning_cache_path();
+  if (path.empty()) {
+    return;
+  }
+  std::ofstream output(path, std::ios::app);
+  if (output) {
+    output << key << ' ' << static_cast<int>(config) << '\n';
+  }
+}
+
+bool stream_is_capturing(cudaStream_t stream) {
+  cudaStreamCaptureStatus status = cudaStreamCaptureStatusNone;
+  C10_CUDA_CHECK(cudaStreamIsCapturing(stream, &status));
+  return status != cudaStreamCaptureStatusNone;
+}
+
+void run_cutlass_config(
+    CutlassConfig config, int rows, int channels, int width,
+    at::Tensor& input_int8, at::Tensor& weight,
+    at::Tensor& scale_act, at::Tensor& matrix_scale,
+    at::Tensor& matrix_zero, at::Tensor& indices,
+    at::Tensor& output, cudaStream_t stream) {
+  if (config == CutlassConfig::kN64) {
+    shmq_cutlass_sm75::Int8RunnerN64::run(
+        rows, channels, width, input_int8, weight, scale_act, matrix_scale,
+        matrix_zero, indices, output, stream);
+  } else {
+    shmq_cutlass_sm75::Int8Runner::run(
+        rows, channels, width, input_int8, weight, scale_act, matrix_scale,
+        matrix_zero, indices, output, stream);
+  }
+}
+
+CutlassConfig select_cutlass_config(
+    int device_index, int rows, int channels, int width,
+    at::Tensor& input_int8, at::Tensor& weight,
+    at::Tensor& scale_act, at::Tensor& matrix_scale,
+    at::Tensor& matrix_zero, at::Tensor& indices,
+    at::Tensor& output, cudaStream_t stream, bool allow_tuning) {
+  const std::string key = cutlass_tuning_key(device_index, rows, channels, width);
+  {
+    std::lock_guard<std::mutex> lock(g_cutlass_tuning_mutex);
+    auto found = g_cutlass_tuning_cache.find(key);
+    if (found != g_cutlass_tuning_cache.end()) {
+      return found->second;
+    }
+    CutlassConfig disk_config = CutlassConfig::kN128;
+    if (load_cutlass_tuning_from_disk(key, disk_config)) {
+      g_cutlass_tuning_cache.emplace(key, disk_config);
+      return disk_config;
+    }
+  }
+
+  // CUDA graph capture cannot contain the event synchronization or file I/O
+  // used by first-run tuning.  The measured v200 family is the safe fallback.
+  if (!allow_tuning || stream_is_capturing(stream)) {
+    return CutlassConfig::kN128;
+  }
+
+  CutlassConfig best = CutlassConfig::kN128;
+  float best_ms = std::numeric_limits<float>::infinity();
+  for (CutlassConfig candidate : {CutlassConfig::kN128, CutlassConfig::kN64}) {
+    cudaEvent_t begin = nullptr;
+    cudaEvent_t end = nullptr;
+    C10_CUDA_CHECK(cudaEventCreate(&begin));
+    C10_CUDA_CHECK(cudaEventCreate(&end));
+    for (int iteration = 0; iteration < kCutlassTuningWarmup; ++iteration) {
+      run_cutlass_config(
+          candidate, rows, channels, width, input_int8, weight, scale_act,
+          matrix_scale, matrix_zero, indices, output, stream);
+    }
+    C10_CUDA_CHECK(cudaEventRecord(begin, stream));
+    for (int iteration = 0; iteration < kCutlassTuningIterations; ++iteration) {
+      run_cutlass_config(
+          candidate, rows, channels, width, input_int8, weight, scale_act,
+          matrix_scale, matrix_zero, indices, output, stream);
+    }
+    C10_CUDA_CHECK(cudaEventRecord(end, stream));
+    C10_CUDA_CHECK(cudaEventSynchronize(end));
+    float elapsed_ms = 0.0f;
+    C10_CUDA_CHECK(cudaEventElapsedTime(&elapsed_ms, begin, end));
+    C10_CUDA_CHECK(cudaEventDestroy(begin));
+    C10_CUDA_CHECK(cudaEventDestroy(end));
+    if (elapsed_ms < best_ms) {
+      best_ms = elapsed_ms;
+      best = candidate;
+    }
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(g_cutlass_tuning_mutex);
+    auto [entry, inserted] = g_cutlass_tuning_cache.emplace(key, best);
+    if (!inserted) {
+      best = entry->second;
+    } else {
+      save_cutlass_tuning_to_disk(key, best);
+    }
+  }
+  return best;
 }
 
 void record_tensor_stream(const at::Tensor& tensor, cudaStream_t stream) {
@@ -592,7 +747,8 @@ void run_cutlass_int_partition(
     at::Tensor input_int8, at::Tensor scale_act,
     at::Tensor weight, at::Tensor matrix_scale,
     at::Tensor matrix_zero, at::Tensor indices,
-    at::Tensor& output, int rows, int width, cudaStream_t stream) {
+    at::Tensor& output, int rows, int width, cudaStream_t stream,
+    cudaStream_t caller_stream) {
   if (indices.numel() == 0) {
     return;
   }
@@ -603,10 +759,13 @@ void run_cutlass_int_partition(
   record_tensor_stream(matrix_zero, stream);
   record_tensor_stream(indices, stream);
   record_tensor_stream(output, stream);
-  shmq_cutlass_sm75::Int8Runner::run(
-      rows, static_cast<int>(indices.numel()), width,
-      input_int8, weight, scale_act, matrix_scale,
-      matrix_zero, indices, output, stream);
+  CutlassConfig config = select_cutlass_config(
+      input_int8.device().index(), rows, static_cast<int>(indices.numel()), width,
+      input_int8, weight, scale_act, matrix_scale, matrix_zero, indices, output,
+      stream, !stream_is_capturing(caller_stream));
+  run_cutlass_config(
+      config, rows, static_cast<int>(indices.numel()), width, input_int8, weight,
+      scale_act, matrix_scale, matrix_zero, indices, output, stream);
 }
 
 void begin_integer_prefill_overlap(
@@ -634,14 +793,14 @@ void begin_integer_prefill_overlap(
     C10_CUDA_CHECK(cudaStreamWaitEvent(streams.int4, streams.fork, 0));
     run_cutlass_int_partition(
         input_int8, scale_act, expanded_int4, matrix_scale4, matrix_zero,
-        indices_int4, output, rows, width, streams.int4);
+        indices_int4, output, rows, width, streams.int4, caller_stream);
     C10_CUDA_CHECK(cudaEventRecord(streams.done_int4, streams.int4));
   }
   if (indices_int8.numel()) {
     C10_CUDA_CHECK(cudaStreamWaitEvent(streams.int8, streams.fork, 0));
     run_cutlass_int_partition(
         input_int8, scale_act, weight_int8, matrix_scale8, matrix_zero,
-        indices_int8, output, rows, width, streams.int8);
+        indices_int8, output, rows, width, streams.int8, caller_stream);
     C10_CUDA_CHECK(cudaEventRecord(streams.done_int8, streams.int8));
   }
 }

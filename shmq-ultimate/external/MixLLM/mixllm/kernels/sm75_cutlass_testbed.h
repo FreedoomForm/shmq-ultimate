@@ -91,6 +91,21 @@ __global__ void kernel(
   int quad = threadIdx.x >> 2;
   int lane_in_quad = threadIdx.x & 3;
 
+  using IndexFragment = cutlass::Array<int,
+      MmaIterations::kColumn * kElementsPerAccess>;
+  IndexFragment index_fragment;
+  for (int mma_n = 0; mma_n < MmaIterations::kColumn; ++mma_n) {
+    for (int col = 0; col < kElementsPerAccess; ++col) {
+      int local_channel = lane_in_quad * kElementsPerAccess +
+                          mma_n * InstructionShape::kN *
+                              Operator::IteratorC::OpDelta::kColumn + col;
+      int partition_channel = channel_tile + local_channel;
+      int fragment_index = mma_n * kElementsPerAccess + col;
+      index_fragment[fragment_index] =
+          partition_channel < problem_size.n() ? indices[partition_channel] : -1;
+    }
+  }
+
   for (int mma_n = 0; mma_n < MmaIterations::kColumn; ++mma_n) {
     for (int mma_m = 0; mma_m < MmaIterations::kRow; ++mma_m) {
       int start = kAccumulatorRows * kElementsPerAccess *
@@ -100,13 +115,13 @@ __global__ void kernel(
           int local_row = quad +
                           mma_m * InstructionShape::kM * Operator::IteratorC::OpDelta::kRow +
                           row * kRowsPerTile;
-          int local_channel = lane_in_quad * kElementsPerAccess +
-                              mma_n * InstructionShape::kN * Operator::IteratorC::OpDelta::kColumn + col;
           int global_row = row_tile + local_row;
-          int partition_channel = channel_tile + local_channel;
+          int fragment_index = mma_n * kElementsPerAccess + col;
           int index = start + row * kElementsPerAccess + col;
-          if (global_row < problem_size.m() && partition_channel < problem_size.n()) {
-            ptr_C[global_row * ldc + indices[partition_channel]] = (*converted)[index];
+          if (global_row < problem_size.m() &&
+              index_fragment[fragment_index] >= 0) {
+            ptr_C[global_row * ldc + index_fragment[fragment_index]] =
+                (*converted)[index];
           }
         }
       }
@@ -192,5 +207,17 @@ using Core = cutlass::gemm::threadblock::DefaultMmaCore<
 
 
 using Int8Runner = Runner<Core, 2>;
+
+// Candidate family for channel partitions smaller than the v200 N=128 tile.
+// It remains K=64 and NumStages=2, the only TensorOp family provided by the
+// vendored SM75 DefaultMmaCore specializations.
+using CoreN64 = cutlass::gemm::threadblock::DefaultMmaCore<
+    cutlass::gemm::GemmShape<32, 64, 64>,
+    cutlass::gemm::GemmShape<32, 32, 64>,
+    cutlass::gemm::GemmShape<8, 8, 16>,
+    ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC,
+    cutlass::arch::OpClassTensorOp, 2, cutlass::arch::OpMultiplyAddSaturate>;
+
+using Int8RunnerN64 = Runner<CoreN64, 2>;
 
 }  // namespace shmq_cutlass_sm75

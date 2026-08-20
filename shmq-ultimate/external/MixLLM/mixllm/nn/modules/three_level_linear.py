@@ -53,12 +53,88 @@ class ThreeLevelLinear(nn.Module):
         self._sm75_fp16_placeholders = None
         self._sm75_int4_expanded = None
         self._sm75_prefill_metadata = None
+        self._sm75_packed_tensors = None
 
     def _apply(self, fn, recurse=True):
         self._sm75_fp16_placeholders = None
         self._sm75_int4_expanded = None
         self._sm75_prefill_metadata = None
-        return super()._apply(fn, recurse)
+        self._sm75_packed_tensors = None
+        result = super()._apply(fn, recurse)
+        if self.weight_int4.is_cuda and self.indices_4.numel():
+            self.prepare_sm75_prefill_cache()
+        if self.weight_int4.is_cuda and (self.indices_4.numel() or self.indices_8.numel()):
+            self.prepare_sm75_prefill_metadata()
+        return result
+
+    @torch.no_grad()
+    def prepare_sm75_packed_tensors(self):
+        """Cache the immutable packed tensors used by the SM75 operator ABI."""
+        tensors = (
+            self.weight_int4, self.scale_int4, self.zero_int4, self.indices_4,
+            self.weight_int8, self.scale_int8, self.indices_8,
+            self.weight_fp16, self.indices_16,
+        )
+        signature = tuple(
+            (id(tensor), int(tensor._version), tensor.device,
+             tuple(tensor.shape), tuple(tensor.stride()), tensor.is_contiguous())
+            for tensor in tensors
+        )
+        cached = self._sm75_packed_tensors
+        if cached is not None and cached[0] == signature:
+            return cached[1]
+        if not all(tensor.is_contiguous() for tensor in tensors):
+            self._sm75_packed_tensors = None
+            return None
+        self._sm75_packed_tensors = (signature, tensors)
+        return tensors
+
+    @torch.no_grad()
+    def prepare_sm75_prefill_cache(self):
+        """Prepare the signed INT8 INT4 representation outside the hot forward path."""
+        if not self.indices_4.numel() or not self.weight_int4.numel():
+            return None
+        signature = (
+            self.weight_int4.device,
+            id(self.weight_int4), int(self.weight_int4._version),
+            id(self.zero_int4), int(self.zero_int4._version),
+            tuple(self.weight_int4.shape), tuple(self.zero_int4.shape),
+        )
+        cached = self._sm75_int4_expanded
+        if cached is not None and cached[0] == signature:
+            return cached[1]
+        codes = _unpack_uint4(self.weight_int4)
+        zeros = self.zero_int4.repeat_interleave(
+            self.group_size, dim=1,
+        ).to(torch.int16)
+        expanded = (codes.to(torch.int16) - zeros).to(torch.int8).contiguous()
+        self._sm75_int4_expanded = (signature, expanded)
+        return expanded
+
+    @torch.no_grad()
+    def prepare_sm75_prefill_metadata(self):
+        """Prepare the [groups, channels] CUTLASS metadata layout before forward."""
+        if not self.indices_4.numel() and not self.indices_8.numel():
+            return None
+        signature = (
+            self.scale_int4.device,
+            id(self.scale_int4), int(self.scale_int4._version),
+            id(self.zero_int4), int(self.zero_int4._version),
+            id(self.scale_int8), int(self.scale_int8._version),
+            tuple(self.scale_int4.shape), tuple(self.zero_int4.shape),
+            tuple(self.scale_int8.shape),
+        )
+        cached = self._sm75_prefill_metadata
+        if cached is not None and cached[0] == signature:
+            return cached
+        cached = (
+            signature,
+            self.scale_int4.transpose(0, 1).contiguous(),
+            self.zero_int4.transpose(0, 1).contiguous(),
+            self.scale_int8.transpose(0, 1).contiguous(),
+        )
+        self._sm75_prefill_metadata = cached
+        return cached
 
     @classmethod
     @torch.no_grad()
@@ -96,6 +172,10 @@ class ThreeLevelLinear(nn.Module):
                 layer.weight_int4 = _pack_uint4(codes.to(torch.uint8).reshape(-1, in_features))
                 layer.scale_int4 = scale.to(torch.float16).contiguous()
                 layer.zero_int4 = zero.to(torch.uint8).contiguous()
+        layer.prepare_sm75_packed_tensors()
+        if layer.weight_int4.is_cuda:
+            layer.prepare_sm75_prefill_cache()
+            layer.prepare_sm75_prefill_metadata()
         return layer
 
     @torch.no_grad()
@@ -120,6 +200,7 @@ class ThreeLevelLinear(nn.Module):
         self._sm75_fp16_placeholders = None
         self._sm75_int4_expanded = None
         self._sm75_prefill_metadata = None
+        self._sm75_packed_tensors = None
         # Two-level checkpoints predate the FP16 partition. Treat its omitted
         # tensors as an empty partition while preserving strict loading for all
         # other packed state.
@@ -139,6 +220,10 @@ class ThreeLevelLinear(nn.Module):
                 setattr(self, name, torch.empty_like(state_dict[key], device=self.weight_fp16.device))
         super()._load_from_state_dict(state_dict, prefix, local_metadata, strict,
                                       missing_keys, unexpected_keys, error_msgs)
+        self.prepare_sm75_packed_tensors()
+        if self.weight_int4.is_cuda:
+            self.prepare_sm75_prefill_cache()
+            self.prepare_sm75_prefill_metadata()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if x.shape[-1] != self.in_features:

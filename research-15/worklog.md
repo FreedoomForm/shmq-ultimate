@@ -1004,3 +1004,15 @@ Original MixLLM also uses indexed column-major output, so removing scatter or ch
 
 ## v225 freeze — return to v200 before full audit repair
 Per the user's new protocol, v224 is not accepted and is removed from the source tree. The production base is now the clean v200 implementation: `three_level_sm75.cu` and `sm75_backend.py` match v200 exactly, while v218's import-safe local test-harness repairs remain. The complete original-first audit matrix is recorded in `research-15/audit_v200_full_repair_plan.md`. No further Kaggle runs will be performed during repairs; only one final T4 measurement is authorized after the entire list has been locally implemented, tested, committed, and notebook-provenance checked. Frozen-base local discovery passes 74 tests with 6 CUDA-only skips, Python compilation passes, and `git diff --check` passes.
+
+## v226 local candidate — legal SM75 N64 family and bounded autotuner
+Original MixLLM and NVIDIA CUTLASS both use a bounded legal configuration search, CUDA-event measurements, warmups, and a shape/device cache. Added only a K=64, `32x64x64` TensorOp family with `NumStages=2`, because the vendored SM75 headers do not support the upstream stage-5/11 choices. Added capture-safe selection, two warmups plus four timed repetitions per candidate, in-process cache, optional `/tmp`/environment cache, and deterministic v200 N128 fallback. No Kaggle run was performed. The new source contract and full local discovery passed 75 tests with 6 CUDA-only skips; Python compilation and diff checks passed.
+
+## v227 local repair — persistent INT4 and metadata preparation
+The original-first wrapper audit showed that allocator stream recording and event waits cannot be removed safely, but immutable packed state and quantization metadata can be prepared outside the hot dispatcher. Added module-owned, version-invalidated caches for signed expanded INT4, transposed CUTLASS metadata, and contiguous packed ABI tensors; backend dispatch now reuses those caches and retains graph-capture guards. Added lifecycle and mutation tests. Backend tests passed 19 tests with 6 CUDA-only skips; Python compilation and diff checks passed. No Kaggle run was performed.
+
+## v228 local repair — indexed epilogue fragment hoist
+Upstream MixLLM also uses indexed output placement but hoists the channel index fragment. Reapplied that safe optimization to v200: one index is loaded per MMA column fragment, masked lanes use `-1`, and the exact indexed float output write remains unchanged. Source contracts passed 13 tests; Python compilation and diff checks passed. No Kaggle run was performed.
+
+## v228 capture-safety refinement
+The tuner now receives the caller stream's capture state through the auxiliary-stream launch seam. If either the caller is capturing or the auxiliary stream is capturing, selection returns the v200 N128 fallback without CUDA-event synchronization or cache file I/O. Full local discovery passes 80 tests with 6 CUDA-only skips; Python compilation and diff checks pass. No Kaggle run was performed.
