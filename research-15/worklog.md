@@ -1056,3 +1056,6 @@ The fused packed pair now has a host seam and is selected only for `rows>=32`, `
 
 ## v229 Kaggle result — pure INT4 candidate kept
 Kaggle v229 compiled and ran the fused pure-INT4 dispatch. Native correctness passed; timing integrity passed. Pure INT4 end-to-end speedups vs FP16 were `0.742x` (rows=1), `0.613x` (rows=16), and `0.686x` (rows=128); rows=128 exceeds the v228 pure-INT4 keep threshold of `0.6254x`. The overall kernel remains `no_go` because mixed 4/8/16 end-to-end gates are still failures, but those mixed paths remain on v228 and were not altered by the pure-only gate. Keep v229 as a safe candidate and adapt the fused pair to the mixed INT4 partition next.
+
+## v230 candidate — fused INT4 inside mixed prefill overlap
+The proven pair is now used for the INT4 auxiliary stream whenever `n4>0` and metadata is uncached, including mixed 4/8/16 prefill. INT8 remains on its own v228 CUTLASS stream and FP16 remains on the caller stream; pure INT4 keeps the direct fused branch. Cached metadata and all unsupported shapes retain the v228 path. Added a source contract for the seam. Local 82-test suite, CPU proof, Python checks, and diff checks pass. Kaggle validation pending.

@@ -1077,7 +1077,8 @@ void run_cutlass_int_partition(
 
 void begin_integer_prefill_overlap(
     const at::Tensor& input_int8, const at::Tensor& scale_act,
-    const at::Tensor& expanded_int4, const at::Tensor& scale_int4,
+    const at::Tensor& weight_int4, const at::Tensor& expanded_int4,
+    const at::Tensor& scale_int4,
     const at::Tensor& zero_int4, const at::Tensor& indices_int4,
     const at::Tensor& weight_int8, const at::Tensor& scale_int8,
     const at::Tensor& indices_int8, at::Tensor& output,
@@ -1085,7 +1086,8 @@ void begin_integer_prefill_overlap(
     IntegerPrefillStreams& streams,
     const at::Tensor* cached_scale_int4,
     const at::Tensor* cached_zero_int4,
-    const at::Tensor* cached_scale_int8) {
+    const at::Tensor* cached_scale_int8,
+    bool use_fused_int4) {
   auto matrix_scale4 = cached_scale_int4
       ? *cached_scale_int4 : scale_int4.transpose(0, 1).contiguous();
   auto matrix_scale8 = cached_scale_int8
@@ -1098,9 +1100,15 @@ void begin_integer_prefill_overlap(
   C10_CUDA_CHECK(cudaEventRecord(streams.fork, caller_stream));
   if (indices_int4.numel()) {
     C10_CUDA_CHECK(cudaStreamWaitEvent(streams.int4, streams.fork, 0));
-    run_cutlass_int_partition(
-        input_int8, scale_act, expanded_int4, matrix_scale4, matrix_zero,
-        indices_int4, output, rows, width, streams.int4, caller_stream);
+    if (use_fused_int4) {
+      run_int4_pair_partition(
+          input_int8, scale_act, weight_int4, scale_int4, zero_int4,
+          indices_int4, output, rows, width, streams.int4);
+    } else {
+      run_cutlass_int_partition(
+          input_int8, scale_act, expanded_int4, matrix_scale4, matrix_zero,
+          indices_int4, output, rows, width, streams.int4, caller_stream);
+    }
     C10_CUDA_CHECK(cudaEventRecord(streams.done_int4, streams.int4));
   }
   if (indices_int8.numel()) {
@@ -1299,12 +1307,13 @@ at::Tensor three_level_linear_v2_core(
     // and rows==16 remains on the validated direct-WMMA control path.
     auto& integer_streams = integer_prefill_streams(input_fp16.device().index());
     begin_integer_prefill_overlap(
-        input_int8, scale_act, expanded_int4, scale_int4, zero_int4,
-        indices_int4, weight_int8, scale_int8, indices_int8, output,
+        input_int8, scale_act, weight_int4, expanded_int4, scale_int4,
+        zero_int4, indices_int4, weight_int8, scale_int8, indices_int8, output,
         rows, width, stream.stream(), integer_streams,
         has_cached_metadata ? &cached_scale_int4 : nullptr,
         has_cached_metadata ? &cached_zero_int4 : nullptr,
-        has_cached_metadata ? &cached_scale_int8 : nullptr);
+        has_cached_metadata ? &cached_scale_int8 : nullptr,
+        n4 > 0 && !has_cached_metadata);
     if (n16 > 0) {
       const dim3 grid_fp16(
           (n16 + kPrefillChannels - 1) / kPrefillChannels,

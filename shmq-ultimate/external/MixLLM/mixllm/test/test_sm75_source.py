@@ -97,6 +97,17 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("struct InstructionPair", probe)
         self.assertIn("mq_mma_sm75_int4_pair.h", self.cutlass_testbed)
 
+    def test_v229_fused_int4_dispatch_contract(self):
+        source_compact = "".join(self.source.split())
+        self.assertIn("__global__voidsm75_int4_pair_gemm_kernel", source_compact)
+        self.assertIn("voidrun_int4_pair_partition(", source_compact)
+        self.assertIn("use_fused_int4", source_compact)
+        self.assertIn("n4>0&&n8==0&&n16==0&&!has_cached_metadata", source_compact)
+        self.assertIn("n4>0&&!has_cached_metadata", source_compact)
+        self.assertIn("low_mma(low_accum,low_a,weights,low_accum)", source_compact)
+        self.assertIn("high_mma(high_accum,high_a,weights,high_accum)", source_compact)
+        self.assertIn("16*high_tile[warp][item]-correction", source_compact)
+
     def test_v226_legal_sm75_candidate_tuner_contract(self):
         source_compact = "".join(self.source.split())
         cutlass_compact = "".join(self.cutlass_testbed.split())
