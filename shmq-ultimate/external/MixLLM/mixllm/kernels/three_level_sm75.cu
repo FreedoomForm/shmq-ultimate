@@ -11,6 +11,9 @@
 
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
+#include <memory>
+#include <mutex>
+#include <unordered_map>
 #include <mma.h>
 #include "sm75_cutlass_testbed.h"
 
@@ -28,6 +31,47 @@ constexpr int kDecodeSubwarp = kWarpSize / kDecodeChannelsPerWarp;
 constexpr int kPrefillWarps = 4;
 constexpr int kPrefillChannels = kPrefillWarps * kTile;
 constexpr int kReuseRows = 2 * kTile;
+
+// Upstream MixLLM overlaps its INT4 and INT8 staged GEMMs on two auxiliary
+// streams and joins them on the caller stream.  Keep that topology private to
+// the SM75 adapter: the public operator remains one synchronous three-level
+// interface, while partition launch and stream lifetime stay in one deep module.
+struct IntegerPrefillStreams {
+  cudaStream_t int4 = nullptr;
+  cudaStream_t int8 = nullptr;
+  cudaEvent_t fork = nullptr;
+  cudaEvent_t done_int4 = nullptr;
+  cudaEvent_t done_int8 = nullptr;
+};
+
+std::mutex g_integer_streams_mutex;
+std::unordered_map<int, std::unique_ptr<IntegerPrefillStreams>> g_integer_streams;
+
+IntegerPrefillStreams& integer_prefill_streams(int device_index) {
+  std::lock_guard<std::mutex> lock(g_integer_streams_mutex);
+  auto& slot = g_integer_streams[device_index];
+  if (!slot) {
+    slot = std::make_unique<IntegerPrefillStreams>();
+    C10_CUDA_CHECK(cudaSetDevice(device_index));
+    C10_CUDA_CHECK(cudaStreamCreateWithFlags(&slot->int4, cudaStreamNonBlocking));
+    C10_CUDA_CHECK(cudaStreamCreateWithFlags(&slot->int8, cudaStreamNonBlocking));
+    C10_CUDA_CHECK(cudaEventCreateWithFlags(&slot->fork, cudaEventDisableTiming));
+    C10_CUDA_CHECK(cudaEventCreateWithFlags(&slot->done_int4, cudaEventDisableTiming));
+    C10_CUDA_CHECK(cudaEventCreateWithFlags(&slot->done_int8, cudaEventDisableTiming));
+  }
+  return *slot;
+}
+
+void record_tensor_stream(const at::Tensor& tensor, cudaStream_t stream) {
+  if (!tensor.defined() || !tensor.numel()) {
+    return;
+  }
+  auto external_stream = at::cuda::getStreamFromExternal(
+      stream, tensor.device().index());
+  c10::cuda::CUDACachingAllocator::recordStream(
+      tensor.storage().data_ptr(), external_stream);
+}
+
 // Four warps per block; each warp quantizes one contiguous 128-element group.
 // This mirrors the upstream MixLLM activation contract without constructing a
 // chain of temporary FP32 tensors through the PyTorch dispatcher.
@@ -546,36 +590,70 @@ void check_same_device(const at::Tensor& input, const at::Tensor& tensor,
 
 void run_cutlass_int_partition(
     at::Tensor input_int8, at::Tensor scale_act,
-    at::Tensor weight, at::Tensor scale,
-    at::Tensor zero, at::Tensor indices,
-    at::Tensor& output, int rows, int width, cudaStream_t stream,
-    const at::Tensor* cached_scale = nullptr,
-    const at::Tensor* cached_zero = nullptr) {
+    at::Tensor weight, at::Tensor matrix_scale,
+    at::Tensor matrix_zero, at::Tensor indices,
+    at::Tensor& output, int rows, int width, cudaStream_t stream) {
   if (indices.numel() == 0) {
     return;
   }
-  auto matrix_scale = cached_scale ? *cached_scale : scale.transpose(0, 1).contiguous();
-  auto matrix_zero = cached_zero
-      ? *cached_zero
-      : (zero.numel() ? zero.transpose(0, 1).contiguous() : zero);
-  auto allocation_stream = at::cuda::getStreamFromExternal(
-      stream, input_int8.device().index());
-  c10::cuda::CUDACachingAllocator::recordStream(
-      matrix_scale.storage().data_ptr(), allocation_stream);
-  if (matrix_zero.numel()) {
-    c10::cuda::CUDACachingAllocator::recordStream(
-        matrix_zero.storage().data_ptr(), allocation_stream);
+  record_tensor_stream(input_int8, stream);
+  record_tensor_stream(scale_act, stream);
+  record_tensor_stream(weight, stream);
+  record_tensor_stream(matrix_scale, stream);
+  record_tensor_stream(matrix_zero, stream);
+  record_tensor_stream(indices, stream);
+  record_tensor_stream(output, stream);
+  shmq_cutlass_sm75::Int8Runner::run(
+      rows, static_cast<int>(indices.numel()), width,
+      input_int8, weight, scale_act, matrix_scale,
+      matrix_zero, indices, output, stream);
+}
+
+void begin_integer_prefill_overlap(
+    const at::Tensor& input_int8, const at::Tensor& scale_act,
+    const at::Tensor& expanded_int4, const at::Tensor& scale_int4,
+    const at::Tensor& zero_int4, const at::Tensor& indices_int4,
+    const at::Tensor& weight_int8, const at::Tensor& scale_int8,
+    const at::Tensor& indices_int8, at::Tensor& output,
+    int rows, int width, cudaStream_t caller_stream,
+    IntegerPrefillStreams& streams,
+    const at::Tensor* cached_scale_int4,
+    const at::Tensor* cached_zero_int4,
+    const at::Tensor* cached_scale_int8) {
+  auto matrix_scale4 = cached_scale_int4
+      ? *cached_scale_int4 : scale_int4.transpose(0, 1).contiguous();
+  auto matrix_scale8 = cached_scale_int8
+      ? *cached_scale_int8 : scale_int8.transpose(0, 1).contiguous();
+  auto matrix_zero = cached_zero_int4
+      ? *cached_zero_int4
+      : (zero_int4.numel() ? zero_int4.transpose(0, 1).contiguous() : zero_int4);
+  // All fallback transposes above are queued on caller_stream.  Record the fork
+  // only after them so both auxiliary streams observe initialized metadata.
+  C10_CUDA_CHECK(cudaEventRecord(streams.fork, caller_stream));
+  if (indices_int4.numel()) {
+    C10_CUDA_CHECK(cudaStreamWaitEvent(streams.int4, streams.fork, 0));
+    run_cutlass_int_partition(
+        input_int8, scale_act, expanded_int4, matrix_scale4, matrix_zero,
+        indices_int4, output, rows, width, streams.int4);
+    C10_CUDA_CHECK(cudaEventRecord(streams.done_int4, streams.int4));
   }
-  if (rows >= 64) {
-    shmq_cutlass_sm75::WideInt8Runner::run(
-        rows, static_cast<int>(indices.numel()), width,
-        input_int8, weight, scale_act, matrix_scale,
-        matrix_zero, indices, output, stream);
-  } else {
-    shmq_cutlass_sm75::Int8Runner::run(
-        rows, static_cast<int>(indices.numel()), width,
-        input_int8, weight, scale_act, matrix_scale,
-        matrix_zero, indices, output, stream);
+  if (indices_int8.numel()) {
+    C10_CUDA_CHECK(cudaStreamWaitEvent(streams.int8, streams.fork, 0));
+    run_cutlass_int_partition(
+        input_int8, scale_act, weight_int8, matrix_scale8, matrix_zero,
+        indices_int8, output, rows, width, streams.int8);
+    C10_CUDA_CHECK(cudaEventRecord(streams.done_int8, streams.int8));
+  }
+}
+
+void finish_integer_prefill_overlap(
+    int n4, int n8, cudaStream_t caller_stream,
+    IntegerPrefillStreams& streams) {
+  if (n4) {
+    C10_CUDA_CHECK(cudaStreamWaitEvent(caller_stream, streams.done_int4, 0));
+  }
+  if (n8) {
+    C10_CUDA_CHECK(cudaStreamWaitEvent(caller_stream, streams.done_int8, 0));
   }
 }
 
@@ -747,20 +825,14 @@ at::Tensor three_level_linear_v2_core(
     // for larger M. The helper is deliberately selected only for rows>=32:
     // the SM75 16x128 CUTLASS geometry is not a valid portable small-M core,
     // and rows==16 remains on the validated direct-WMMA control path.
-    if (n4 > 0) {
-      run_cutlass_int_partition(
-          input_int8, scale_act, expanded_int4, scale_int4, zero_int4,
-          indices_int4, output, rows, width, stream.stream(),
-          has_cached_metadata ? &cached_scale_int4 : nullptr,
-          has_cached_metadata ? &cached_zero_int4 : nullptr);
-    }
-    if (n8 > 0) {
-      run_cutlass_int_partition(
-          input_int8, scale_act, weight_int8, scale_int8, zero_int4,
-          indices_int8, output, rows, width, stream.stream(),
-          has_cached_metadata ? &cached_scale_int8 : nullptr,
-          has_cached_metadata ? &cached_zero_int4 : nullptr);
-    }
+    auto& integer_streams = integer_prefill_streams(input_fp16.device().index());
+    begin_integer_prefill_overlap(
+        input_int8, scale_act, expanded_int4, scale_int4, zero_int4,
+        indices_int4, weight_int8, scale_int8, indices_int8, output,
+        rows, width, stream.stream(), integer_streams,
+        has_cached_metadata ? &cached_scale_int4 : nullptr,
+        has_cached_metadata ? &cached_zero_int4 : nullptr,
+        has_cached_metadata ? &cached_scale_int8 : nullptr);
     if (n16 > 0) {
       const dim3 grid_fp16(
           (n16 + kPrefillChannels - 1) / kPrefillChannels,
@@ -780,6 +852,8 @@ at::Tensor three_level_linear_v2_core(
         indices_fp16.data_ptr<int32_t>(), output.data_ptr<float>(), rows, width,
         output_width, 0, 0, n16);
     }
+    finish_integer_prefill_overlap(
+        n4, n8, stream.stream(), integer_streams);
   } else {
     const int channel_tiles =
         (n4 + kPrefillChannels - 1) / kPrefillChannels +

@@ -70,13 +70,17 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("OpClassTensorOp,2,cutlass::arch::OpMultiplyAddSaturate>", cutlass_compact)
         self.assertIn("usingInt8Runner=Runner<Core,2>", cutlass_compact)
 
-    def test_v199_supported_wide_large_m_dispatch_contract(self):
+    def test_v200_integer_prefill_overlap_contract(self):
         source_compact = "".join(self.source.split())
         cutlass_compact = "".join(self.cutlass_testbed.split())
-        self.assertIn("GemmShape<64,128,64>", cutlass_compact)
-        self.assertIn("GemmShape<32,32,64>", cutlass_compact)
-        self.assertIn("usingWideInt8Runner=Runner<WideCore,2>", cutlass_compact)
-        self.assertIn("if(rows>=64)", source_compact)
+        self.assertIn("structIntegerPrefillStreams", source_compact)
+        self.assertIn("begin_integer_prefill_overlap", source_compact)
+        self.assertIn("finish_integer_prefill_overlap", source_compact)
+        self.assertIn("cudaStreamWaitEvent(streams.int4,streams.fork,0)", source_compact)
+        self.assertIn("cudaStreamWaitEvent(streams.int8,streams.fork,0)", source_compact)
+        self.assertIn("usingInt8Runner=Runner<Core,2>", cutlass_compact)
+        self.assertNotIn("WideInt8Runner", source_compact)
+        self.assertNotIn("WideCore", cutlass_compact)
 
     def test_v193_rejected_geometry_is_not_present(self):
         cutlass_compact = "".join(self.cutlass_testbed.split())
@@ -92,7 +96,8 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("} else if (rows >= 32 && (n4 > 0 || n8 > 0)) {", text)
         self.assertIn("run_cutlass_int_partition(", text)
         self.assertIn("expanded_int4, scale_int4, zero_int4", text)
-        self.assertIn("weight_int8, scale_int8, zero_int4", text)
+        self.assertIn("weight_int8, scale_int8", text)
+        self.assertIn("matrix_zero", text)
         self.assertIn("output_width, 0, 0, n16", text)
         cutlass_branch = text.index("} else if (rows >= 32 && (n4 > 0 || n8 > 0)) {")
         fallback_branch = text.index("} else {", cutlass_branch)
