@@ -223,4 +223,15 @@ using CoreN64 = cutlass::gemm::threadblock::DefaultMmaCore<
 
 using Int8RunnerN64 = Runner<CoreN64, 2>;
 
+// Candidate family matching upstream's wider N tile catalog while retaining
+// the supported SM75 stage-2 TensorOp core and instruction shape.
+using CoreN256 = cutlass::gemm::threadblock::DefaultMmaCore<
+    cutlass::gemm::GemmShape<32, 256, 64>,
+    cutlass::gemm::GemmShape<32, 32, 64>,
+    cutlass::gemm::GemmShape<8, 8, 16>,
+    ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC,
+    cutlass::arch::OpClassTensorOp, 2, cutlass::arch::OpMultiplyAddSaturate>;
+
+using Int8RunnerN256 = Runner<CoreN256, 2>;
+
 }  // namespace shmq_cutlass_sm75

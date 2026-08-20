@@ -1152,3 +1152,11 @@ Kaggle server version 241 (v244) passed compilation, mixed-stride probe, embedde
 Deep research attributes the residual failure to the unchanged small-pair dataflow: widening CTA-N reduces block count but still reloads A/B panels and serializes four row subtiles, unlike upstream staged CUTLASS threadblock dataflow and autotuned families. v245 restores the 32-channel pair geometry and `use_fused_int4=false` mixed dispatch; the native pair path remains only in the pure-INT4 candidate and probes, exactly as in the last measured v241 baseline.
 
 Local validation after rollback: full MixLLM suite passed (85 tests, 6 CUDA-only skips), and the v230 native INT4 proof passed.
+
+## v246 — Add legal stage-2 N=256 CUTLASS tuner candidate (local validation complete)
+
+Deep research found that upstream MixLLM searches N=64/128/256 families, while SHMQ exposed only N=64 and N=128 despite the vendored SM75 `DefaultMmaCore` being shape-parameterized for stage 2. v244 showed that widening the handwritten pair kernel does not solve large-M dataflow; v246 therefore targets the existing staged CUTLASS module rather than the native pair path.
+
+Repair: add `CoreN256 = GemmShape<32,256,64>` with the existing `WarpShape<32,32,64>`, instruction `<8,8,16>`, row-major accumulator, and matching stage-2 `Int8RunnerN256`. Extend the exact-shape tuner to test N=128/N=64/N=256 and bump the tuning ABI from 226 to 227 so stale disk choices cannot hide the new candidate. The existing N=128 path remains the deterministic fallback when tuning is unavailable. No arithmetic, quantization, output ABI, streams/events, benchmark settings, model, or quality thresholds changed.
+
+Local validation: source contracts passed (19 tests), full MixLLM suite passed (85 tests, 6 CUDA-only skips), and the native INT4 CPU proof passed. Kaggle has not yet been run for v246.
