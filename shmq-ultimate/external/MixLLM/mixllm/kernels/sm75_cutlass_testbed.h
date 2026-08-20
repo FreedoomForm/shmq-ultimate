@@ -234,4 +234,13 @@ using CoreM128N64 = cutlass::gemm::threadblock::DefaultMmaCore<
 
 using Int8RunnerM128N64 = Runner<CoreM128N64, 2>;
 
+using CoreM128N128 = cutlass::gemm::threadblock::DefaultMmaCore<
+    cutlass::gemm::GemmShape<128, 128, 64>,
+    cutlass::gemm::GemmShape<32, 32, 64>,
+    cutlass::gemm::GemmShape<8, 8, 16>,
+    ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC,
+    cutlass::arch::OpClassTensorOp, 2, cutlass::arch::OpMultiplyAddSaturate>;
+
+using Int8RunnerM128N128 = Runner<CoreM128N128, 2>;
+
 }  // namespace shmq_cutlass_sm75

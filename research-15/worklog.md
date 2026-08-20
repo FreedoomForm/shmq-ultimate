@@ -1238,3 +1238,11 @@ The v255 notebook was pushed as Kaggle kernel version 250 and completed with an 
 The required performance gates still failed, and timing integrity failed. Qwen/Qwen2.5-0.5B mixed 4/8/16 measured end-to-end speedups of 0.870x at rows=1, 0.282x at rows=16, and 0.401x at rows=128; rows=128 end-to-end ratio was 2.493x. The rows=128 end-to-end p50 was 0.408 ms while the reported staged integer GEMM p50 was 0.826 ms, triggering the timing-integrity failure. `terminal_decision` was `no_go`. v255 is rejected and cannot replace the accepted baseline.
 
 The result confirms that the dispatch inconsistency was real but correcting it did not satisfy the gates; it also exposed a timing/stream measurement issue in the restored staged overlap path that must be researched before further optimization. No benchmark or quality settings changed.
+
+## v256 — add legal M=128,N=128 stage-2 CUTLASS candidate (local validation complete)
+
+Deep research after v255's no-go found that the restored staged path still failed timing integrity only for Qwen mixed rows=128, with GEMM p50 0.8256 ms and end-to-end p50 0.4080 ms. The official MixLLM configuration table includes the larger `{128,128,32,64}`, `{128,128,64,32}`, and `{128,128,64,64}` families. The vendored SM75 core is generic in element types and the existing stage-2 INT8 path preserves the legal SM75 `m8n8k32` architecture constraints.
+
+v256 adds one bounded candidate: `GemmShape<128,128,64>`, `WarpShape<32,32,64>`, instruction `<8,8,16>`, stage 2. It is added to the exact-shape tuner and cache ABI 256 while retaining N=128, N=64, and M=128,N=64. No arithmetic, dispatch selector, timing gate, benchmark, model, quality, or output ABI changed. Deep-research note: research-15/v256_deep_research_original_vs_sm75.md.
+
+Local validation passed: focused source/backend tests 38 passed with 6 CUDA-only skips; full suite 85 passed with 6 CUDA-only skips; native INT4 proof passed; git diff check passed. Kaggle has not been run for v256.
