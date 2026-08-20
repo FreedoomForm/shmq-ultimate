@@ -1246,3 +1246,9 @@ Deep research after v255's no-go found that the restored staged path still faile
 v256 adds one bounded candidate: `GemmShape<128,128,64>`, `WarpShape<32,32,64>`, instruction `<8,8,16>`, stage 2. It is added to the exact-shape tuner and cache ABI 256 while retaining N=128, N=64, and M=128,N=64. No arithmetic, dispatch selector, timing gate, benchmark, model, quality, or output ABI changed. Deep-research note: research-15/v256_deep_research_original_vs_sm75.md.
 
 Local validation passed: focused source/backend tests 38 passed with 6 CUDA-only skips; full suite 85 passed with 6 CUDA-only skips; native INT4 proof passed; git diff check passed. Kaggle has not been run for v256.
+
+## v256 — Kaggle T4 result (kernel version 251, rejected at runtime)
+
+The v256 notebook compiled with the exact committed source and reached the benchmark, but the new M=128,N=128 candidate failed on the T4 with `CUDA error: too many resources requested for launch` from the SM75 `three_level_linear_prequantized` path. The failure is consistent with the 16-warp/512-thread block and its shared/register resource footprint. No benchmark result is valid for v256; the candidate is rejected and must not remain selectable in production.
+
+The run did not modify model, quality, or benchmark settings. The next iteration must remove or strictly guard the oversized candidate and begin with deep research into a lower-resource legal geometry or a direct packed INT4 implementation before any new Kaggle submission.
