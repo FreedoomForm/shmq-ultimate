@@ -2,6 +2,8 @@
 
 #include <cuda_runtime.h>
 #include <torch/extension.h>
+#include <cstdint>
+#include <type_traits>
 
 #include "cutlass/array.h"
 #include "cutlass/cutlass.h"
@@ -29,11 +31,111 @@ struct Problem {
   Problem(int m, int n, int k) : size({m, n, k}), partial_n(n) {}
 };
 
+// Global B iterator for the v202 experiment. It reuses CUTLASS's validated
+// column-major predicates and thread map, but converts one logical int8 vector
+// from the checkpoint's [N,K/2] packed-nibble storage. Conversion occurs in the
+// existing MQMmaPipelinedSm75 global-to-shared stage; no standalone expansion
+// tensor is allocated.
+template <typename Shape_, typename ThreadMap_, typename AccessType_>
+class PackedInt4Iterator {
+ public:
+  using Shape = Shape_;
+  using Element = int8_t;
+  using Layout = LayoutB;
+  using ThreadMap = ThreadMap_;
+  using AccessType = AccessType_;
+  static int const kAccessesPerVector =
+      ThreadMap::kElementsPerAccess / AccessType::kElements;
+  using TensorCoord = typename Layout::TensorCoord;
+  using Underlying = cutlass::transform::threadblock::PredicatedTileAccessIterator<
+      Shape, Element, Layout, 0, ThreadMap, AccessType>;
+
+  struct Params {
+    typename Underlying::Params base;
+    int width = 0;
+    int groups = 0;
+    const uint8_t* zero = nullptr;
+
+    CUTLASS_HOST_DEVICE
+    Params() {}
+
+    CUTLASS_HOST_DEVICE
+    Params(int logical_stride, int group_count, const uint8_t* zero_ptr)
+        : base(Layout(logical_stride)),
+          width(logical_stride),
+          groups(group_count),
+          zero(zero_ptr) {}
+  };
+
+ private:
+  Underlying iterator_;
+  const int8_t* packed_ = nullptr;
+  int width_ = 0;
+  int groups_ = 0;
+  const uint8_t* zero_ = nullptr;
+  mutable AccessType decoded_;
+
+ public:
+  CUTLASS_HOST_DEVICE
+  PackedInt4Iterator(
+      Params const& params, const int8_t* packed, TensorCoord extent,
+      int thread_id, TensorCoord const& threadblock_offset)
+      : iterator_(params.base, packed, extent, thread_id, threadblock_offset),
+        packed_(packed), width_(params.width), groups_(params.groups),
+        zero_(params.zero) {
+    decoded_.clear();
+  }
+
+  CUTLASS_HOST_DEVICE
+  void set_iteration_index(int index) { iterator_.set_iteration_index(index); }
+
+  CUTLASS_DEVICE
+  void add_tile_offset(TensorCoord const& tile_offset) {
+    iterator_.add_tile_offset(tile_offset);
+  }
+
+  CUTLASS_DEVICE
+  AccessType* get() const {
+    decoded_.clear();
+    if (!iterator_.valid()) {
+      return &decoded_;
+    }
+    const int8_t* logical = reinterpret_cast<const int8_t*>(iterator_.get());
+    const uintptr_t logical_address = reinterpret_cast<uintptr_t>(logical);
+    const uintptr_t packed_address = reinterpret_cast<uintptr_t>(packed_);
+    const int logical_offset = static_cast<int>(logical_address - packed_address);
+    const int channel = logical_offset / width_;
+    const int k_base = logical_offset - channel * width_;
+#pragma unroll
+    for (int item = 0; item < AccessType::kElements; ++item) {
+      const int k = k_base + item;
+      const uint8_t byte = reinterpret_cast<const uint8_t*>(packed_)[
+          channel * (width_ / 2) + k / 2];
+      const int code = (k & 1) ? (byte >> 4) : (byte & 0x0f);
+      decoded_[item] = static_cast<int8_t>(
+          code - static_cast<int>(zero_[channel * groups_ + k / 128]));
+    }
+    return &decoded_;
+  }
+
+  CUTLASS_HOST_DEVICE
+  PackedInt4Iterator& operator++() {
+    ++iterator_;
+    return *this;
+  }
+
+  CUTLASS_HOST_DEVICE
+  void clear_mask(bool enable = true) { iterator_.clear_mask(enable); }
+
+  CUTLASS_HOST_DEVICE
+  bool valid() const { return iterator_.valid(); }
+};
+
 template <typename Mma, typename SharedStorage>
 __global__ void kernel(
     cutlass::gemm::GemmCoord problem_size,
     typename Mma::IteratorA::Params params_A, ElementA* ptr_A,
-    typename Mma::IteratorB::Params params_B, ElementB* ptr_B,
+    typename Mma::IteratorB::Params params_B, const uint8_t* ptr_B,
     typename Mma::IteratorScale::Params params_scale,
     typename Mma::ElementScale const* ptr_scale,
     typename Mma::IteratorScaleAct::Params params_scale_act,
@@ -53,8 +155,11 @@ __global__ void kernel(
 
   typename Mma::IteratorA iterator_A(
       params_A, ptr_A, {problem_size.m(), problem_size.k()}, tb_thread_id, offset_A);
+  auto* typed_ptr_B = reinterpret_cast<typename Mma::IteratorB::Element*>(
+      const_cast<uint8_t*>(ptr_B));
   typename Mma::IteratorB iterator_B(
-      params_B, ptr_B, {problem_size.k(), problem_size.n()}, tb_thread_id, offset_B);
+      params_B, typed_ptr_B, {problem_size.k(), problem_size.n()}, tb_thread_id,
+      offset_B);
 
   int groups = problem_size.k() / 128;
   cutlass::MatrixCoord offset_scale{0, tb_tile.n() * Mma::Shape::kN};
@@ -114,7 +219,7 @@ __global__ void kernel(
   }
 }
 
-template <typename Core, int Stages>
+template <typename Core, int Stages, bool PackedInt4 = false>
 struct Runner {
   using ThreadblockShape = typename Core::Shape;
   using Element = typename Core::ElementA;
@@ -125,9 +230,15 @@ struct Runner {
   using IteratorA = cutlass::transform::threadblock::PredicatedTileAccessIterator<
       cutlass::MatrixShape<ThreadblockShape::kM, ThreadblockShape::kK>,
       ElementA, LayoutA, 1, ThreadMapA, AccessTypeA>;
-  using IteratorB = cutlass::transform::threadblock::PredicatedTileAccessIterator<
+  using StandardIteratorB = cutlass::transform::threadblock::PredicatedTileAccessIterator<
       cutlass::MatrixShape<ThreadblockShape::kK, ThreadblockShape::kN>,
       ElementB, LayoutB, 0, ThreadMapB, AccessTypeB>;
+  using IteratorB = typename std::conditional<
+      PackedInt4,
+      PackedInt4Iterator<
+          cutlass::MatrixShape<ThreadblockShape::kK, ThreadblockShape::kN>,
+          ThreadMapB, AccessTypeB>,
+      StandardIteratorB>::type;
   using SmemIteratorA = cutlass::transform::threadblock::RegularTileAccessIterator<
       cutlass::MatrixShape<ThreadblockShape::kM, ThreadblockShape::kK>,
       typename Core::ElementA, typename Core::SmemLayoutA, 0, ThreadMapA>;
@@ -151,10 +262,21 @@ struct Runner {
       at::Tensor& matrix_A, at::Tensor& matrix_B,
       at::Tensor& matrix_scale_act, at::Tensor& matrix_scale,
       at::Tensor& matrix_zero, at::Tensor& matrix_indices,
-      at::Tensor& matrix_C, cudaStream_t stream) {
+      at::Tensor& matrix_C, cudaStream_t stream,
+      const at::Tensor* packed_zero = nullptr) {
     cutlass::gemm::GemmCoord problem_size(rows, channels, width);
     typename IteratorA::Params params_A(matrix_A.stride(0));
-    typename IteratorB::Params params_B(problem_size.k());
+    typename IteratorB::Params params_B = [&] {
+      if constexpr (PackedInt4) {
+        TORCH_CHECK(packed_zero && packed_zero->defined(),
+                    "packed INT4 runner requires checkpoint zero points");
+        return typename IteratorB::Params(
+            problem_size.k(), problem_size.k() / 128,
+            packed_zero->data_ptr<uint8_t>());
+      } else {
+        return typename IteratorB::Params(problem_size.k());
+      }
+    }();
     typename Mma::IteratorScale::Params params_scale(matrix_scale.stride(0));
     typename Mma::IteratorScaleAct::Params params_scale_act(matrix_scale_act.stride(0));
     typename Mma::IteratorZero::Params params_zero(matrix_zero.stride(0));
@@ -172,7 +294,7 @@ struct Runner {
     }
     kernel<Mma, SharedStorage><<<grid, block, shared_bytes, stream>>>(
         problem_size, params_A, matrix_A.data_ptr<int8_t>(), params_B,
-        matrix_B.data_ptr<int8_t>(), params_scale,
+        matrix_B.data_ptr<uint8_t>(), params_scale,
         reinterpret_cast<typename Mma::ElementScale const*>(matrix_scale.data_ptr<at::Half>()),
         params_scale_act,
         reinterpret_cast<typename Mma::ElementScale const*>(matrix_scale_act.data_ptr<at::Half>()),
@@ -191,6 +313,7 @@ using Core = cutlass::gemm::threadblock::DefaultMmaCore<
 
 
 
-using Int8Runner = Runner<Core, 2>;
+using Int8Runner = Runner<Core, 2, false>;
+using PackedInt4Runner = Runner<Core, 2, true>;
 
 }  // namespace shmq_cutlass_sm75
