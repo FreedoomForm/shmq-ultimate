@@ -74,7 +74,7 @@ enum class CutlassConfig : int {
   kM64N64 = 3,
 };
 
-constexpr int kCutlassTuningAbi = 266;
+constexpr int kCutlassTuningAbi = 267;
 constexpr int kCutlassTuningWarmup = 2;
 constexpr int kCutlassTuningIterations = 4;
 std::mutex g_cutlass_tuning_mutex;
@@ -185,6 +185,13 @@ CutlassConfig select_cutlass_config(
   // used by first-run tuning.  The measured v200 family is the safe fallback.
   if (!allow_tuning || stream_is_capturing(stream)) {
     return CutlassConfig::kN128;
+  }
+
+  // Upstream MixLLM's large-M row-major fallback uses a larger M tile.  On
+  // SM75 the legal equivalent is the already validated M128N64 family.  Keep
+  // this shape guard narrow; all other shapes still use measured tuning.
+  if (rows == 128 && channels >= 64 && width >= 2048) {
+    return CutlassConfig::kM128N64;
   }
 
   CutlassConfig best = CutlassConfig::kN128;
@@ -1124,19 +1131,17 @@ void run_cutlass_int_partition(
     at::Tensor input_int8, at::Tensor scale_act,
     at::Tensor weight, at::Tensor matrix_scale,
     at::Tensor matrix_zero, at::Tensor indices,
-    at::Tensor& output,     int rows, int width, cudaStream_t stream,
-    cudaStream_t caller_stream, bool persistent_metadata) {
+    at::Tensor& output, int rows, int width, cudaStream_t stream,
+    cudaStream_t caller_stream) {
   if (indices.numel() == 0) {
     return;
   }
   record_tensor_stream(input_int8, stream);
   record_tensor_stream(scale_act, stream);
-  // `weight`, `indices`, and cached metadata are persistent module buffers.
-  // v2 transposed metadata are temporary allocations, so retain their record.
-  if (!persistent_metadata) {
-    record_tensor_stream(matrix_scale, stream);
-    record_tensor_stream(matrix_zero, stream);
-  }
+  // `weight` and `indices` are persistent module buffers.  The transposed
+  // matrix metadata can be a temporary v2 allocation, so retain its record.
+  record_tensor_stream(matrix_scale, stream);
+  record_tensor_stream(matrix_zero, stream);
   record_tensor_stream(output, stream);
   CutlassConfig config = select_cutlass_config(
       input_int8.device().index(), rows, static_cast<int>(indices.numel()), width,
@@ -1201,16 +1206,15 @@ void begin_integer_prefill_overlap(
     } else {
       run_cutlass_int_partition(
           input_int8, scale_act, expanded_int4, matrix_scale4, matrix_zero,
-          indices_int4, output, rows, width, streams.int4, caller_stream,
-          cached_scale_int4 != nullptr);
+          indices_int4, output, rows, width, streams.int4, caller_stream);
     }
     C10_CUDA_CHECK(cudaEventRecord(streams.done_int4, streams.int4));
   }
   if (indices_int8.numel()) {
     C10_CUDA_CHECK(cudaStreamWaitEvent(streams.int8, streams.fork, 0));
     run_cutlass_int_partition(
-        input_int8, scale_act, weight_int8,         matrix_scale8, matrix_zero, indices_int8, output, rows, width,
-        streams.int8, caller_stream, cached_scale_int8 != nullptr);
+        input_int8, scale_act, weight_int8, matrix_scale8, matrix_zero,
+        indices_int8, output, rows, width, streams.int8, caller_stream);
     C10_CUDA_CHECK(cudaEventRecord(streams.done_int8, streams.int8));
   }
 }

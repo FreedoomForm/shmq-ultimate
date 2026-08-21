@@ -1390,3 +1390,13 @@ The v264 `index_copy_` experiment was removed after Kaggle showed the production
 Deep research of original MixLLM's persistent operands and SHMQ's v3 cache found that cached `matrix_scale`/`matrix_zero` buffers are module-owned immutable tensors, yet the auxiliary integer launcher records them on every call. v266 will skip only those two records when cached metadata are present; dynamic activation, activation scales, output, and v2 temporary metadata remain recorded. No arithmetic, ABI, model partition, stream dependency, or benchmark setting changes. No Kaggle run has been made.
 
 v266 local validation completed: focused source/backend tests `41 passed, 6 skipped`; full suite `88 passed, 6 skipped`; Python compilation and `git diff --check` passed. CUDA compilation remains deferred to the next single Kaggle T4 run.
+
+## v266 — rejected cached-metadata allocator-record optimization
+
+Kaggle version 263 compiled and ran on Tesla T4 with embedded source SHA-256 `6497698703862313b140ebeb186515eee413424bad5e018b28bb58db3e6bd13f`. Native correctness and timing integrity passed, but both required mixed end-to-end gates failed. Qwen mixed rows=128 measured `sm75_end_to_end=0.714896 ms`, `dense_fp16=0.240272 ms`, speedup `0.3361x`; rows=1 speedup was `0.8713x`. The candidate is rejected because it did not pass all required gates. Restore v263 before the next research iteration.
+
+## v267 — explicit M128N64 large-M geometry (pre-run)
+
+Deep research found that upstream MixLLM selects among measured M/N tile families and uses a 64x128 or related large-M organization, while SHMQ has legal SM75 M128N64 and M64N64 families but does not expose which family the persisted tuner selected. v267 will force only the already-validated `M=128,N=64,K=64` family for `rows==128`, `channels>=64`, and `width>=2048`; all other shapes retain the tuner and CUDA-graph fallback. This changes only tile-family dispatch, not arithmetic, quantization, indices, output ABI, streams, benchmark settings, or model quality. No Kaggle run has been made.
+
+v267 local validation completed: focused source/backend tests `41 passed, 6 skipped`; full suite `88 passed, 6 skipped`; Python compilation and `git diff --check` passed. The candidate is committed before notebook rebuild; CUDA compilation is deferred to the single Kaggle T4 run.
