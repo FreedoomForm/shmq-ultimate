@@ -1538,3 +1538,11 @@ Local validation passed: 91 tests, 6 CUDA-only skips, compileall, and `git diff 
 Deep research found that the original MixLLM shape-family organization and the accepted SHMQ INT8 runner expose an M128/N64 large-M family, while the native packed INT4 adapter had only M64/N64. v283 adds a compile-time `CorePackedInt4M128N64`/`PackedInt4RunnerM128N64` adapter and selects it for rows>=96; rows below 96 retain M64/N64. The shared v282 scheduler, packed layout, arithmetic, metadata, output ABI, benchmark, and quality contracts remain unchanged. This is a compile candidate, not a performance claim.
 
 Local validation passed: 92 tests, 6 CUDA-only skips, compileall, and `git diff --check`. Kaggle T4 validation is required; no candidate is accepted before the unchanged production gates and timing-integrity pass.
+
+## v284 — defer redundant expanded INT4 cache on native packed prefill (T4 pending)
+
+Deep research compared the preserved original MixLLM `LinearMixLLM` layout with SHMQ. Upstream stores a persistent CUTLASS-interleaved packed INT4 tensor for the native hot path and does not eagerly retain a signed expanded `[n4, K]` INT8 copy. SHMQ was eagerly preparing both the native packed cache and the legacy signed expansion in `from_weight()`/`_apply()`, then selecting cached-v3 while carrying an unread expanded ABI slot.
+
+v284 keeps the original packed layout and metadata eager, makes signed expansion lazy, and uses the existing empty device-correct placeholder for the unread v3 ABI slot. The signed expansion remains available for v2 fallback and explicit callers; arithmetic, partitioning, output ABI, model quality, benchmark settings, and timing-integrity criteria are unchanged. Memory telemetry continues to report `expanded_int4_bytes` honestly, including zero for native-only preparation.
+
+Local validation passed after the source-contract update: 93 tests, 6 CUDA-only skips, compileall, and `git diff --check`. This is not a T4 acceptance claim; Kaggle validation remains required.

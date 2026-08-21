@@ -89,7 +89,9 @@ class ThreeLevelLinear(nn.Module):
         self._sm75_packed_tensors = None
         result = super()._apply(fn, recurse)
         if self.weight_int4.is_cuda and self.indices_4.numel():
-            self.prepare_sm75_prefill_cache()
+            # Native SM75 prefill consumes the persistent packed layout.  Keep
+            # the signed expanded copy lazy so it is allocated only by the v2
+            # fallback, matching the original MixLLM memory organization.
             self.prepare_sm75_prefill_int4()
         if self.weight_int4.is_cuda and (self.indices_4.numel() or self.indices_8.numel()):
             self.prepare_sm75_prefill_metadata()
@@ -223,7 +225,8 @@ class ThreeLevelLinear(nn.Module):
                 layer.zero_int4 = zero.to(torch.uint8).contiguous()
         layer.prepare_sm75_packed_tensors()
         if layer.weight_int4.is_cuda:
-            layer.prepare_sm75_prefill_cache()
+            # Prepare native packed INT4 and metadata eagerly; signed expansion
+            # remains lazy for the legacy v2 fallback only.
             layer.prepare_sm75_prefill_int4()
             layer.prepare_sm75_prefill_metadata()
         return layer

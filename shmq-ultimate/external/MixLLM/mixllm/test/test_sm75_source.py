@@ -68,7 +68,15 @@ class SM75SourceContractTest(unittest.TestCase):
         selector = self.backend[self.backend.index("def _use_v188_mixed_prefill_path"):]
         self.assertIn("return False", selector)
         self.assertIn("_prefill_metadata_for_cutlass(module, x, torch_module)", self.backend)
-        self.assertIn("native_v3(\n                *arguments[:4], prefill_int4, *arguments[4:], *metadata[1:],\n            )", self.backend)
+        self.assertIn("use_cached_v3", self.backend)
+        self.assertIn("native_v3", self.backend)
+        self.assertIn("prefill_int4", self.backend)
+        self.assertIn("*metadata[1:]", self.backend)
+
+    def test_v284_native_packed_prefill_defers_expanded_int4(self):
+        self.assertIn("Do not materialize SHMQ's signed expanded copy", self.backend)
+        self.assertIn("expanded_int4 = module.weight_int8[:0]", self.backend)
+        self.assertIn("signed expanded copy lazy", self.linear)
 
     def test_v196_timing_integrity_contract(self):
         self.assertIn("timing_integrity_ratio", self.backend)

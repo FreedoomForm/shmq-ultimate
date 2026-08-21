@@ -263,12 +263,34 @@ def three_level_linear_prequantized(module, x, input_int8, scale_act, torch_modu
         return torch_module.empty(
             0, module.out_features, device=x.device, dtype=torch_module.float32,
         )
-    expanded_int4 = _expanded_int4_for_prefill(module, x, torch_module)
+    # The original MixLLM hot path retains only its persistent packed INT4
+    # layout.  Do not materialize SHMQ's signed expanded copy when the cached
+    # native-v3 launcher can consume the packed layout directly; retain the
+    # expansion for the legacy v2 fallback and for unsupported environments.
+    expanded_int4 = None
     prefill_int4 = module.weight_int4[:0]
-    if x.shape[0] >= 32 and module.indices_4.numel():
-        prepared_int4 = module.prepare_sm75_prefill_int4()
-        if prepared_int4 is not None:
-            prefill_int4 = prepared_int4
+    metadata = None
+    native_v3 = None
+    use_cached_v3 = False
+    if x.shape[0] >= 32 and (module.indices_4.numel() or module.indices_8.numel()):
+        native_v3 = getattr(torch_module.ops.mixllm_sm75,
+                            "_three_level_linear_v3_unchecked", None)
+        if native_v3 is not None:
+            metadata = _prefill_metadata_for_cutlass(module, x, torch_module)
+            if module.indices_4.numel():
+                prepared_int4 = module.prepare_sm75_prefill_int4()
+                if prepared_int4 is not None:
+                    prefill_int4 = prepared_int4
+                    use_cached_v3 = True
+            else:
+                use_cached_v3 = True
+    if not use_cached_v3:
+        expanded_int4 = _expanded_int4_for_prefill(module, x, torch_module)
+    else:
+        # v3 receives this ABI slot but the native packed branch does not read
+        # it.  Use the existing empty, device-correct placeholder instead of
+        # allocating a redundant [n4, K] signed tensor.
+        expanded_int4 = module.weight_int8[:0]
     arguments = (
         x if x.is_contiguous() else x.contiguous(),
         input_int8 if input_int8.is_contiguous() else input_int8.contiguous(),
@@ -280,14 +302,10 @@ def three_level_linear_prequantized(module, x, input_int8, scale_act, torch_modu
     )
     if _use_v188_mixed_prefill_path(module, x, torch_module):
         return torch_module.ops.mixllm_sm75._three_level_linear_v2_unchecked(*arguments)
-    if x.shape[0] >= 32 and (module.indices_4.numel() or module.indices_8.numel()):
-        metadata = _prefill_metadata_for_cutlass(module, x, torch_module)
-        native_v3 = getattr(torch_module.ops.mixllm_sm75,
-                            "_three_level_linear_v3_unchecked", None)
-        if native_v3 is not None:
-            return native_v3(
-                *arguments[:4], prefill_int4, *arguments[4:], *metadata[1:],
-            )
+    if use_cached_v3 and native_v3 is not None and metadata is not None:
+        return native_v3(
+            *arguments[:4], prefill_int4, *arguments[4:], *metadata[1:],
+        )
     return torch_module.ops.mixllm_sm75._three_level_linear_v2_unchecked(*arguments)
 
 
