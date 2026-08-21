@@ -1628,3 +1628,9 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 - Complete embedded suite result: `Ran 91 tests in 87.834s — OK`; 6 CUDA-only skips remain part of the test selection. The single-partition-validation handoff contract passed alongside all prior SM75, model, vLLM, scheduler, quantization, and source contracts. Marker: `COLAB_V291_SM75_CHECK_PASS`.
 - Colab teardown was verified separately: `No active sessions found on server.`
 - v291 is accepted only for Colab compile/correctness scope. No performance claim is made; Kaggle remains authoritative for same-condition T4 performance, timing integrity, full-model Qwen quality, memory gates, and the >=2.6x target.
+
+## v291 Kaggle result — 2026-08-22 — NO-GO
+
+- The submitted gate notebook completed execution on Kaggle T4, but the production gate decision was `no_go`: `operator_production=failed`, `model_vllm_production=failed`, and `t4_production=failed`. Therefore v291 is **not** a new safe baseline and v271 remains the last Kaggle-confirmed safe baseline.
+- The visible benchmark payload completed with exact numerical correctness for the reported rows (`max_abs_error=0.0`, `max_abs_error_vs_dense_fp16=0.0`) and `timing_integrity=true`, but performance was a regression versus dense FP16 on the reported mixed rows: end-to-end speedup ratios were approximately `0.985x` at rows=1, `0.356x` at rows=16, and `0.141x` at rows=128. This is not an improvement claim.
+- The terminal report also showed `Full-model Qwen quality: unavailable_environment`; this alone prevents a production GO decision. Exact gate failure details must be resolved before retaining any subsequent candidate.
