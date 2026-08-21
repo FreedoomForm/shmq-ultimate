@@ -1615,3 +1615,9 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 - Deep research compared original MixLLM mixed output handling with SHMQ v289. Original MixLLM returns a column-major mixed GEMM result and then performs a custom or generic transpose; SHMQ already writes directly to row-major `[rows, output_width]` using indexed epilogues/scatter.
 - The transpose hypothesis is therefore already solved in SHMQ. Reintroducing an intermediate column-major result would add work and risk the output ABI. No production code change was made. The research note records this rejected direction.
 - v289 remains the last validated candidate: local 90-test pass and Colab T4 compile/correctness pass. Performance, memory-gate deltas, timing integrity, and full-model Qwen quality still require the authoritative Kaggle run.
+
+## v291 — avoid duplicate partition-validation scan
+
+- Deep research compared the original direct MixLLM wrapper with SHMQ v289. The top-level SHMQ path validated the three partition index tensors, then the prequantized path rebuilt the cached validation signature and checked it again on every call.
+- v291 adds an internal `partition_validated` handoff. The top-level path still performs the full validation first and passes the flag only afterward; direct prequantized callers retain validation by default. Packed-cache forwarding, dynamic tensor checks, output mapping, streams/events, arithmetic, quality, and benchmark boundaries are unchanged.
+- Local validation: 91 tests passed, 6 CUDA-only skipped, compileall passed, and `git diff --check` passed. Colab T4 compile/correctness validation is required before retaining v291; performance remains Kaggle-only.

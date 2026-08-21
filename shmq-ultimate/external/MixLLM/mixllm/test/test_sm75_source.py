@@ -207,6 +207,13 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertNotIn("if(rows>=96)", source_compact)
         self.assertIn("kCutlassTuningAbi=286", source_compact)
 
+    def test_v291_single_partition_validation_contract(self):
+        backend = "".join(self.backend.split())
+        self.assertIn("partition_validated=False", backend)
+        self.assertIn("ifnotpartition_validated:_validate_partition(module,x,torch_module)", backend)
+        self.assertIn("_validate_partition(module,x,torch_module)ifx.shape[0]==0", backend)
+        self.assertIn("packed_tensors,True", backend)
+
     def test_v288_cached_packed_wrapper_contract(self):
         backend = self.backend
         self.assertIn("packed_argument_tensors=packed_tensors", "".join(backend.split()))

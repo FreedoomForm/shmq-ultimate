@@ -240,6 +240,7 @@ def _use_v188_mixed_prefill_path(module, x, torch_module):
 
 def three_level_linear_prequantized(
     module, x, input_int8, scale_act, torch_module, packed_tensors=None,
+    partition_validated=False,
 ):
     """Run the physical GEMM kernel with precomputed activation quantization."""
     if not _LOADED:
@@ -269,7 +270,8 @@ def three_level_linear_prequantized(
         raise ValueError("SM75 Tensor Core backend requires float16 activation input")
     if module.group_size != 128:
         raise ValueError("SM75 Tensor Core backend currently requires group_size=128")
-    _validate_partition(module, x, torch_module)
+    if not partition_validated:
+        _validate_partition(module, x, torch_module)
     if x.shape[0] == 0:
         return torch_module.empty(
             0, module.out_features, device=x.device, dtype=torch_module.float32,
@@ -361,12 +363,14 @@ def three_level_linear(module, x, torch_module):
         input_int8, scale_act = _fp16_abi_placeholders(module, x, torch_module)
         return three_level_linear_prequantized(
             module, x, input_int8, scale_act, torch_module, packed_tensors,
+            True,
         )
     input_int8, scale_act = quantize_activation_native(
         x, torch_module, module.group_size,
     )
     return three_level_linear_prequantized(
         module, x, input_int8, scale_act, torch_module, packed_tensors,
+        True,
     )
 
 
