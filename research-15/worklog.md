@@ -1410,3 +1410,13 @@ Kaggle version 264 compiled on Tesla T4 with embedded source SHA-256 `6587e7a3d1
 Deep research of upstream shape-aware GEMM selection and v267's M128N64 result indicates that the Qwen mixed layer has unequal integer partitions: INT4 N=2400 and INT8 N=896. v268 will use M128N64 only for rows=128, width>=2048, channels>=2048 and M64N64 for the smaller 64<=channels<2048 branch; all other shapes retain the existing tuner and graph fallback. This is an already validated SM75 family choice and does not alter arithmetic, streams, output mapping, quantization, model, or benchmark settings. No Kaggle run has been made.
 
 v268 local validation completed: focused source/backend tests `41 passed, 6 skipped`; full suite `88 passed, 6 skipped`; Python compilation and `git diff --check` passed. The candidate is committed before notebook rebuild; CUDA compilation is deferred to the single Kaggle T4 run.
+
+## v268 — rejected partition-width-aware geometry
+
+Kaggle version 265 compiled on Tesla T4 with embedded source SHA-256 `33e730ae47e3ae828e8a317794e713e2d8ff8f0f9dd392f76fdd4e57c86a86c8`. Native correctness and mixed decode GEMM passed, but mixed decode E2E, mixed prefill E2E, and the aggregate timing-integrity gate failed. Qwen mixed rows=128 measured `sm75_gemm=0.372592 ms`, `sm75_end_to_end=0.385424 ms`, `dense_fp16=0.204736 ms`, speedup `0.53120x`; rows=16 timing integrity was false. Despite improving rows=128 versus v267, it does not satisfy the all-gates requirement and is rejected. Restore v263 before the next research iteration.
+
+## v269 — all-large-partition M64N64 geometry (pre-run)
+
+Deep research of upstream shape-dependent configuration and v268's improvement from using M64N64 for the N=896 branch motivates one isolation test: force the legal lower-footprint M64N64 family for every normal rows=128, width>=2048, channels>=64 integer partition. All other shapes retain measured tuning and graph fallback. No arithmetic, quantization, output mapping, stream topology, model, or benchmark setting changes. No Kaggle run has been made.
+
+v269 local validation completed: focused source/backend tests `41 passed, 6 skipped`; full suite `88 passed, 6 skipped`; Python compilation and `git diff --check` passed. The candidate is committed before notebook rebuild; CUDA compilation is deferred to the single Kaggle T4 run.

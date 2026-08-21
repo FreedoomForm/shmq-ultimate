@@ -1,0 +1,7 @@
+# v269 deep research: test M64N64 across both large integer partitions
+
+The v268 T4 result is the strongest recent large-M measurement: partition-width-aware dispatch reached 0.5312x mixed rows=128 E2E speedup and retained native correctness, but it failed timing integrity at rows=16 and both required E2E gates. The v268 change used M128N64 for the wide INT4 partition and M64N64 for the smaller INT8 partition.
+
+The upstream MixLLM source does not assume that a larger threadblock is always better. Its configuration table is shape-dependent, and the row-major fallback uses a 64x128 threadblock rather than maximizing N for every partition. SHMQ's legal SM75 `M64N64` family uses four warps and lower per-CTA resource pressure than `M128N64`. The v268 result shows that the smaller-N branch did not destabilize correctness and that the mixed result improved over v267. That makes the remaining falsifiable question whether M64N64 is generally better on T4 for the large-M expanded-INT4 and INT8 runners, or whether only the N=896 branch benefits.
+
+v269 will force M64N64 for every normal rows=128, width>=2048, channels>=64 integer partition. All other shapes remain on the existing tuner and graph fallback. This changes only the already validated tile family; it preserves the expanded INT4 representation, INT8 arithmetic, metadata, output indices, persistent streams, FP16 branch, and benchmark conditions. If v269 regresses, the evidence will rule out M64N64 as a universal large-M choice and leave v263 as the safe baseline.

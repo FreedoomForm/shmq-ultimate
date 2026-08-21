@@ -74,7 +74,7 @@ enum class CutlassConfig : int {
   kM64N64 = 3,
 };
 
-constexpr int kCutlassTuningAbi = 268;
+constexpr int kCutlassTuningAbi = 269;
 constexpr int kCutlassTuningWarmup = 2;
 constexpr int kCutlassTuningIterations = 4;
 std::mutex g_cutlass_tuning_mutex;
@@ -187,16 +187,10 @@ CutlassConfig select_cutlass_config(
     return CutlassConfig::kN128;
   }
 
-  // Upstream MixLLM selects tile families per output partition.  Preserve the
-  // larger M tile for the wide INT4 branch, but use the lower-footprint legal
-  // M64N64 family for the smaller INT8 branch.
-  if (rows == 128 && width >= 2048) {
-    if (channels >= 2048) {
-      return CutlassConfig::kM128N64;
-    }
-    if (channels >= 64) {
-      return CutlassConfig::kM64N64;
-    }
+  // Isolate the lower-footprint legal family for all large-M integer
+  // partitions.  Other shapes retain measured tuning.
+  if (rows == 128 && channels >= 64 && width >= 2048) {
+    return CutlassConfig::kM64N64;
   }
 
   CutlassConfig best = CutlassConfig::kN128;
