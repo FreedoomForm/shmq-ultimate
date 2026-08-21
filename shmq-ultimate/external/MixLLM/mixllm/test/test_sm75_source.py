@@ -169,7 +169,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("usingInt8RunnerM64N64=Runner<CoreM64N64,2>", cutlass_compact)
         self.assertIn("kM128N64=2", source_compact)
         self.assertIn("kM64N64=3", source_compact)
-        self.assertIn("kCutlassTuningAbi=279", source_compact)
+        self.assertIn("kCutlassTuningAbi=280", source_compact)
         self.assertNotIn("GemmShape<128,128,64>", cutlass_compact)
         self.assertNotIn("kM128N128", source_compact)
         self.assertIn("kM128N64", source_compact)
@@ -184,7 +184,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("constfloatinverse_scale=1.0f/scale", source_compact)
         self.assertIn("constfloatlower_boundary=static_cast<float>(fast_value)-0.5f", source_compact)
         self.assertIn("scaled=values[item]/scale", source_compact)
-        self.assertIn("kCutlassTuningAbi=279", source_compact)
+        self.assertIn("kCutlassTuningAbi=280", source_compact)
 
     def test_v275_native_packed_int4_staged_contract(self):
         source_compact = "".join(self.source.split())
@@ -199,6 +199,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("MatrixShape<32,ArchMmaOperator::Shape::kN>", mixed_compact)
         self.assertIn("kASecondK=MmaIterations::kRow", mixed_compact)
         self.assertIn("kBSecondK=MmaIterations::kColumn", mixed_compact)
+        self.assertIn("FragmentShuffler<ElementBMma,ElementB,2*MmaIterations::kColumn", mixed_compact)
         dequantizer_compact = "".join(self.dequantizer.split())
         self.assertIn("constexprintkKGroups", dequantizer_compact)
         self.assertIn("k_group<kKGroups", dequantizer_compact)

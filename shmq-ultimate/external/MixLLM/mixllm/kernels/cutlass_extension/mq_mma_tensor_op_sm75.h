@@ -1,5 +1,6 @@
 
-// v278: SM75 packed INT4 uses a widened logical shared-memory load.  The
+// v280: SM75 packed INT4 uses a widened logical shared-memory load and the
+// original MixLLM warp-level B-fragment permutation before upcast.  The
 // source tensor is CUTLASS's compact uint4 array representation; the warp
 // iterator therefore loads 32 logical uint4 values per iteration (a valid
 // 128-bit ldmatrix access) and the warp adapter issues two legal SM75
@@ -162,12 +163,22 @@ class MQMmaPackedInputTensorOpSm75 {
   CUTLASS_DEVICE
   void transform(TransformedFragmentA &dst_A, TransformedFragmentB &dst_B,
                  FragmentA const &A, FragmentB const &B) const {
+    // The original MixLLM path shuffles the loaded B fragment across the warp
+    // before upcasting.  The ldmatrix fragment is not already in mma.sync's
+    // register layout.  v280 applies that same proven permutation to both
+    // internal k16 halves of the widened k32 fragment.
+    detail::FragmentShuffler<ElementBMma, ElementB,
+                             2 * MmaIterations::kColumn,
+                             FragmentB::kElements, MmaOperandB::kElements,
+                             Operand::kB>
+        shuffler_B;
+    FragmentB tmp_B = shuffler_B(B);
+
     // The compact uint4 Array stores two nibbles per byte.  This conversion
-    // expands each loaded 32-value logical fragment to 32 signed int8 values;
-    // it is the same conversion used by the original mixed-input path.
+    // expands each loaded 32-value logical fragment to 32 signed int8 values.
     detail::FragmentConverter<ElementBMma, ElementB, FragmentB::kElements>
         convert_B;
-    dst_B = convert_B(B);
+    dst_B = convert_B(tmp_B);
 
     FragmentA tmp_A = A;
     Array<ElementA, FragmentA::kElements / 2> const *ptr_tmp_A =
