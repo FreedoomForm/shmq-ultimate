@@ -1430,3 +1430,13 @@ Kaggle version 266 compiled and ran on Tesla T4 with the intended v269 source. N
 Deep research compared the original MixLLM warp/group quantizer with SHMQ. Both use one warp per 128-value group and the same caller-stream ordering, but SHMQ currently performs four float divisions per lane during int8 conversion. v270 will compute one reciprocal scale and replace only those repeated divisions with multiplications, retaining float scale computation, round/clamp semantics, packed stores, and all launch/ABI behavior. No Kaggle run has been made.
 
 v270 local validation completed after repairing the stale ABI contract: focused source/backend tests `40 passed, 6 skipped`; full suite `87 passed, 6 skipped`; Python compilation and `git diff --check` passed. The candidate is committed before notebook rebuild; CUDA compilation is deferred to the single Kaggle T4 run.
+
+## v270 — rejected reciprocal-multiply activation quantizer
+
+Kaggle version 267 compiled and ran the benchmark on T4, but the embedded backend test `test_random_rows_widths_and_determinism(rows=7, width=384)` failed because replacing division with reciprocal multiplication changed quantization rounding at a boundary. Native benchmark outputs completed, but `embedded_contract_tests` failed and the notebook terminated with `T4 gate did not execute completely`; no performance claim is valid for this candidate. Reject v270 and restore v263. The attempted arithmetic change is not safe under the exact correctness contract.
+
+## v271 — boundary-corrected reciprocal activation quantizer (pre-run)
+
+Deep research of v270's exact failure and the upstream half2 quantizer shows that reciprocal multiplication is valid only if half-integer rounding boundaries are protected. v271 will retain the reciprocal fast path but recompute the original float division when the fast product is within `1e-3` of either adjacent half-integer boundary. It will not loosen tolerances or alter quantization semantics. No Kaggle run has been made.
+
+v271 local validation completed: focused source/backend tests `41 passed, 6 skipped`; full suite `88 passed, 6 skipped`; Python compilation and `git diff --check` passed. The candidate is committed before notebook rebuild; CUDA compilation is deferred to the single Kaggle T4 run.

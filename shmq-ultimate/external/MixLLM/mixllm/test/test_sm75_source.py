@@ -167,7 +167,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("usingInt8RunnerM64N64=Runner<CoreM64N64,2>", cutlass_compact)
         self.assertIn("kM128N64=2", source_compact)
         self.assertIn("kM64N64=3", source_compact)
-        self.assertIn("kCutlassTuningAbi=270", source_compact)
+        self.assertIn("kCutlassTuningAbi=271", source_compact)
         self.assertNotIn("GemmShape<128,128,64>", cutlass_compact)
         self.assertNotIn("kM128N128", source_compact)
         self.assertIn("kM128N64", source_compact)
@@ -176,6 +176,13 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("cudaEventElapsedTime", source_compact)
         self.assertIn("SHMQ_SM75_TUNE_CACHE", source_compact)
         self.assertIn("cudaStreamIsCapturing", source_compact)
+
+    def test_v271_boundary_corrected_quantizer_contract(self):
+        source_compact = "".join(self.source.split())
+        self.assertIn("constfloatinverse_scale=1.0f/scale", source_compact)
+        self.assertIn("constfloatlower_boundary=static_cast<float>(fast_value)-0.5f", source_compact)
+        self.assertIn("scaled=values[item]/scale", source_compact)
+        self.assertIn("kCutlassTuningAbi=271", source_compact)
 
     def test_v200_integer_prefill_overlap_contract(self):
         source_compact = "".join(self.source.split())

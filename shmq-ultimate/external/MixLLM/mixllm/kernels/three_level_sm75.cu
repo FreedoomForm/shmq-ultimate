@@ -74,7 +74,7 @@ enum class CutlassConfig : int {
   kM64N64 = 3,
 };
 
-constexpr int kCutlassTuningAbi = 270;
+constexpr int kCutlassTuningAbi = 271;
 constexpr int kCutlassTuningWarmup = 2;
 constexpr int kCutlassTuningIterations = 4;
 std::mutex g_cutlass_tuning_mutex;
@@ -282,7 +282,15 @@ __global__ void quantize_activation_sm75_kernel(
   uint32_t packed = 0;
 #pragma unroll
   for (int item = 0; item < 4; ++item) {
-    int value = __float2int_rn(values[item] * inverse_scale);
+    float scaled = values[item] * inverse_scale;
+    const int fast_value = __float2int_rn(scaled);
+    const float lower_boundary = static_cast<float>(fast_value) - 0.5f;
+    const float upper_boundary = static_cast<float>(fast_value) + 0.5f;
+    if (fabsf(scaled - lower_boundary) < 1.0e-3f ||
+        fabsf(scaled - upper_boundary) < 1.0e-3f) {
+      scaled = values[item] / scale;
+    }
+    int value = __float2int_rn(scaled);
     value = max(-127, min(127, value));
     packed |= static_cast<uint32_t>(static_cast<uint8_t>(value)) << (item * 8);
   }
