@@ -58,6 +58,40 @@ class SM75PythonDispatchTest(unittest.TestCase):
         third = module.prepare_sm75_prefill_cache()
         self.assertIsNot(first, third)
 
+    def test_prefill_int4_interleave_matches_original_and_is_cached(self):
+        module = self._module((2, 0, 0))
+        packed = module.prepare_sm75_prefill_int4()
+        codes = torch.empty((2, 128), dtype=torch.uint8)
+        codes[:, 0::2] = module.weight_int4 & 0x0f
+        codes[:, 1::2] = module.weight_int4 >> 4
+        first = []
+        for index in range(128):
+            sub = index % 32
+            if 4 <= sub < 8:
+                first.append(index + 12)
+            elif 8 <= sub < 12:
+                first.append(index - 4)
+            elif 12 <= sub < 16:
+                first.append(index + 8)
+            elif 16 <= sub < 20:
+                first.append(index - 8)
+            elif 20 <= sub < 24:
+                first.append(index + 4)
+            elif 24 <= sub < 28:
+                first.append(index - 12)
+            else:
+                first.append(index)
+        second = []
+        for base in range(0, 128, 8):
+            second.extend((base, base + 4, base + 1, base + 5,
+                           base + 2, base + 6, base + 3, base + 7))
+        expected_codes = codes[:, torch.tensor(first, dtype=torch.int64)[second]]
+        expected = expected_codes[:, 0::2] | (expected_codes[:, 1::2] << 4)
+        torch.testing.assert_close(packed, expected, rtol=0, atol=0)
+        self.assertIs(packed, module.prepare_sm75_prefill_int4())
+        module.weight_int4[0, 0] ^= 0x0f
+        self.assertIsNot(packed, module.prepare_sm75_prefill_int4())
+
     def test_prefill_int4_expansion_is_signed_cached_and_invalidated(self):
         module = self._module((2, 0, 0))
         x = torch.empty(2, 128, dtype=torch.float16)

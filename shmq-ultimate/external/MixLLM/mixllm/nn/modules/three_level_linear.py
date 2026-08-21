@@ -25,6 +25,31 @@ def _unpack_uint4(packed: torch.Tensor) -> torch.Tensor:
     return output
 
 
+def _cutlass_uint4_interleave_indices(width: int, device: torch.device) -> torch.Tensor:
+    first = []
+    for index in range(width):
+        sub = index % 32
+        if 4 <= sub < 8:
+            first.append(index + 12)
+        elif 8 <= sub < 12:
+            first.append(index - 4)
+        elif 12 <= sub < 16:
+            first.append(index + 8)
+        elif 16 <= sub < 20:
+            first.append(index - 8)
+        elif 20 <= sub < 24:
+            first.append(index + 4)
+        elif 24 <= sub < 28:
+            first.append(index - 12)
+        else:
+            first.append(index)
+    second = []
+    for base in range(0, width, 8):
+        second.extend((base, base + 4, base + 1, base + 5,
+                       base + 2, base + 6, base + 3, base + 7))
+    return torch.tensor(first, dtype=torch.int64, device=device)[second]
+
+
 class ThreeLevelLinear(nn.Module):
     """Reference backend and serialization contract for a three-level op."""
 
@@ -52,17 +77,20 @@ class ThreeLevelLinear(nn.Module):
         # SM75 runtime caches are not buffers because they contain no model state.
         self._sm75_fp16_placeholders = None
         self._sm75_int4_expanded = None
+        self._sm75_int4_interleaved = None
         self._sm75_prefill_metadata = None
         self._sm75_packed_tensors = None
 
     def _apply(self, fn, recurse=True):
         self._sm75_fp16_placeholders = None
         self._sm75_int4_expanded = None
+        self._sm75_int4_interleaved = None
         self._sm75_prefill_metadata = None
         self._sm75_packed_tensors = None
         result = super()._apply(fn, recurse)
         if self.weight_int4.is_cuda and self.indices_4.numel():
             self.prepare_sm75_prefill_cache()
+            self.prepare_sm75_prefill_int4()
         if self.weight_int4.is_cuda and (self.indices_4.numel() or self.indices_8.numel()):
             self.prepare_sm75_prefill_metadata()
         return result
@@ -110,6 +138,27 @@ class ThreeLevelLinear(nn.Module):
         expanded = (codes.to(torch.int16) - zeros).to(torch.int8).contiguous()
         self._sm75_int4_expanded = (signature, expanded)
         return expanded
+
+    @torch.no_grad()
+    def prepare_sm75_prefill_int4(self):
+        """Prepare original MixLLM's persistent interleaved packed INT4 layout."""
+        if not self.indices_4.numel() or not self.weight_int4.numel():
+            return None
+        signature = (
+            self.weight_int4.device,
+            id(self.weight_int4), int(self.weight_int4._version),
+            tuple(self.weight_int4.shape), tuple(self.weight_int4.stride()),
+        )
+        cached = self._sm75_int4_interleaved
+        if cached is not None and cached[0] == signature:
+            return cached[1]
+        codes = _unpack_uint4(self.weight_int4)
+        permutation = _cutlass_uint4_interleave_indices(
+            self.in_features, self.weight_int4.device,
+        )
+        interleaved = _pack_uint4(codes.index_select(1, permutation))
+        self._sm75_int4_interleaved = (signature, interleaved)
+        return interleaved
 
     @torch.no_grad()
     def prepare_sm75_prefill_metadata(self):
@@ -175,6 +224,7 @@ class ThreeLevelLinear(nn.Module):
         layer.prepare_sm75_packed_tensors()
         if layer.weight_int4.is_cuda:
             layer.prepare_sm75_prefill_cache()
+            layer.prepare_sm75_prefill_int4()
             layer.prepare_sm75_prefill_metadata()
         return layer
 
@@ -199,6 +249,7 @@ class ThreeLevelLinear(nn.Module):
                               missing_keys, unexpected_keys, error_msgs):
         self._sm75_fp16_placeholders = None
         self._sm75_int4_expanded = None
+        self._sm75_int4_interleaved = None
         self._sm75_prefill_metadata = None
         self._sm75_packed_tensors = None
         # Two-level checkpoints predate the FP16 partition. Treat its omitted
@@ -223,6 +274,7 @@ class ThreeLevelLinear(nn.Module):
         self.prepare_sm75_packed_tensors()
         if self.weight_int4.is_cuda:
             self.prepare_sm75_prefill_cache()
+            self.prepare_sm75_prefill_int4()
             self.prepare_sm75_prefill_metadata()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

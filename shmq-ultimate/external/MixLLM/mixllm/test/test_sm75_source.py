@@ -9,6 +9,7 @@ class SM75SourceContractTest(unittest.TestCase):
         cls.source = (root / "kernels" / "three_level_sm75.cu").read_text(encoding="utf-8")
         cls.linear = (root / "nn" / "modules" / "three_level_linear.py").read_text(encoding="utf-8")
         cls.cutlass_testbed = (root / "kernels" / "sm75_cutlass_testbed.h").read_text(encoding="utf-8")
+        cls.cutlass_sm75_mixed = (root / "kernels" / "cutlass_extension" / "mq_mma_tensor_op_sm75.h").read_text(encoding="utf-8")
         cls.cutlass_pipeline = (root / "kernels" / "cutlass_extension" / "mq_mma_pipelined_sm75.h").read_text(encoding="utf-8")
         cls.backend = (root / "sm75_backend.py").read_text(encoding="utf-8")
 
@@ -65,7 +66,7 @@ class SM75SourceContractTest(unittest.TestCase):
         selector = self.backend[self.backend.index("def _use_v188_mixed_prefill_path"):]
         self.assertIn("return False", selector)
         self.assertIn("_prefill_metadata_for_cutlass(module, x, torch_module)", self.backend)
-        self.assertIn("native_v3(*arguments, *metadata[1:])", self.backend)
+        self.assertIn("native_v3(\n                *arguments[:4], prefill_int4, *arguments[4:], *metadata[1:],\n            )", self.backend)
 
     def test_v196_timing_integrity_contract(self):
         self.assertIn("timing_integrity_ratio", self.backend)
@@ -73,7 +74,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("timing_integrity", self.source)
 
     def test_v197_sm75_three_stage_runner_contract(self):
-        self.assertIn("template <typename Core, int Stages>", self.cutlass_testbed)
+        self.assertIn("template <typename Core, int Stages, typename ElementB_ = ElementB>", self.cutlass_testbed)
         self.assertIn("MQMmaPipelinedSm75<", self.cutlass_testbed)
         self.assertIn("Stages>", self.cutlass_testbed)
         self.assertIn("DefaultMmaCore<", self.cutlass_testbed)
@@ -167,7 +168,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("usingInt8RunnerM64N64=Runner<CoreM64N64,2>", cutlass_compact)
         self.assertIn("kM128N64=2", source_compact)
         self.assertIn("kM64N64=3", source_compact)
-        self.assertIn("kCutlassTuningAbi=271", source_compact)
+        self.assertIn("kCutlassTuningAbi=275", source_compact)
         self.assertNotIn("GemmShape<128,128,64>", cutlass_compact)
         self.assertNotIn("kM128N128", source_compact)
         self.assertIn("kM128N64", source_compact)
@@ -182,7 +183,25 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("constfloatinverse_scale=1.0f/scale", source_compact)
         self.assertIn("constfloatlower_boundary=static_cast<float>(fast_value)-0.5f", source_compact)
         self.assertIn("scaled=values[item]/scale", source_compact)
-        self.assertIn("kCutlassTuningAbi=271", source_compact)
+        self.assertIn("kCutlassTuningAbi=275", source_compact)
+
+    def test_v275_native_packed_int4_staged_contract(self):
+        source_compact = "".join(self.source.split())
+        testbed_compact = "".join(self.cutlass_testbed.split())
+        mixed_compact = "".join(self.cutlass_sm75_mixed.split())
+        linear_compact = "".join(self.linear.split())
+        backend_compact = "".join(self.backend.split())
+        self.assertIn("structOpMultiplyAddSm75PackedInputUpcast", mixed_compact)
+        self.assertIn("MQMmaMixedInputTensorOp", mixed_compact)
+        self.assertIn("usingPackedInt4RunnerM64N64=Runner<CorePackedInt4M64N64,2,cutlass::uint4b_t>", testbed_compact)
+        self.assertIn("reinterpret_cast<ElementB*>(matrix_B.data_ptr())", testbed_compact)
+        self.assertIn("run_cutlass_packed_int4_partition", source_compact)
+        self.assertIn("weight_int4_interleaved", source_compact)
+        self.assertIn("Tensorweight_int4_interleaved", source_compact)
+        self.assertIn("prepare_sm75_prefill_int4", linear_compact)
+        self.assertIn("prefill_int4", backend_compact)
+        self.assertIn("*arguments[:4],prefill_int4,*arguments[4:]", backend_compact)
+        self.assertNotIn("weight_int4_interleaved.data_ptr<int8_t>()", source_compact)
 
     def test_v200_integer_prefill_overlap_contract(self):
         source_compact = "".join(self.source.split())

@@ -14,6 +14,7 @@
 #include "cutlass/transform/threadblock/regular_tile_access_iterator_tensor_op.h"
 #include "cutlass_extension/mq_mma_pipelined_sm75.h"
 #include "cutlass_extension/mq_mma_sm75_int4_pair.h"
+#include "cutlass_extension/mq_mma_tensor_op_sm75.h"
 
 namespace shmq_cutlass_sm75 {
 
@@ -32,11 +33,11 @@ struct Problem {
   Problem(int m, int n, int k) : size({m, n, k}), partial_n(n) {}
 };
 
-template <typename Mma, typename SharedStorage>
+template <typename Mma, typename SharedStorage, typename ElementB_>
 __global__ void kernel(
     cutlass::gemm::GemmCoord problem_size,
     typename Mma::IteratorA::Params params_A, ElementA* ptr_A,
-    typename Mma::IteratorB::Params params_B, ElementB* ptr_B,
+    typename Mma::IteratorB::Params params_B, ElementB_* ptr_B,
     typename Mma::IteratorScale::Params params_scale,
     typename Mma::ElementScale const* ptr_scale,
     typename Mma::IteratorScaleAct::Params params_scale_act,
@@ -132,10 +133,11 @@ __global__ void kernel(
   }
 }
 
-template <typename Core, int Stages>
+template <typename Core, int Stages, typename ElementB_ = ElementB>
 struct Runner {
   using ThreadblockShape = typename Core::Shape;
   using Element = typename Core::ElementA;
+  using ElementB = ElementB_;
   using ThreadMapA = typename Core::IteratorThreadMapA;
   using ThreadMapB = typename Core::IteratorThreadMapB;
   using AccessTypeA = cutlass::Array<ElementA, ThreadMapA::kElementsPerAccess>;
@@ -182,15 +184,15 @@ struct Runner {
     int shared_bytes = smem_size();
     if (shared_bytes >= (48 << 10)) {
       C10_CUDA_CHECK(cudaFuncSetAttribute(
-          kernel<Mma, SharedStorage>,
+          kernel<Mma, SharedStorage, ElementB>,
           cudaFuncAttributeMaxDynamicSharedMemorySize, shared_bytes));
       C10_CUDA_CHECK(cudaFuncSetAttribute(
-          kernel<Mma, SharedStorage>,
+          kernel<Mma, SharedStorage, ElementB>,
           cudaFuncAttributePreferredSharedMemoryCarveout, 100));
     }
-    kernel<Mma, SharedStorage><<<grid, block, shared_bytes, stream>>>(
+    kernel<Mma, SharedStorage, ElementB><<<grid, block, shared_bytes, stream>>>(
         problem_size, params_A, matrix_A.data_ptr<int8_t>(), params_B,
-        matrix_B.data_ptr<int8_t>(), params_scale,
+        reinterpret_cast<ElementB*>(matrix_B.data_ptr()), params_scale,
         reinterpret_cast<typename Mma::ElementScale const*>(matrix_scale.data_ptr<at::Half>()),
         params_scale_act,
         reinterpret_cast<typename Mma::ElementScale const*>(matrix_scale_act.data_ptr<at::Half>()),
@@ -242,5 +244,15 @@ using CoreM64N64 = cutlass::gemm::threadblock::DefaultMmaCore<
     cutlass::arch::OpClassTensorOp, 2, cutlass::arch::OpMultiplyAddSaturate>;
 
 using Int8RunnerM64N64 = Runner<CoreM64N64, 2>;
+
+using CorePackedInt4M64N64 = cutlass::gemm::threadblock::DefaultMmaCore<
+    cutlass::gemm::GemmShape<64, 64, 64>,
+    cutlass::gemm::GemmShape<32, 32, 64>,
+    cutlass::gemm::GemmShape<8, 8, 16>,
+    ElementA, LayoutA, cutlass::uint4b_t, LayoutB, ElementC, LayoutC,
+    cutlass::arch::OpClassTensorOp, 2,
+    cutlass::arch::OpMultiplyAddSm75PackedInputUpcast>;
+
+using PackedInt4RunnerM64N64 = Runner<CorePackedInt4M64N64, 2, cutlass::uint4b_t>;
 
 }  // namespace shmq_cutlass_sm75

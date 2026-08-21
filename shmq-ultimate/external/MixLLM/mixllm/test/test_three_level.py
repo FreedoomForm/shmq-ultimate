@@ -223,23 +223,29 @@ class ThreeLevelReferenceTest(unittest.TestCase):
         )
         original = ThreeLevelLinear.from_weight(weight, allocation)
         original._sm75_int4_expanded = ("runtime-only", torch.empty(1))
+        original._sm75_int4_interleaved = ("runtime-only", torch.empty(1))
         loaded = ThreeLevelLinear(128, 4)
         loaded._sm75_int4_expanded = ("stale", torch.empty(1))
+        loaded._sm75_int4_interleaved = ("stale", torch.empty(1))
         loaded.load_state_dict(original.state_dict())
 
         self.assertNotIn("_sm75_int4_expanded", original.state_dict())
+        self.assertNotIn("_sm75_int4_interleaved", original.state_dict())
         self.assertIsNone(loaded._sm75_int4_expanded)
+        self.assertIsNone(loaded._sm75_int4_interleaved)
         torch.testing.assert_close(loaded.dequantize_weight(), original.dequantize_weight())
 
     def test_runtime_caches_clear_on_apply_and_load(self):
         module = ThreeLevelLinear(128, 4)
         module._sm75_fp16_placeholders = object()
         module._sm75_int4_expanded = object()
+        module._sm75_int4_interleaved = object()
 
         module.to(dtype=torch.float16)
 
         self.assertIsNone(module._sm75_fp16_placeholders)
         self.assertIsNone(module._sm75_int4_expanded)
+        self.assertIsNone(module._sm75_int4_interleaved)
 
     def test_backward_compatible_two_level_state_dict(self):
         weight = torch.randn(4, 128)

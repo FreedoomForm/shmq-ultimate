@@ -17,6 +17,7 @@ SOURCE_FILES = (
     "mixllm/kernels/sm75_cutlass_testbed.h",
     "mixllm/kernels/cutlass_extension/mq_mma_pipelined_sm75.h",
     "mixllm/kernels/cutlass_extension/mq_mma_sm75_int4_pair.h",
+    "mixllm/kernels/cutlass_extension/mq_mma_tensor_op_sm75.h",
     "mixllm/kernels/cutlass_extension/mq_mma_base.h",
     "mixllm/kernels/cutlass_extension/mq_mma_tensor_op_dequantizer.h",
     "mixllm/kernels/cutlass_extension/mq_fine_grained_scale_zero_iterator.h",

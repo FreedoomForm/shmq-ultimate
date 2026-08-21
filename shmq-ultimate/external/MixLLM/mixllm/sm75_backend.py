@@ -264,6 +264,11 @@ def three_level_linear_prequantized(module, x, input_int8, scale_act, torch_modu
             0, module.out_features, device=x.device, dtype=torch_module.float32,
         )
     expanded_int4 = _expanded_int4_for_prefill(module, x, torch_module)
+    prefill_int4 = module.weight_int4[:0]
+    if x.shape[0] >= 32 and module.indices_4.numel():
+        prepared_int4 = module.prepare_sm75_prefill_int4()
+        if prepared_int4 is not None:
+            prefill_int4 = prepared_int4
     arguments = (
         x if x.is_contiguous() else x.contiguous(),
         input_int8 if input_int8.is_contiguous() else input_int8.contiguous(),
@@ -280,7 +285,9 @@ def three_level_linear_prequantized(module, x, input_int8, scale_act, torch_modu
         native_v3 = getattr(torch_module.ops.mixllm_sm75,
                             "_three_level_linear_v3_unchecked", None)
         if native_v3 is not None:
-            return native_v3(*arguments, *metadata[1:])
+            return native_v3(
+                *arguments[:4], prefill_int4, *arguments[4:], *metadata[1:],
+            )
     return torch_module.ops.mixllm_sm75._three_level_linear_v2_unchecked(*arguments)
 
 
