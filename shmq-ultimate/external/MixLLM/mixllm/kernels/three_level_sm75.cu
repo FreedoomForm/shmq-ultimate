@@ -1164,9 +1164,9 @@ void run_cutlass_packed_int4_partition(
   }
   record_tensor_stream(input_int8, stream);
   record_tensor_stream(scale_act, stream);
-  record_tensor_stream(weight_int4_interleaved, stream);
-  record_tensor_stream(matrix_scale, stream);
-  record_tensor_stream(matrix_zero, stream);
+  // Packed weights and cached metadata are persistent module-owned buffers. They
+  // remain alive for the complete forward call and do not need allocator
+  // stream-recording; only dynamic activation/output tensors are recorded.
   record_tensor_stream(output, stream);
   shmq_cutlass_sm75::PackedInt4RunnerM64N64::run(
       rows, static_cast<int>(indices.numel()), width, input_int8,

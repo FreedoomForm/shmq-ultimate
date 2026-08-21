@@ -207,6 +207,17 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertNotIn("if(rows>=96)", source_compact)
         self.assertIn("kCutlassTuningAbi=286", source_compact)
 
+    def test_v287_persistent_packed_stream_record_contract(self):
+        source_compact = "".join(self.source.split())
+        self.assertIn("Packedweightsandcachedmetadataarepersistentmodule-ownedbuffers", source_compact)
+        self.assertIn("record_tensor_stream(input_int8,stream)", source_compact)
+        self.assertIn("record_tensor_stream(scale_act,stream)", source_compact)
+        self.assertIn("record_tensor_stream(output,stream)", source_compact)
+        packed_helper = self.source.split("void run_cutlass_packed_int4_partition(", 1)[1].split("void run_fp16_partition_cublas(", 1)[0]
+        self.assertNotIn("record_tensor_stream(weight_int4_interleaved", packed_helper)
+        self.assertNotIn("record_tensor_stream(matrix_scale", packed_helper)
+        self.assertNotIn("record_tensor_stream(matrix_zero", packed_helper)
+
     def test_v282_unified_three_level_prefill_scheduler_contract(self):
         source_compact = "".join(self.source.split())
         self.assertIn("structUnifiedPrefillPlan", source_compact)

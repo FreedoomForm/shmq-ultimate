@@ -1570,3 +1570,9 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 - Native T4 coverage therefore passed for CUDA graph capture, INT4 tile-width boundaries, mixed/empty partitions, activation quantizer equivalence, non-default stream dependency, randomized rows/widths/determinism, plus all Python/source/model/vLLM contracts. Marker: `COLAB_V286_SM75_CHECK_PASS`.
 - `colab sessions` after teardown reported `No active sessions found on server.`
 - This is a Colab compile/correctness result only. It does not replace the required Kaggle T4 performance gates, full-model Qwen quality gate, timing-integrity gate, or the >=2.6x target. v286 is safe with respect to the tested Colab contracts but remains performance- and full-model-quality-pending.
+
+## v287 — remove redundant persistent-buffer stream records
+
+- Deep research compared original MixLLM’s one-op launcher with SHMQ v286. The upstream path does not call allocator `record_stream` for persistent INT8/INT4 weights, scales, zero points, or indices. SHMQ already follows this rule for the fused pair and fallback paths but redundantly recorded the native packed INT4 weight and cached metadata on every call.
+- Removed only those redundant records from `run_cutlass_packed_int4_partition`; dynamic `input_int8`, `scale_act`, and `output` recording remains. Module-owned packed weights and metadata are guaranteed alive for the complete forward call. Arithmetic, streams, events, layout, precision, quality, and benchmark settings are unchanged. The CUTLASS tuning ABI remains 286 because no tuned kernel configuration changed.
+- Local validation: 89 tests passed, 6 CUDA-only skipped, compileall passed, and `git diff --check` passed. Colab T4 compile/correctness validation is required before treating v287 as safe; performance remains Kaggle-only.
