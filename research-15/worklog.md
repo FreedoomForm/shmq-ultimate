@@ -1526,3 +1526,9 @@ The v280 submission was blocked before execution by Kaggle quota. A further prim
 
 ## v281 — corrected original B shuffler fragment width (quota-pending)
 The v281 audit correction changes only the original B shuffler’s template metadata: four groups of eight uint4 logical values fill the 32-bit shuffle words, then conversion yields the two four-int8 B operands consumed by each internal k16 MMA. The ABI is 281. Local validation passed again: 90 tests, 6 CUDA-only skips, compileall, and `git diff --check`. Kaggle submission remains intentionally deferred because the weekly 30-hour T4 quota was exhausted before v280 execution; no v281 performance or correctness claim exists.
+
+## v282 — unified three-level prefill scheduler seam (T4 pending)
+
+Deep research compared the original MixLLM launcher with the v271 SM75 dispatcher. The original uses separate compile-time INT4/INT8 arithmetic adapters behind one persistent stream/event and configuration organization, while v271 already shares the integer overlap but launches FP16 outside that module. v282 adds `UnifiedPrefillPlan` and `run_unified_prefill` as a host-side deep module that owns the integer fork/join and FP16 launch ordering while preserving the existing INT4, INT8, FP16 leaves, output ABI, arithmetic, model, benchmark shapes, and quality gates. The native packed INT4 leaf remains capability-gated by the existing interleaved-weight input and is not claimed as measured.
+
+Local validation passed: 91 tests, 6 CUDA-only skips, compileall, and `git diff --check`. Kaggle T4 validation is required; no performance, memory, or quality improvement claim is made before the T4 run.

@@ -61,7 +61,8 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("voidrun_fp16_partition_cublas(", source_compact)
         self.assertIn("at::mm(input_fp16,weight_fp16.transpose(0,1))", source_compact)
         self.assertIn("scatter_fp16_partition_kernel<<<blocks,threads,0,stream>>>", source_compact)
-        self.assertIn("run_fp16_partition_cublas(input_fp16,weight_fp16,indices_fp16,output,rows,width,stream.stream())", source_compact)
+        self.assertIn("run_fp16_partition_cublas(input_fp16,weight_fp16,indices_fp16,output,plan.rows,plan.width,caller_stream)", source_compact)
+        self.assertIn("run_unified_prefill(", source_compact)
 
     def test_v261_mixed_prefill_uses_cached_metadata_dispatch(self):
         selector = self.backend[self.backend.index("def _use_v188_mixed_prefill_path"):]
@@ -152,7 +153,8 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("voidrun_int4_pair_partition(", source_compact)
         self.assertIn("use_fused_int4", source_compact)
         self.assertIn("n4>0&&n8==0&&n16==0&&!has_cached_metadata", source_compact)
-        self.assertIn("has_cached_metadata?&cached_scale_int8:nullptr,false)", source_compact)
+        self.assertIn("has_cached_metadata?&cached_scale_int8:nullptr", source_compact)
+        self.assertIn("false);", source_compact)
         self.assertIn("n4>0&&n8==0&&n16==0&&!has_cached_metadata", source_compact)
         self.assertIn("low_mma(low_accum[row_tile][n_tile],low_a,weights,low_accum[row_tile][n_tile])", source_compact)
         self.assertIn("high_mma(high_accum[row_tile][n_tile],high_a,weights,high_accum[row_tile][n_tile])", source_compact)
@@ -169,7 +171,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("usingInt8RunnerM64N64=Runner<CoreM64N64,2>", cutlass_compact)
         self.assertIn("kM128N64=2", source_compact)
         self.assertIn("kM64N64=3", source_compact)
-        self.assertIn("kCutlassTuningAbi=281", source_compact)
+        self.assertIn("kCutlassTuningAbi=282", source_compact)
         self.assertNotIn("GemmShape<128,128,64>", cutlass_compact)
         self.assertNotIn("kM128N128", source_compact)
         self.assertIn("kM128N64", source_compact)
@@ -184,7 +186,17 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("constfloatinverse_scale=1.0f/scale", source_compact)
         self.assertIn("constfloatlower_boundary=static_cast<float>(fast_value)-0.5f", source_compact)
         self.assertIn("scaled=values[item]/scale", source_compact)
-        self.assertIn("kCutlassTuningAbi=281", source_compact)
+        self.assertIn("kCutlassTuningAbi=282", source_compact)
+
+    def test_v282_unified_three_level_prefill_scheduler_contract(self):
+        source_compact = "".join(self.source.split())
+        self.assertIn("structUnifiedPrefillPlan", source_compact)
+        self.assertIn("boolhas_integer()const", source_compact)
+        self.assertIn("voidrun_unified_prefill(", source_compact)
+        self.assertIn("run_unified_prefill(plan,input_fp16,input_int8,scale_act", source_compact)
+        self.assertIn("finish_integer_prefill_overlap(plan.n4,plan.n8,caller_stream,streams)", source_compact)
+        self.assertIn("run_fp16_partition_cublas(input_fp16,weight_fp16,indices_fp16,output,plan.rows,plan.width,caller_stream)", source_compact)
+        self.assertIn("kCutlassTuningAbi=282", source_compact)
 
     def test_v275_native_packed_int4_staged_contract(self):
         source_compact = "".join(self.source.split())

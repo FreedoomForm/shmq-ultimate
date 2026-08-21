@@ -74,7 +74,7 @@ enum class CutlassConfig : int {
   kM64N64 = 3,
 };
 
-constexpr int kCutlassTuningAbi = 281;
+constexpr int kCutlassTuningAbi = 282;
 constexpr int kCutlassTuningWarmup = 2;
 constexpr int kCutlassTuningIterations = 4;
 std::mutex g_cutlass_tuning_mutex;
@@ -1257,6 +1257,53 @@ void finish_integer_prefill_overlap(
   }
 }
 
+// v282 deep-module seam: one logical three-level prefill operation owns the
+// integer fork/join, FP16 launch, and final completion ordering.  Precision
+// arithmetic remains in the existing compile-time-specialized leaves.
+struct UnifiedPrefillPlan {
+  int rows;
+  int width;
+  int n4;
+  int n8;
+  int n16;
+
+  bool has_integer() const { return n4 != 0 || n8 != 0; }
+};
+
+void run_unified_prefill(
+    const UnifiedPrefillPlan& plan,
+    const at::Tensor& input_fp16, const at::Tensor& input_int8,
+    const at::Tensor& scale_act, const at::Tensor& weight_int4,
+    const at::Tensor& weight_int4_interleaved,
+    const at::Tensor& expanded_int4, const at::Tensor& scale_int4,
+    const at::Tensor& zero_int4, const at::Tensor& indices_int4,
+    const at::Tensor& weight_int8, const at::Tensor& scale_int8,
+    const at::Tensor& indices_int8, const at::Tensor& weight_fp16,
+    const at::Tensor& indices_fp16, at::Tensor& output,
+    cudaStream_t caller_stream,
+    const at::Tensor* cached_scale_int4,
+    const at::Tensor* cached_zero_int4,
+    const at::Tensor* cached_scale_int8) {
+  auto& streams = integer_prefill_streams(input_fp16.device().index());
+  if (plan.has_integer()) {
+    begin_integer_prefill_overlap(
+        input_int8, scale_act, weight_int4, weight_int4_interleaved,
+        expanded_int4, scale_int4, zero_int4, indices_int4,
+        weight_int8, scale_int8, indices_int8, output, plan.rows, plan.width,
+        caller_stream, streams, cached_scale_int4, cached_zero_int4,
+        cached_scale_int8, false);
+  }
+  if (plan.n16 > 0) {
+    run_fp16_partition_cublas(
+        input_fp16, weight_fp16, indices_fp16, output, plan.rows, plan.width,
+        caller_stream);
+  }
+  if (plan.has_integer()) {
+    finish_integer_prefill_overlap(
+        plan.n4, plan.n8, caller_stream, streams);
+  }
+}
+
 std::tuple<at::Tensor, at::Tensor> quantize_activation_sm75(
     const at::Tensor& input) {
   check_cuda_contiguous(input, "input");
@@ -1452,23 +1499,15 @@ at::Tensor three_level_linear_v2_core(
     // The helper is deliberately selected only for rows>=32: the SM75
     // 16x128 CUTLASS geometry is not a valid portable small-M core, and
     // rows==16 remains on the validated direct-WMMA control path.
-    auto& integer_streams = integer_prefill_streams(input_fp16.device().index());
-    begin_integer_prefill_overlap(
-        input_int8, scale_act, weight_int4, weight_int4_interleaved,
-        expanded_int4, scale_int4,
-        zero_int4, indices_int4, weight_int8, scale_int8, indices_int8, output,
-        rows, width, stream.stream(), integer_streams,
+    const UnifiedPrefillPlan plan{rows, width, n4, n8, n16};
+    run_unified_prefill(
+        plan, input_fp16, input_int8, scale_act, weight_int4,
+        weight_int4_interleaved, expanded_int4, scale_int4, zero_int4,
+        indices_int4, weight_int8, scale_int8, indices_int8, weight_fp16,
+        indices_fp16, output, stream.stream(),
         has_cached_metadata ? &cached_scale_int4 : nullptr,
         has_cached_metadata ? &cached_zero_int4 : nullptr,
-        has_cached_metadata ? &cached_scale_int8 : nullptr,
-        false);
-    if (n16 > 0) {
-      run_fp16_partition_cublas(
-          input_fp16, weight_fp16, indices_fp16, output, rows, width,
-          stream.stream());
-    }
-    finish_integer_prefill_overlap(
-        n4, n8, stream.stream(), integer_streams);
+        has_cached_metadata ? &cached_scale_int8 : nullptr);
   } else {
     const int channel_tiles =
         (n4 + kPrefillChannels - 1) / kPrefillChannels +
