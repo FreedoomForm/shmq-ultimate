@@ -29,6 +29,7 @@ def main() -> int:
     if ROOT.exists():
         shutil.rmtree(ROOT)
     run("git", "clone", "--depth", "1", "--branch", BRANCH, REPO_URL, str(ROOT))
+    run("git", "-C", str(ROOT), "fetch", "--unshallow")
     run("git", "-C", str(ROOT), "checkout", "--detach", EXPECTED_COMMIT)
     commit = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip()
     print("SHMQ_COMMIT", commit, flush=True)
