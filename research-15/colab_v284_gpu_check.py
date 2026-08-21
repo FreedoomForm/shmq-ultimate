@@ -15,7 +15,7 @@ import sys
 
 REPO_URL = "https://github.com/FreedoomForm/shmq-ultimate.git"
 BRANCH = "unified-three-level-sm75"
-EXPECTED_COMMIT = "9a5e9ab"
+EXPECTED_COMMIT = "d64fb16"
 ROOT = pathlib.Path("/content/shmq-ultimate-v284")
 FORK = ROOT / "shmq-ultimate" / "external" / "MixLLM"
 
@@ -32,7 +32,7 @@ def main() -> int:
     commit = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip()
     print("SHMQ_COMMIT", commit, flush=True)
     if not commit.startswith(EXPECTED_COMMIT):
-        raise RuntimeError(f"expected v284 commit prefix {EXPECTED_COMMIT}, got {commit}")
+        raise RuntimeError(f"expected v286 commit prefix {EXPECTED_COMMIT}, got {commit}")
 
     import torch
 
