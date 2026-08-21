@@ -167,7 +167,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("usingInt8RunnerM64N64=Runner<CoreM64N64,2>", cutlass_compact)
         self.assertIn("kM128N64=2", source_compact)
         self.assertIn("kM64N64=3", source_compact)
-        self.assertIn("kCutlassTuningAbi=267", source_compact)
+        self.assertIn("kCutlassTuningAbi=268", source_compact)
         self.assertNotIn("GemmShape<128,128,64>", cutlass_compact)
         self.assertNotIn("kM128N128", source_compact)
         self.assertIn("kM128N64", source_compact)
@@ -177,10 +177,10 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("SHMQ_SM75_TUNE_CACHE", source_compact)
         self.assertIn("cudaStreamIsCapturing", source_compact)
 
-    def test_v267_large_m128n64_dispatch_contract(self):
+    def test_v268_partition_width_geometry_dispatch_contract(self):
         source_compact = "".join(self.source.split())
-        self.assertIn("if(rows==128&&channels>=64&&width>=2048){returnCutlassConfig::kM128N64;}", source_compact)
-        self.assertIn("kCutlassTuningAbi=267", source_compact)
+        self.assertIn("if(rows==128&&width>=2048){if(channels>=2048){returnCutlassConfig::kM128N64;}if(channels>=64){returnCutlassConfig::kM64N64;}}", source_compact)
+        self.assertIn("kCutlassTuningAbi=268", source_compact)
 
     def test_v200_integer_prefill_overlap_contract(self):
         source_compact = "".join(self.source.split())

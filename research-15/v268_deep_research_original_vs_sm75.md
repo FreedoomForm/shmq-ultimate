@@ -1,0 +1,7 @@
+# v268 deep research: partition-width-aware large-M geometry
+
+The v267 T4 result established that explicit `M128N64` dispatch improves the mixed Qwen rows=128 case from the recent v266 regression to 0.462x E2E speedup, but it still misses the target. The upstream MixLLM launcher treats the output partition as a separate GEMM problem and exposes different tile families for different N sizes. SHMQ's mixed layer has two unequal integer partitions: INT4 has 2400 channels and INT8 has 896 channels for Qwen QKV.
+
+A single M128N64 decision for both branches is therefore not faithful to the upstream shape-aware organization. The legal SM75 `M64N64` family has half the M tile and half the warp count of M128N64. For a smaller partition such as N=896, this can reduce register/shared-memory pressure and increase resident CTAs, while the large N=2400 INT4 branch retains M128N64. v268 will apply this only to the normal rows=128, width>=2048 path: `channels>=2048` uses M128N64, `64<=channels<2048` uses M64N64; all other shapes retain the existing tuner and graph fallback. The change preserves the exact INT4 expansion, INT8 arithmetic, scales, zeros, output indices, streams, and benchmark settings.
+
+This is a falsifiable tile-family experiment rather than a bookkeeping change. If the smaller INT8 branch is not the bottleneck, the result should be neutral; if M128N64 is overprovisioned for N=896, the branch and possibly total mixed prefill latency should improve.

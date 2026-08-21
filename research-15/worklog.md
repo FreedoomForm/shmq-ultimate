@@ -1404,3 +1404,9 @@ v267 local validation completed: focused source/backend tests `41 passed, 6 skip
 ## v267 — rejected explicit M128N64 large-M geometry
 
 Kaggle version 264 compiled on Tesla T4 with embedded source SHA-256 `6587e7a3d1029aa074e12ec739adfd5401a58a15f16fd4333103c154b677fa56`. Native correctness and timing integrity passed; mixed decode GEMM passed, but mixed decode E2E and mixed prefill E2E failed. Qwen mixed rows=128 measured `sm75_gemm=0.501888 ms`, `sm75_end_to_end=0.497872 ms`, `dense_fp16=0.230240 ms`, speedup `0.46245x`. This improved over v266's 0.3361x E2E speedup in the same comparison family but remains far below the required 2.6x target, so the candidate is rejected. The explicit M128N64 family is retained as a measured option, not promoted as the baseline.
+
+## v268 — partition-width-aware M64N64 geometry (pre-run)
+
+Deep research of upstream shape-aware GEMM selection and v267's M128N64 result indicates that the Qwen mixed layer has unequal integer partitions: INT4 N=2400 and INT8 N=896. v268 will use M128N64 only for rows=128, width>=2048, channels>=2048 and M64N64 for the smaller 64<=channels<2048 branch; all other shapes retain the existing tuner and graph fallback. This is an already validated SM75 family choice and does not alter arithmetic, streams, output mapping, quantization, model, or benchmark settings. No Kaggle run has been made.
+
+v268 local validation completed: focused source/backend tests `41 passed, 6 skipped`; full suite `88 passed, 6 skipped`; Python compilation and `git diff --check` passed. The candidate is committed before notebook rebuild; CUDA compilation is deferred to the single Kaggle T4 run.
