@@ -1517,3 +1517,6 @@ Kaggle version 275 compiled v279 successfully, passed embedded contracts, timing
 Deep research of the original MixLLM CUTLASS source identified the v279 native-only correctness defect: the original `transform()` applies `FragmentShuffler` to B with cross-lane shuffles and `__byte_perm` before uint4 upcast, while the new SM75 adapter converted B directly. v280 restores this exact permutation over `2 * MmaIterations::kColumn` groups so both internal k16 halves of the widened fragment are transformed. A, zero broadcast, arithmetic, cache layout, ABI shape, benchmark settings, and quality model are unchanged. `kCutlassTuningAbi` is 280.
 
 Local validation passed: 90 tests, 6 CUDA-only skips, compileall, and `git diff --check`. v280 requires one Kaggle T4 compile/correctness/gate run; it is not accepted before that evidence.
+
+## v280 — T4 submission blocked before execution by Kaggle quota
+The v280 source and notebook passed local validation and payload/hash checks. The submission API rejected the run before execution with `Maximum weekly GPU quota of 30.00 hours reached`; no Kaggle version was created and no v280 correctness, timing, performance, or quality result exists. v280 must remain pending/unaccepted until the same notebook can execute on the required T4. No benchmark settings or quality gates were relaxed.
