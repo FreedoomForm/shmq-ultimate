@@ -1576,3 +1576,10 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 - Deep research compared original MixLLM’s one-op launcher with SHMQ v286. The upstream path does not call allocator `record_stream` for persistent INT8/INT4 weights, scales, zero points, or indices. SHMQ already follows this rule for the fused pair and fallback paths but redundantly recorded the native packed INT4 weight and cached metadata on every call.
 - Removed only those redundant records from `run_cutlass_packed_int4_partition`; dynamic `input_int8`, `scale_act`, and `output` recording remains. Module-owned packed weights and metadata are guaranteed alive for the complete forward call. Arithmetic, streams, events, layout, precision, quality, and benchmark settings are unchanged. The CUTLASS tuning ABI remains 286 because no tuned kernel configuration changed.
 - Local validation: 89 tests passed, 6 CUDA-only skipped, compileall passed, and `git diff --check` passed. Colab T4 compile/correctness validation is required before treating v287 as safe; performance remains Kaggle-only.
+
+## v287 Colab T4 result — 2026-08-22
+
+- The v287 runner checked out immutable source commit `d92ae5c` on Tesla T4 / SM75 after fetching the shallow clone. It compiled the unchanged v287 arithmetic and layout with nvcc and linked the extension successfully.
+- Complete embedded suite result: `Ran 89 tests in 86.721s — OK`; 6 CUDA-only skips remain part of the local/source selection, and the Colab run explicitly enabled `MIXLLM_TEST_SM75=1`. The new persistent-buffer stream-record contract passed alongside all prior SM75, model, vLLM, and quality-contract tests. Marker: `COLAB_V287_SM75_CHECK_PASS`.
+- Colab teardown was verified separately: `No active sessions found on server.`
+- v287 is accepted for the tested Colab compile/correctness scope only. No performance claim is made; Kaggle remains mandatory for same-condition T4 performance, timing integrity, full-model Qwen/Qwen2.5-0.5B quality, memory gates, and the >=2.6x target.
