@@ -15,7 +15,7 @@ import sys
 
 REPO_URL = "https://github.com/FreedoomForm/shmq-ultimate.git"
 BRANCH = "unified-three-level-sm75"
-EXPECTED_COMMIT = "d64fb16"
+EXPECTED_COMMIT = "9a5e9ab"
 ROOT = pathlib.Path("/content/shmq-ultimate-v284")
 FORK = ROOT / "shmq-ultimate" / "external" / "MixLLM"
 
@@ -29,6 +29,7 @@ def main() -> int:
     if ROOT.exists():
         shutil.rmtree(ROOT)
     run("git", "clone", "--depth", "1", "--branch", BRANCH, REPO_URL, str(ROOT))
+    run("git", "-C", str(ROOT), "checkout", "--detach", EXPECTED_COMMIT)
     commit = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip()
     print("SHMQ_COMMIT", commit, flush=True)
     if not commit.startswith(EXPECTED_COMMIT):
