@@ -1546,3 +1546,11 @@ Deep research compared the preserved original MixLLM `LinearMixLLM` layout with 
 v284 keeps the original packed layout and metadata eager, makes signed expansion lazy, and uses the existing empty device-correct placeholder for the unread v3 ABI slot. The signed expansion remains available for v2 fallback and explicit callers; arithmetic, partitioning, output ABI, model quality, benchmark settings, and timing-integrity criteria are unchanged. Memory telemetry continues to report `expanded_int4_bytes` honestly, including zero for native-only preparation.
 
 Local validation passed after the source-contract update: 93 tests, 6 CUDA-only skips, compileall, and `git diff --check`. This is not a T4 acceptance claim; Kaggle validation remains required.
+
+## Colab v284 validation — 2026-08-22
+
+- Added `research-15/colab_v284_gpu_check.py`, a one-shot `google-colab-cli` runner that clones branch `unified-three-level-sm75`, verifies commit prefix `ccd7433`, requires Tesla T4 / SM75, installs missing Ninja, and executes the existing seven unittest modules without changing thresholds, model, precision, or benchmark settings.
+- Attempt 1: Colab allocated `Tesla T4`, capability `(7, 5)`, exact commit `ccd74338f0bda0c759a523036cc0cc5d17acb103`; validation stopped at the environment dependency check because Ninja was absent. No SHMQ test failure was observed.
+- Runner was updated to install Ninja inside the ephemeral VM and print captured unittest output.
+- Attempt 2: allocation was rejected before VM creation with official CLI `TooManyAssignmentsError` / HTTP `412 Precondition Failed` for `accelerator=T4`. The runner did not execute. The Colab assignment limit is now the blocker, analogous to the exhausted Kaggle quota.
+- Decision: retain v284 unchanged as the only T4-pending candidate; do not claim Colab correctness or performance until a complete T4 run passes.
