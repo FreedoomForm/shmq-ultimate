@@ -238,13 +238,16 @@ def _use_v188_mixed_prefill_path(module, x, torch_module):
     return False
 
 
-def three_level_linear_prequantized(module, x, input_int8, scale_act, torch_module):
+def three_level_linear_prequantized(
+    module, x, input_int8, scale_act, torch_module, packed_tensors=None,
+):
     """Run the physical GEMM kernel with precomputed activation quantization."""
     if not _LOADED:
         raise RuntimeError("call load_sm75_backend before using the SM75 operator")
     if x.dim() != 2:
         raise ValueError("SM75 correctness backend currently requires a 2D input")
-    packed_tensors = module.prepare_sm75_packed_tensors()
+    if packed_tensors is None:
+        packed_tensors = module.prepare_sm75_packed_tensors()
     if packed_tensors is None:
         packed_tensors = (
             module.weight_int4, module.scale_int4, module.zero_int4, module.indices_4,
@@ -357,13 +360,13 @@ def three_level_linear(module, x, torch_module):
     if not module.indices_4.numel() and not module.indices_8.numel():
         input_int8, scale_act = _fp16_abi_placeholders(module, x, torch_module)
         return three_level_linear_prequantized(
-            module, x, input_int8, scale_act, torch_module,
+            module, x, input_int8, scale_act, torch_module, packed_tensors,
         )
     input_int8, scale_act = quantize_activation_native(
         x, torch_module, module.group_size,
     )
     return three_level_linear_prequantized(
-        module, x, input_int8, scale_act, torch_module,
+        module, x, input_int8, scale_act, torch_module, packed_tensors,
     )
 
 
