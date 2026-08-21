@@ -1646,3 +1646,9 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 - The corrected runner allocated a Tesla T4 and verified `torch 2.11.0+cu128`, CUDA available, one device, and capability `(7, 5)`. It then began downloading the public Qwen2.5-0.5B model to writable Colab storage.
 - After more than ten minutes the captured output remained at `Fetching 7 files: 0%`; the Hugging Face client also reported that the Colab UI secret lookup for `HF_TOKEN` timed out and the request was unauthenticated. No notebook benchmark cell executed, so this attempt produced no performance or gate result and must not change any baseline.
 - The remote T4 session and its local wrapper were explicitly terminated; `colab sessions` reported no active sessions. Next iteration will avoid the stalled implicit secret lookup and use the official persistent `colab exec` workflow to stage or cache model files before running the gate.
+
+## v292 Colab full-gate execution fix — 2026-08-22
+
+- The persistent `colab exec` attempt exposed a second workflow issue: launching `jupyter nbconvert --execute` from inside the already-running remote Jupyter kernel remained BUSY for over 36 minutes and emitted no gate cells. This was a nested-kernel deadlock/indefinite wait, not a SHMQ result.
+- The runner now parses the committed gate notebook and executes its code cells directly, in order, inside the current Colab kernel namespace. This preserves the notebook’s exact embedded sources, benchmark cases, CUDA-event timing, thresholds, vLLM smoke, Qwen quality logic, and final gate decision while following the official `colab exec` execution model.
+- The stalled persistent T4 was stopped and `colab sessions` confirmed no active sessions before this fix.

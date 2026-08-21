@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Run the complete SHMQ gate on a fresh Colab T4 VM.
 
-This follows googlecolab/google-colab-cli's documented ``colab run`` model:
-the local script is sent to a fresh named T4 runtime and the VM is released by
-the CLI after completion. The gate notebook remains the single source of
-benchmark inputs, thresholds, and production decision logic.
+This follows googlecolab/google-colab-cli's documented ``colab run`` and
+``colab exec`` model. The gate notebook remains the single source of
+benchmark inputs, thresholds, and production decision logic. Its code cells
+are executed directly in the current Colab kernel, avoiding a nested Jupyter
+server inside the remote kernel.
 """
 from __future__ import annotations
 
@@ -36,7 +37,6 @@ def install_runtime_dependencies() -> None:
     for module, package in (
         ("transformers", "transformers>=4.45"),
         ("huggingface_hub", "huggingface_hub>=0.25"),
-        ("nbconvert", "nbconvert"),
     ):
         try:
             __import__(module)
@@ -47,7 +47,9 @@ def install_runtime_dependencies() -> None:
 
 
 def prepare_qwen_model() -> None:
-    """Download the public exact Qwen2.5-0.5B model into a writable path."""
+    """Download the public exact Qwen2.5-0.5B model into writable storage."""
+    os.environ["HF_HUB_DISABLE_IMPLICIT_TOKEN"] = "1"
+    os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
     from huggingface_hub import snapshot_download
 
     MODEL_ROOT.mkdir(parents=True, exist_ok=True)
@@ -72,6 +74,19 @@ def prepare_qwen_model() -> None:
 def prepare_paths() -> None:
     """Create the writable artifact path expected by the notebook."""
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def execute_gate_cells(colab_notebook: Path) -> int:
+    """Execute the gate notebook’s code cells in this Colab kernel."""
+    notebook = json.loads(colab_notebook.read_text(encoding="utf-8"))
+    namespace = {"__name__": "__main__", "__file__": str(colab_notebook)}
+    for index, cell in enumerate(notebook["cells"]):
+        if cell.get("cell_type") != "code":
+            continue
+        print(f"COLAB_EXEC_GATE_CELL {index}", flush=True)
+        source = "".join(cell.get("source", []))
+        exec(compile(source, f"{colab_notebook}:cell-{index}", "exec"), namespace, namespace)
+    return 0
 
 
 def main() -> int:
@@ -113,46 +128,7 @@ def main() -> int:
         "/kaggle/input/qwen2-5/transformers/0.5b/1", str(MODEL_ROOT),
     )
     colab_notebook.write_text(notebook_text, encoding="utf-8")
-    output_name = "mixllm_3level_gate_colab_v292_output.ipynb"
-    command = [
-        sys.executable, "-m", "jupyter", "nbconvert", "--to", "notebook",
-        "--execute", str(colab_notebook), "--output", output_name,
-        "--output-dir", "/content", "--ExecutePreprocessor.timeout=1800",
-        "--ExecutePreprocessor.kernel_name=python3",
-    ]
-    env = os.environ.copy()
-    env["PYTHONPATH"] = str(REPO_ROOT / "external" / "MixLLM") + os.pathsep + env.get("PYTHONPATH", "")
-    env["MIXLLM_TEST_SM75"] = "1"
-    result = subprocess.run(command, env=env, text=True, capture_output=True)
-    print("NOTEBOOK_STDOUT_BEGIN", flush=True)
-    print(result.stdout[-12000:], flush=True)
-    print("NOTEBOOK_STDOUT_END", flush=True)
-    print("NOTEBOOK_STDERR_BEGIN", flush=True)
-    print(result.stderr[-12000:], flush=True)
-    print("NOTEBOOK_STDERR_END", flush=True)
-    print("NOTEBOOK_RETURN_CODE", result.returncode, flush=True)
-
-    report_path = ARTIFACT_DIR / "mixllm_3level_gate.json"
-    if report_path.is_file():
-        report = json.loads(report_path.read_text(encoding="utf-8"))
-        print(
-            "COLAB_GATE_STATUS",
-            json.dumps(report.get("gate_status", {}), sort_keys=True),
-            flush=True,
-        )
-        print(
-            "COLAB_GATE_BENCHMARKS",
-            json.dumps(report.get("benchmarks", {}), sort_keys=True),
-            flush=True,
-        )
-        print(
-            "COLAB_GATE_QUALITY",
-            json.dumps(report.get("full_model_quality", {}), sort_keys=True),
-            flush=True,
-        )
-    else:
-        print("COLAB_GATE_ARTIFACT", "missing", flush=True)
-    return result.returncode
+    return execute_gate_cells(colab_notebook)
 
 
 if __name__ == "__main__":
