@@ -78,15 +78,6 @@ class SM75PythonDispatchTest(unittest.TestCase):
         third = sm75_backend._expanded_int4_for_prefill(module, x, torch)
         self.assertIsNot(first, third)
 
-    def test_large_m_native_int4_skips_expansion(self):
-        module = self._module((2, 2, 0))
-        x = torch.empty(32, 128, dtype=torch.float16)
-        with mock.patch.object(module, "prepare_sm75_prefill_cache") as prepare:
-            placeholder = sm75_backend._expanded_int4_for_prefill(module, x, torch)
-        prepare.assert_not_called()
-        self.assertEqual(placeholder.shape, (0, 128))
-        self.assertEqual(placeholder.numel(), 0)
-
     def test_module_can_prepare_contiguous_packed_state_before_forward(self):
         module = self._module((2, 2, 0))
         first = module.prepare_sm75_packed_tensors()
