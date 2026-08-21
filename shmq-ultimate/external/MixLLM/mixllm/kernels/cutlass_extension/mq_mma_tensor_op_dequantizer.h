@@ -226,9 +226,13 @@ public:
     {
         using MmaOperandB = typename ArchMmaOperator::FragmentB;
         using ExpandedMmaOperandB = Array<typename MmaOperandB::Element, MmaOperandB::kElements>;
-        static_assert(MmaOperandB::kElements * MmaOperator::MmaIterations::kColumn
+        constexpr int kMmaBElements =
+            MmaOperandB::kElements * MmaOperator::MmaIterations::kColumn;
+        constexpr int kKGroups =
+            MmaOperator::TransformedFragmentB::kElements / kMmaBElements;
+        static_assert(kKGroups * kMmaBElements
                 == MmaOperator::TransformedFragmentB::kElements,
-            "");
+            "transformed B fragment must contain complete k groups");
 
         // 0,0,0,0,0,0,0,0
         // 1,1,1,1,1,1,1,1
@@ -240,12 +244,15 @@ public:
 
         if constexpr (FragmentZero::kElements % 4 != 0){
             CUTLASS_PRAGMA_UNROLL
-            for (int mma_m_iter = 0; mma_m_iter < MmaOperator::MmaIterations::kColumn; ++mma_m_iter)
-            {
-                typename MmaOperandB::Element* operand_ptr = reinterpret_cast<typename MmaOperandB::Element*>(&operand_frag_ptr[mma_m_iter]);
+            for (int k_group = 0; k_group < kKGroups; ++k_group) {
                 CUTLASS_PRAGMA_UNROLL
-                for (int ii = 0; ii < MmaOperandB::kElements; ++ii){
-                    operand_ptr[ii] = operand_ptr[ii] - zero_frag[mma_m_iter];
+                for (int mma_m_iter = 0; mma_m_iter < MmaOperator::MmaIterations::kColumn; mma_m_iter++)
+                {
+                    typename MmaOperandB::Element* operand_ptr = reinterpret_cast<typename MmaOperandB::Element*>(&operand_frag_ptr[k_group * MmaOperator::MmaIterations::kColumn + mma_m_iter]);
+                    CUTLASS_PRAGMA_UNROLL
+                    for (int ii = 0; ii < MmaOperandB::kElements; ++ii){
+                        operand_ptr[ii] = operand_ptr[ii] - zero_frag[mma_m_iter];
+                    }
                 }
             }
         }
@@ -262,14 +269,17 @@ public:
                 zero_points[3] = __byte_perm(packed_zeros, 0, 0x00003333);
 
                 CUTLASS_PRAGMA_UNROLL
-                for (int mma_m_iter = 0; mma_m_iter < 4; ++mma_m_iter){
-                    uint32_t* operand_ptr = reinterpret_cast<uint32_t*>(&operand_frag_ptr[mma_m_iter + outer_index*4]);
+                for (int k_group = 0; k_group < kKGroups; ++k_group) {
                     CUTLASS_PRAGMA_UNROLL
-                    for (int ii = 0; ii < 2; ++ii){
-                        // operand_ptr[ii] = __vsub4(operand_ptr[ii], zero_points[mma_m_iter]);
-                        asm volatile("vsub4.u32.u32.u32 %0,%1,%2,%3;"
-                            : "=r"(operand_ptr[ii])
-                            : "r"(operand_ptr[ii]), "r"(zero_points[mma_m_iter]), "r"(0));
+                    for (int mma_m_iter = 0; mma_m_iter < 4; ++mma_m_iter){
+                        uint32_t* operand_ptr = reinterpret_cast<uint32_t*>(&operand_frag_ptr[k_group * MmaOperator::MmaIterations::kColumn + mma_m_iter + outer_index*4]);
+                        CUTLASS_PRAGMA_UNROLL
+                        for (int ii = 0; ii < 2; ++ii){
+                            // operand_ptr[ii] = __vsub4(operand_ptr[ii], zero_points[mma_m_iter]);
+                            asm volatile("vsub4.u32.u32.u32 %0,%1,%2,%3;"
+                                : "=r"(operand_ptr[ii])
+                                : "r"(operand_ptr[ii]), "r"(zero_points[mma_m_iter]), "r"(0));
+                        }
                     }
                 }
             }

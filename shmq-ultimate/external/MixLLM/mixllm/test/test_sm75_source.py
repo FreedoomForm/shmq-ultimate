@@ -11,6 +11,7 @@ class SM75SourceContractTest(unittest.TestCase):
         cls.cutlass_testbed = (root / "kernels" / "sm75_cutlass_testbed.h").read_text(encoding="utf-8")
         cls.cutlass_sm75_mixed = (root / "kernels" / "cutlass_extension" / "mq_mma_tensor_op_sm75.h").read_text(encoding="utf-8")
         cls.cutlass_pipeline = (root / "kernels" / "cutlass_extension" / "mq_mma_pipelined_sm75.h").read_text(encoding="utf-8")
+        cls.dequantizer = (root / "kernels" / "cutlass_extension" / "mq_mma_tensor_op_dequantizer.h").read_text(encoding="utf-8")
         cls.backend = (root / "sm75_backend.py").read_text(encoding="utf-8")
 
     def test_v51_prefill_and_three_level_paths(self):
@@ -168,7 +169,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("usingInt8RunnerM64N64=Runner<CoreM64N64,2>", cutlass_compact)
         self.assertIn("kM128N64=2", source_compact)
         self.assertIn("kM64N64=3", source_compact)
-        self.assertIn("kCutlassTuningAbi=278", source_compact)
+        self.assertIn("kCutlassTuningAbi=279", source_compact)
         self.assertNotIn("GemmShape<128,128,64>", cutlass_compact)
         self.assertNotIn("kM128N128", source_compact)
         self.assertIn("kM128N64", source_compact)
@@ -183,7 +184,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("constfloatinverse_scale=1.0f/scale", source_compact)
         self.assertIn("constfloatlower_boundary=static_cast<float>(fast_value)-0.5f", source_compact)
         self.assertIn("scaled=values[item]/scale", source_compact)
-        self.assertIn("kCutlassTuningAbi=278", source_compact)
+        self.assertIn("kCutlassTuningAbi=279", source_compact)
 
     def test_v275_native_packed_int4_staged_contract(self):
         source_compact = "".join(self.source.split())
@@ -198,6 +199,9 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("MatrixShape<32,ArchMmaOperator::Shape::kN>", mixed_compact)
         self.assertIn("kASecondK=MmaIterations::kRow", mixed_compact)
         self.assertIn("kBSecondK=MmaIterations::kColumn", mixed_compact)
+        dequantizer_compact = "".join(self.dequantizer.split())
+        self.assertIn("constexprintkKGroups", dequantizer_compact)
+        self.assertIn("k_group<kKGroups", dequantizer_compact)
         self.assertIn("usingPackedInt4RunnerM64N64=Runner<CorePackedInt4M64N64,2,cutlass::uint4b_t>", testbed_compact)
         self.assertIn("reinterpret_cast<ElementB*>(matrix_B.data_ptr())", testbed_compact)
         self.assertIn("run_cutlass_packed_int4_partition", source_compact)
