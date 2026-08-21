@@ -1,6 +1,6 @@
 """Build and validate the self-contained MixLLM T4 gate notebook."""
 from __future__ import annotations
-import argparse, hashlib, json, subprocess
+import argparse, base64, hashlib, json, subprocess, zlib
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 FORK = ROOT / "shmq-ultimate" / "external" / "MixLLM"
@@ -140,6 +140,12 @@ report['gates']['vllm_apply_path'] = vllm_apply['status']
 assert vllm_apply['status'] in {'passed', 'unavailable_environment', 'not_run'}, vllm_apply
 """
 def build_notebook(sources, manifest):
+    embedded_sources = {
+        name: base64.b64encode(
+            zlib.compress(text.encode('utf-8'), level=9),
+        ).decode('ascii')
+        for name, text in sources.items()
+    }
     cells = [cell("markdown", """# MixLLM 4/8/16 real T4 gate
 
 This notebook embeds the current Python and CUDA sources and validates them on NVIDIA T4 / SM75. It runs model_gate import/allocator checks and native operator benchmarks for mixed and pure precision partitions. Operator timings are not model throughput. Full-model Qwen quality remains not_run unless separately measured.
@@ -149,7 +155,12 @@ import torch
 ARTIFACT_DIR = Path('/kaggle/working')
 print('Python', sys.version)
 print('STARTUP_HEARTBEAT', flush=True); print('PyTorch', torch.__version__, flush=True); print('DEVICE_COUNT', torch.cuda.device_count(), flush=True); print('ACTIVE_DEVICE', torch.cuda.get_device_name(0) if torch.cuda.is_available() else None, flush=True)
-"""), cell("code", f"""sources = {sources!r}
+"""), cell("code", f"""import base64, zlib
+embedded_sources = {embedded_sources!r}
+sources = {{
+    relative: zlib.decompress(base64.b64decode(payload)).decode('utf-8')
+    for relative, payload in embedded_sources.items()
+}}
 source_manifest = {manifest!r}
 root = ARTIFACT_DIR / 'mixllm-3level'
 for relative, text in sources.items():
