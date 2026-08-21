@@ -1561,3 +1561,12 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 - A temporary Colab T4 probe removed only the M128/N64 alias and dispatch, preserving the exact v284 source otherwise. The remaining M64/N64 runner compiled with nvcc on Tesla T4 / SM75 and passed all six native backend tests: CUDA graph capture, INT4 tile boundaries, mixed/empty partitions, activation quantizer equivalence, non-default stream dependency, and randomized rows/widths/determinism. Result: `COLAB_V285_M64_PROBE_PASS`.
 - Production v286 removes the unproven M128/N64 packed-INT4 alias and routes every native packed-INT4 prefill shape through measured M64/N64. The persistent packed layout, lazy expansion, unified three-level scheduler, INT4/INT8/FP16 arithmetic, quality contracts, and benchmark settings are unchanged. The CUTLASS tuning ABI is advanced to 286 to invalidate stale shape-cache entries.
 - Local validation after the change: 88 tests passed, 6 CUDA-only skipped, compileall passed, and `git diff --check` passed. Full v286 Colab validation remains pending and is required before acceptance.
+
+## v286 Colab T4 result — 2026-08-22
+
+- The immutable-source Colab runner checked out exact production source commit `9a5e9ab` after fetching the shallow clone, then ran on Tesla T4 / SM75 with PyTorch 2.11.0+cu128.
+- Ninja was installed inside the ephemeral VM. The production SM75 CUDA extension compiled with nvcc and linked successfully.
+- Complete embedded suite result: `Ran 88 tests in 81.508s — OK`; 6 CUDA-only tests are skipped by the local/non-CUDA contract selection, while the Colab runner explicitly enabled `MIXLLM_TEST_SM75=1` and the native SM75 class ran.
+- Native T4 coverage therefore passed for CUDA graph capture, INT4 tile-width boundaries, mixed/empty partitions, activation quantizer equivalence, non-default stream dependency, randomized rows/widths/determinism, plus all Python/source/model/vLLM contracts. Marker: `COLAB_V286_SM75_CHECK_PASS`.
+- `colab sessions` after teardown reported `No active sessions found on server.`
+- This is a Colab compile/correctness result only. It does not replace the required Kaggle T4 performance gates, full-model Qwen quality gate, timing-integrity gate, or the >=2.6x target. v286 is safe with respect to the tested Colab contracts but remains performance- and full-model-quality-pending.
