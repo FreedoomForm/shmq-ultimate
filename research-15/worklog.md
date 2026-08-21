@@ -1609,3 +1609,9 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 - Complete embedded suite result: `Ran 90 tests in 81.520s — OK`; 6 CUDA-only skips remain part of the test selection. The single-cache-lookup contract passed alongside all prior SM75, model, vLLM, scheduler, quantization, and source contracts. Marker: `COLAB_V289_SM75_CHECK_PASS`.
 - Colab teardown was verified separately: `No active sessions found on server.`
 - v289 is accepted only for Colab compile/correctness scope. No performance claim is made; Kaggle remains authoritative for same-condition T4 performance, timing integrity, full-model Qwen quality, memory gates, and the >=2.6x target.
+
+## v290 — output-layout audit, no production change
+
+- Deep research compared original MixLLM mixed output handling with SHMQ v289. Original MixLLM returns a column-major mixed GEMM result and then performs a custom or generic transpose; SHMQ already writes directly to row-major `[rows, output_width]` using indexed epilogues/scatter.
+- The transpose hypothesis is therefore already solved in SHMQ. Reintroducing an intermediate column-major result would add work and risk the output ABI. No production code change was made. The research note records this rejected direction.
+- v289 remains the last validated candidate: local 90-test pass and Colab T4 compile/correctness pass. Performance, memory-gate deltas, timing integrity, and full-model Qwen quality still require the authoritative Kaggle run.
