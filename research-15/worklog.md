@@ -1640,3 +1640,9 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 - The first official `colab run --gpu T4 --session shmq-v292-full-gate` attempt correctly allocated and tore down a T4, but the runner failed before importing PyTorch because Colab exposes `/kaggle/input` as read-only. The failure was environment-only: `OSError: [Errno 30] Read-only file system: '/kaggle/input/qwen2.5'`.
 - The runner was corrected to download the same public `Qwen/Qwen2.5-0.5B` model to writable `/content/qwen2.5/transformers/0.5b/1`, create a temporary notebook copy with only the two hard-coded model paths remapped, and retain `/kaggle/working` for writable artifacts. Notebook benchmark scenarios, precision, thresholds, source commit, and gate logic are unchanged.
 - Official CLI cleanup was verified: `No active sessions found on server.` No Kaggle run was launched.
+
+## v292 Colab full-gate attempt 2 — 2026-08-22 — ENVIRONMENT STOP
+
+- The corrected runner allocated a Tesla T4 and verified `torch 2.11.0+cu128`, CUDA available, one device, and capability `(7, 5)`. It then began downloading the public Qwen2.5-0.5B model to writable Colab storage.
+- After more than ten minutes the captured output remained at `Fetching 7 files: 0%`; the Hugging Face client also reported that the Colab UI secret lookup for `HF_TOKEN` timed out and the request was unauthenticated. No notebook benchmark cell executed, so this attempt produced no performance or gate result and must not change any baseline.
+- The remote T4 session and its local wrapper were explicitly terminated; `colab sessions` reported no active sessions. Next iteration will avoid the stalled implicit secret lookup and use the official persistent `colab exec` workflow to stage or cache model files before running the gate.
