@@ -22,7 +22,7 @@ ROOT = Path("/content/shmq-ultimate-v292")
 REPO_ROOT = ROOT / "shmq-ultimate"
 NOTEBOOK = REPO_ROOT / "mixllm_3level_kaggle" / "mixllm_3level_gate.ipynb"
 ARTIFACT_DIR = Path("/kaggle/working")
-MODEL_ROOT = Path("/kaggle/input/qwen2.5/transformers/0.5b/1")
+MODEL_ROOT = Path("/content/qwen2.5/transformers/0.5b/1")
 
 
 def run(*args: str, cwd: Path | None = None, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -47,7 +47,7 @@ def install_runtime_dependencies() -> None:
 
 
 def prepare_qwen_model() -> None:
-    """Download the public exact Qwen2.5-0.5B model into the gate path."""
+    """Download the public exact Qwen2.5-0.5B model into a writable path."""
     from huggingface_hub import snapshot_download
 
     MODEL_ROOT.mkdir(parents=True, exist_ok=True)
@@ -70,9 +70,8 @@ def prepare_qwen_model() -> None:
 
 
 def prepare_paths() -> None:
-    """Create the Kaggle-compatible artifact paths expected by the notebook."""
+    """Create the writable artifact path expected by the notebook."""
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
-    MODEL_ROOT.parent.mkdir(parents=True, exist_ok=True)
 
 
 def main() -> int:
@@ -105,10 +104,19 @@ def main() -> int:
         raise RuntimeError(f"expected Tesla T4 / SM75, got {name} {capability}")
 
     prepare_qwen_model()
+    colab_notebook = Path("/content/mixllm_3level_gate_colab_v292.ipynb")
+    notebook_text = NOTEBOOK.read_text(encoding="utf-8")
+    notebook_text = notebook_text.replace(
+        "/kaggle/input/qwen2.5/transformers/0.5b/1", str(MODEL_ROOT),
+    )
+    notebook_text = notebook_text.replace(
+        "/kaggle/input/qwen2-5/transformers/0.5b/1", str(MODEL_ROOT),
+    )
+    colab_notebook.write_text(notebook_text, encoding="utf-8")
     output_name = "mixllm_3level_gate_colab_v292_output.ipynb"
     command = [
         sys.executable, "-m", "jupyter", "nbconvert", "--to", "notebook",
-        "--execute", str(NOTEBOOK), "--output", output_name,
+        "--execute", str(colab_notebook), "--output", output_name,
         "--output-dir", "/content", "--ExecutePreprocessor.timeout=1800",
         "--ExecutePreprocessor.kernel_name=python3",
     ]
@@ -127,9 +135,21 @@ def main() -> int:
     report_path = ARTIFACT_DIR / "mixllm_3level_gate.json"
     if report_path.is_file():
         report = json.loads(report_path.read_text(encoding="utf-8"))
-        print("COLAB_GATE_STATUS", json.dumps(report.get("gate_status", {}), sort_keys=True), flush=True)
-        print("COLAB_GATE_BENCHMARKS", json.dumps(report.get("benchmarks", {}), sort_keys=True), flush=True)
-        print("COLAB_GATE_QUALITY", json.dumps(report.get("full_model_quality", {}), sort_keys=True), flush=True)
+        print(
+            "COLAB_GATE_STATUS",
+            json.dumps(report.get("gate_status", {}), sort_keys=True),
+            flush=True,
+        )
+        print(
+            "COLAB_GATE_BENCHMARKS",
+            json.dumps(report.get("benchmarks", {}), sort_keys=True),
+            flush=True,
+        )
+        print(
+            "COLAB_GATE_QUALITY",
+            json.dumps(report.get("full_model_quality", {}), sort_keys=True),
+            flush=True,
+        )
     else:
         print("COLAB_GATE_ARTIFACT", "missing", flush=True)
     return result.returncode

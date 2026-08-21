@@ -1634,3 +1634,9 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 - The submitted gate notebook completed execution on Kaggle T4, but the production gate decision was `no_go`: `operator_production=failed`, `model_vllm_production=failed`, and `t4_production=failed`. Therefore v291 is **not** a new safe baseline and v271 remains the last Kaggle-confirmed safe baseline.
 - The visible benchmark payload completed with exact numerical correctness for the reported rows (`max_abs_error=0.0`, `max_abs_error_vs_dense_fp16=0.0`) and `timing_integrity=true`, but performance was a regression versus dense FP16 on the reported mixed rows: end-to-end speedup ratios were approximately `0.985x` at rows=1, `0.356x` at rows=16, and `0.141x` at rows=128. This is not an improvement claim.
 - The terminal report also showed `Full-model Qwen quality: unavailable_environment`; this alone prevents a production GO decision. Exact gate failure details must be resolved before retaining any subsequent candidate.
+
+## v292 Colab full-gate bootstrap fix — 2026-08-22
+
+- The first official `colab run --gpu T4 --session shmq-v292-full-gate` attempt correctly allocated and tore down a T4, but the runner failed before importing PyTorch because Colab exposes `/kaggle/input` as read-only. The failure was environment-only: `OSError: [Errno 30] Read-only file system: '/kaggle/input/qwen2.5'`.
+- The runner was corrected to download the same public `Qwen/Qwen2.5-0.5B` model to writable `/content/qwen2.5/transformers/0.5b/1`, create a temporary notebook copy with only the two hard-coded model paths remapped, and retain `/kaggle/working` for writable artifacts. Notebook benchmark scenarios, precision, thresholds, source commit, and gate logic are unchanged.
+- Official CLI cleanup was verified: `No active sessions found on server.` No Kaggle run was launched.
