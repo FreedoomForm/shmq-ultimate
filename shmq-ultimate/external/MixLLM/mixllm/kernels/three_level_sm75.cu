@@ -74,7 +74,7 @@ enum class CutlassConfig : int {
   kM64N64 = 3,
 };
 
-constexpr int kCutlassTuningAbi = 271;
+constexpr int kCutlassTuningAbi = 272;
 constexpr int kCutlassTuningWarmup = 2;
 constexpr int kCutlassTuningIterations = 4;
 std::mutex g_cutlass_tuning_mutex;
@@ -1347,10 +1347,16 @@ at::Tensor three_level_linear_v2_core(
               "scale_act must have shape [K/128, rows]");
   TORCH_CHECK(weight_int4.size(0) == n4 && weight_int4.size(1) == width / 2,
               "invalid packed INT4 weight shape");
-  TORCH_CHECK(rows == 1 ||
-                  (expanded_int4.dim() == 2 && expanded_int4.size(0) == n4 &&
-                   expanded_int4.size(1) == width),
-              "expanded_int4 must have shape [n4, K] for prefill");
+  const bool native_int4_prefill = rows >= 32 && n4 > 0;
+  TORCH_CHECK(
+      native_int4_prefill ?
+          (expanded_int4.numel() == 0 ||
+           (expanded_int4.dim() == 2 && expanded_int4.size(0) == n4 &&
+            expanded_int4.size(1) == width)) :
+          (rows == 1 ||
+           (expanded_int4.dim() == 2 && expanded_int4.size(0) == n4 &&
+            expanded_int4.size(1) == width)),
+      "expanded_int4 must be empty or have shape [n4, K] for native large-M INT4 prefill");
   TORCH_CHECK(weight_int8.size(0) == n8 && weight_int8.size(1) == width,
               "invalid INT8 weight shape");
   TORCH_CHECK(weight_fp16.size(0) == n16 && weight_fp16.size(1) == width,
@@ -1395,20 +1401,10 @@ at::Tensor three_level_linear_v2_core(
         reinterpret_cast<const __half*>(weight_fp16.data_ptr<at::Half>()),
         indices_fp16.data_ptr<int32_t>(), reinterpret_cast<__half*>(output.data_ptr<at::Half>()), width,
         output_width, n4, n8, n16);
-  } else if (rows >= 32 && n4 > 0 && n8 == 0 && n16 == 0 && !has_cached_metadata) {
-    // v229 candidate: pure INT4 uses one packed-B fused pair; mixed,
-    // cached, and unsupported shapes stay on the accepted v228 overlap path.
-    run_int4_pair_partition(
-        input_int8, scale_act, weight_int4, scale_int4, zero_int4,
-        indices_int4, output, rows, width, stream.stream());
   } else if (rows >= 32 && (n4 > 0 || n8 > 0)) {
-    // The original MixLLM relies on iterator-based, staged Tensor Core GEMMs
-    // for larger M. Keep the measured v188 overlap path here: the native
-    // packed pair kernel is reserved for the pure-INT4 candidate because its
-    // 32x32 small-tile geometry is not competitive for mixed large-M work.
-    // The helper is deliberately selected only for rows>=32: the SM75
-    // 16x128 CUTLASS geometry is not a valid portable small-M core, and
-    // rows==16 remains on the validated direct-WMMA control path.
+    // For large-M INT4, use the native packed pair kernel instead of the
+    // expanded-INT8 CUTLASS adapter.  The INT8 branch remains staged and the
+    // FP16 branch remains on the caller stream, preserving upstream overlap.
     auto& integer_streams = integer_prefill_streams(input_fp16.device().index());
     begin_integer_prefill_overlap(
         input_int8, scale_act, weight_int4, expanded_int4, scale_int4,
@@ -1417,7 +1413,7 @@ at::Tensor three_level_linear_v2_core(
         has_cached_metadata ? &cached_scale_int4 : nullptr,
         has_cached_metadata ? &cached_zero_int4 : nullptr,
         has_cached_metadata ? &cached_scale_int8 : nullptr,
-        false);
+        n4 > 0);
     if (n16 > 0) {
       run_fp16_partition_cublas(
           input_fp16, weight_fp16, indices_fp16, output, rows, width,

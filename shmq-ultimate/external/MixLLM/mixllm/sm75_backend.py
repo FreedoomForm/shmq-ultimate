@@ -194,8 +194,12 @@ def _validate_partition(module, x, torch_module):
 
 
 def _expanded_int4_for_prefill(module, x, torch_module):
-    """Expand packed INT4 once per packed state/device for the SM75 prefill path."""
-    if x.shape[0] == 1 or not module.indices_4.numel():
+    """Expand packed INT4 only for the legacy small-M prefill ABI.
+
+    The rows>=32 path consumes the packed INT4 weights through the native SM75
+    pair kernel, so it must not materialize or require a signed INT8 expansion.
+    """
+    if x.shape[0] == 1 or x.shape[0] >= 32 or not module.indices_4.numel():
         # Decode does not read this argument. Empty INT4 prefill still needs the
         # ABI-compatible [0, K] shape without allocating a separate tensor.
         return module.weight_int8[:0]

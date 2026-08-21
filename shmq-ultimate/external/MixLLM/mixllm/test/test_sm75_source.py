@@ -149,12 +149,20 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("__global__voidsm75_int4_pair_gemm_kernel", source_compact)
         self.assertIn("voidrun_int4_pair_partition(", source_compact)
         self.assertIn("use_fused_int4", source_compact)
-        self.assertIn("n4>0&&n8==0&&n16==0&&!has_cached_metadata", source_compact)
-        self.assertIn("has_cached_metadata?&cached_scale_int8:nullptr,false)", source_compact)
-        self.assertIn("n4>0&&n8==0&&n16==0&&!has_cached_metadata", source_compact)
+        self.assertIn("n4>0);", source_compact)
+        self.assertIn("has_cached_metadata?&cached_scale_int8:nullptr,n4>0)", source_compact)
         self.assertIn("low_mma(low_accum[row_tile][n_tile],low_a,weights,low_accum[row_tile][n_tile])", source_compact)
         self.assertIn("high_mma(high_accum[row_tile][n_tile],high_a,weights,high_accum[row_tile][n_tile])", source_compact)
         self.assertIn("16*high_accum[row_tile][n_tile][register_index]-correction", source_compact)
+
+    def test_v272_native_large_m_int4_dispatch_contract(self):
+        source_compact = "".join(self.source.split())
+        self.assertIn("constboolnative_int4_prefill=rows>=32&&n4>0;", source_compact)
+        self.assertIn("expanded_int4.numel()==0", source_compact)
+        self.assertIn("}elseif(rows>=32&&(n4>0||n8>0)){", source_compact)
+        self.assertIn("run_int4_pair_partition(", source_compact)
+        self.assertIn("has_cached_metadata?&cached_scale_int8:nullptr,n4>0)", source_compact)
+        self.assertIn("ifx.shape[0]==1orx.shape[0]>=32ornotmodule.indices_4.numel()", "".join(self.backend.split()))
 
     def test_v226_legal_sm75_candidate_tuner_contract(self):
         source_compact = "".join(self.source.split())
@@ -167,7 +175,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("usingInt8RunnerM64N64=Runner<CoreM64N64,2>", cutlass_compact)
         self.assertIn("kM128N64=2", source_compact)
         self.assertIn("kM64N64=3", source_compact)
-        self.assertIn("kCutlassTuningAbi=271", source_compact)
+        self.assertIn("kCutlassTuningAbi=272", source_compact)
         self.assertNotIn("GemmShape<128,128,64>", cutlass_compact)
         self.assertNotIn("kM128N128", source_compact)
         self.assertIn("kM128N64", source_compact)
@@ -177,12 +185,12 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("SHMQ_SM75_TUNE_CACHE", source_compact)
         self.assertIn("cudaStreamIsCapturing", source_compact)
 
-    def test_v271_boundary_corrected_quantizer_contract(self):
+    def test_v272_boundary_corrected_quantizer_contract_and_abi(self):
         source_compact = "".join(self.source.split())
         self.assertIn("constfloatinverse_scale=1.0f/scale", source_compact)
         self.assertIn("constfloatlower_boundary=static_cast<float>(fast_value)-0.5f", source_compact)
         self.assertIn("scaled=values[item]/scale", source_compact)
-        self.assertIn("kCutlassTuningAbi=271", source_compact)
+        self.assertIn("kCutlassTuningAbi=272", source_compact)
 
     def test_v200_integer_prefill_overlap_contract(self):
         source_compact = "".join(self.source.split())

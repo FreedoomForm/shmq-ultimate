@@ -20,7 +20,7 @@ class V51AuditContractTest(unittest.TestCase):
         cls.builder = builder_path.read_text(encoding="utf-8") if builder_path else ""
 
     def test_v51_decode_keeps_packed_int4_and_skips_expansion(self):
-        self.assertIn("if x.shape[0] == 1 or not module.indices_4.numel():", self.backend)
+        self.assertIn("if x.shape[0] == 1 or x.shape[0] >= 32 or not module.indices_4.numel():", self.backend)
         decode_start = self.cuda.index("__global__ void three_level_decode_kernel")
         decode_end = self.cuda.index("void check_cuda_contiguous", decode_start)
         decode = self.cuda[decode_start:decode_end]
