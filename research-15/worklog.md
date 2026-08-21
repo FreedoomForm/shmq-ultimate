@@ -1589,3 +1589,10 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 - Deep research compared original MixLLM’s direct GEMM wrapper with SHMQ v287. SHMQ already cached the immutable packed tuple, but `three_level_linear_prequantized()` rechecked every persistent tensor and rebuilt conditional `.contiguous()` arguments on every forward.
 - v288 now forwards the validated cached tuple directly. The fallback path still performs conditional contiguity conversion when no cache is available; dynamic activation/output checks and all kernel/quality contracts remain unchanged. No weight bytes, arithmetic, partition mapping, stream ordering, benchmark settings, or tuning configuration changed.
 - Local validation: 90 tests passed, 6 CUDA-only skipped, compileall passed, and `git diff --check` passed. Colab T4 compile/correctness validation is required before retaining v288; performance remains Kaggle-only.
+
+## v288 Colab T4 result — 2026-08-22
+
+- The v288 runner checked out immutable source commit `4422a9a` on Tesla T4 / SM75 and compiled the production extension with nvcc successfully.
+- Complete embedded suite result: `Ran 90 tests in 82.653s — OK`; 6 CUDA-only skips remain part of the test selection. The cached packed-wrapper contract passed alongside all prior SM75, model, vLLM, scheduler, quantization, and source contracts. Marker: `COLAB_V288_SM75_CHECK_PASS`.
+- Colab teardown was verified separately: `No active sessions found on server.`
+- v288 is accepted only for Colab compile/correctness scope. No performance claim is made; Kaggle remains authoritative for same-condition T4 performance, timing integrity, full-model Qwen quality, memory gates, and the >=2.6x target.
