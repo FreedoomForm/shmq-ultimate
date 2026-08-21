@@ -1602,3 +1602,10 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 - Deep research compared the original direct MixLLM wrapper with SHMQ v288. `three_level_linear()` already validated and obtained the immutable packed-tensor cache, but `three_level_linear_prequantized()` recomputed the same nine-buffer signature on every forward.
 - v289 adds an optional packed-cache argument and forwards the tuple from the top-level path, eliminating only the duplicate Python bookkeeping. Direct callers without the argument retain the old lookup and fallback contiguity conversion. Device checks, partition validation, dynamic activation handling, output allocation, v3/v2 dispatch, stream/event ordering, precision, quality, and benchmark boundaries are unchanged.
 - Local validation: 90 tests passed, 6 CUDA-only skipped, compileall passed, and `git diff --check` passed. Colab T4 compile/correctness validation remains required; performance remains Kaggle-only.
+
+## v289 Colab T4 result — 2026-08-22
+
+- The v289 runner checked out immutable source commit `048d0a1` on Tesla T4 / SM75 and compiled the production extension with nvcc successfully.
+- Complete embedded suite result: `Ran 90 tests in 81.520s — OK`; 6 CUDA-only skips remain part of the test selection. The single-cache-lookup contract passed alongside all prior SM75, model, vLLM, scheduler, quantization, and source contracts. Marker: `COLAB_V289_SM75_CHECK_PASS`.
+- Colab teardown was verified separately: `No active sessions found on server.`
+- v289 is accepted only for Colab compile/correctness scope. No performance claim is made; Kaggle remains authoritative for same-condition T4 performance, timing integrity, full-model Qwen quality, memory gates, and the >=2.6x target.
