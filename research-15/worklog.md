@@ -1621,3 +1621,10 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 - Deep research compared the original direct MixLLM wrapper with SHMQ v289. The top-level SHMQ path validated the three partition index tensors, then the prequantized path rebuilt the cached validation signature and checked it again on every call.
 - v291 adds an internal `partition_validated` handoff. The top-level path still performs the full validation first and passes the flag only afterward; direct prequantized callers retain validation by default. Packed-cache forwarding, dynamic tensor checks, output mapping, streams/events, arithmetic, quality, and benchmark boundaries are unchanged.
 - Local validation: 91 tests passed, 6 CUDA-only skipped, compileall passed, and `git diff --check` passed. Colab T4 compile/correctness validation is required before retaining v291; performance remains Kaggle-only.
+
+## v291 Colab T4 result — 2026-08-22
+
+- The v291 runner checked out immutable source commit `7be8661` on Tesla T4 / SM75 and compiled the production extension with nvcc successfully.
+- Complete embedded suite result: `Ran 91 tests in 87.834s — OK`; 6 CUDA-only skips remain part of the test selection. The single-partition-validation handoff contract passed alongside all prior SM75, model, vLLM, scheduler, quantization, and source contracts. Marker: `COLAB_V291_SM75_CHECK_PASS`.
+- Colab teardown was verified separately: `No active sessions found on server.`
+- v291 is accepted only for Colab compile/correctness scope. No performance claim is made; Kaggle remains authoritative for same-condition T4 performance, timing integrity, full-model Qwen quality, memory gates, and the >=2.6x target.
