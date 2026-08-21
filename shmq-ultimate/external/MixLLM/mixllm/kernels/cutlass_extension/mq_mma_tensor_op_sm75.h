@@ -168,8 +168,8 @@ class MQMmaPackedInputTensorOpSm75 {
     // register layout.  v280 applies that same proven permutation to both
     // internal k16 halves of the widened k32 fragment.
     detail::FragmentShuffler<ElementBMma, ElementB,
-                             2 * MmaIterations::kColumn,
-                             FragmentB::kElements, MmaOperandB::kElements,
+                             MmaIterations::kColumn,
+                             FragmentB::kElements, 2 * MmaOperandB::kElements,
                              Operand::kB>
         shuffler_B;
     FragmentB tmp_B = shuffler_B(B);

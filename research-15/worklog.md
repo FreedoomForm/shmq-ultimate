@@ -1520,3 +1520,9 @@ Local validation passed: 90 tests, 6 CUDA-only skips, compileall, and `git diff 
 
 ## v280 — T4 submission blocked before execution by Kaggle quota
 The v280 source and notebook passed local validation and payload/hash checks. The submission API rejected the run before execution with `Maximum weekly GPU quota of 30.00 hours reached`; no Kaggle version was created and no v280 correctness, timing, performance, or quality result exists. v280 must remain pending/unaccepted until the same notebook can execute on the required T4. No benchmark settings or quality gates were relaxed.
+
+## v281 — static correction before any T4 run
+The v280 submission was blocked before execution by Kaggle quota. A further primary-source audit found that the first v280 shuffle call used `2 * MmaIterations::kColumn` instructions with `MmaOperandB::kElements` (4) as the shuffler’s per-group element count. CUTLASS’s original uint4 upcast shuffler operates on 32-bit words: for SM75 m8n8k16, four uint4 groups of eight logical values fill the 32-value fragment, and each eight-value shuffled group is then represented as two four-int8 MMA B fragments. v281 will therefore use `MmaIterations::kColumn` groups and `2 * MmaOperandB::kElements` per shuffler group. This is a compile/layout safety correction, not a performance claim; no Kaggle run is attempted while quota is exhausted.
+
+## v281 — corrected original B shuffler fragment width (quota-pending)
+The v281 audit correction changes only the original B shuffler’s template metadata: four groups of eight uint4 logical values fill the 32-bit shuffle words, then conversion yields the two four-int8 B operands consumed by each internal k16 MMA. The ABI is 281. Local validation passed again: 90 tests, 6 CUDA-only skips, compileall, and `git diff --check`. Kaggle submission remains intentionally deferred because the weekly 30-hour T4 quota was exhausted before v280 execution; no v281 performance or correctness claim exists.
