@@ -15,7 +15,7 @@ import sys
 
 REPO_URL = "https://github.com/FreedoomForm/shmq-ultimate.git"
 BRANCH = "unified-three-level-sm75"
-EXPECTED_COMMIT = "ccd7433"
+EXPECTED_COMMIT = "9a5e9ab"
 ROOT = pathlib.Path("/content/shmq-ultimate-v284")
 FORK = ROOT / "shmq-ultimate" / "external" / "MixLLM"
 
@@ -81,7 +81,7 @@ def main() -> int:
     if result.returncode != 0:
         raise SystemExit(result.returncode)
 
-    print("COLAB_V284_SM75_CHECK_PASS", flush=True)
+    print("COLAB_V286_SM75_CHECK_PASS", flush=True)
     return 0
 
 
