@@ -253,6 +253,15 @@ using CorePackedInt4M64N64 = cutlass::gemm::threadblock::DefaultMmaCore<
     cutlass::arch::OpClassTensorOp, 2,
     cutlass::arch::OpMultiplyAddSm75PackedInputUpcast>;
 
+using CorePackedInt4M128N64 = cutlass::gemm::threadblock::DefaultMmaCore<
+    cutlass::gemm::GemmShape<128, 64, 64>,
+    cutlass::gemm::GemmShape<32, 32, 64>,
+    cutlass::gemm::GemmShape<8, 8, 16>,
+    ElementA, LayoutA, cutlass::uint4b_t, LayoutB, ElementC, LayoutC,
+    cutlass::arch::OpClassTensorOp, 2,
+    cutlass::arch::OpMultiplyAddSm75PackedInputUpcast>;
+
 using PackedInt4RunnerM64N64 = Runner<CorePackedInt4M64N64, 2, cutlass::uint4b_t>;
+using PackedInt4RunnerM128N64 = Runner<CorePackedInt4M128N64, 2, cutlass::uint4b_t>;
 
 }  // namespace shmq_cutlass_sm75

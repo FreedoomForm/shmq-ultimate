@@ -1532,3 +1532,9 @@ The v281 audit correction changes only the original B shuffler’s template meta
 Deep research compared the original MixLLM launcher with the v271 SM75 dispatcher. The original uses separate compile-time INT4/INT8 arithmetic adapters behind one persistent stream/event and configuration organization, while v271 already shares the integer overlap but launches FP16 outside that module. v282 adds `UnifiedPrefillPlan` and `run_unified_prefill` as a host-side deep module that owns the integer fork/join and FP16 launch ordering while preserving the existing INT4, INT8, FP16 leaves, output ABI, arithmetic, model, benchmark shapes, and quality gates. The native packed INT4 leaf remains capability-gated by the existing interleaved-weight input and is not claimed as measured.
 
 Local validation passed: 91 tests, 6 CUDA-only skips, compileall, and `git diff --check`. Kaggle T4 validation is required; no performance, memory, or quality improvement claim is made before the T4 run.
+
+## v283 — native INT4 M128/N64 shape-family adapter (T4 pending)
+
+Deep research found that the original MixLLM shape-family organization and the accepted SHMQ INT8 runner expose an M128/N64 large-M family, while the native packed INT4 adapter had only M64/N64. v283 adds a compile-time `CorePackedInt4M128N64`/`PackedInt4RunnerM128N64` adapter and selects it for rows>=96; rows below 96 retain M64/N64. The shared v282 scheduler, packed layout, arithmetic, metadata, output ABI, benchmark, and quality contracts remain unchanged. This is a compile candidate, not a performance claim.
+
+Local validation passed: 92 tests, 6 CUDA-only skips, compileall, and `git diff --check`. Kaggle T4 validation is required; no candidate is accepted before the unchanged production gates and timing-integrity pass.
