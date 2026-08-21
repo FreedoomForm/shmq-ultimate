@@ -1420,3 +1420,13 @@ Kaggle version 265 compiled on Tesla T4 with embedded source SHA-256 `33e730ae47
 Deep research of upstream shape-dependent configuration and v268's improvement from using M64N64 for the N=896 branch motivates one isolation test: force the legal lower-footprint M64N64 family for every normal rows=128, width>=2048, channels>=64 integer partition. All other shapes retain measured tuning and graph fallback. No arithmetic, quantization, output mapping, stream topology, model, or benchmark setting changes. No Kaggle run has been made.
 
 v269 local validation completed: focused source/backend tests `41 passed, 6 skipped`; full suite `88 passed, 6 skipped`; Python compilation and `git diff --check` passed. The candidate is committed before notebook rebuild; CUDA compilation is deferred to the single Kaggle T4 run.
+
+## v269 — rejected all-large-partition M64N64 geometry
+
+Kaggle version 266 compiled and ran on Tesla T4 with the intended v269 source. Native correctness, mixed decode GEMM, and timing integrity passed, but mixed decode E2E and mixed prefill E2E failed. Qwen mixed rows=128 measured `sm75_gemm=0.438352 ms`, `sm75_end_to_end=0.422192 ms`, `dense_fp16=0.219424 ms`, speedup `0.51973x`; rows=16 E2E was `0.28837x`. The universal M64N64 choice was not enough to pass the required gates and is rejected. Restore v263 before the next original-first research iteration.
+
+## v270 — activation reciprocal-multiply quantizer (pre-run)
+
+Deep research compared the original MixLLM warp/group quantizer with SHMQ. Both use one warp per 128-value group and the same caller-stream ordering, but SHMQ currently performs four float divisions per lane during int8 conversion. v270 will compute one reciprocal scale and replace only those repeated divisions with multiplications, retaining float scale computation, round/clamp semantics, packed stores, and all launch/ABI behavior. No Kaggle run has been made.
+
+v270 local validation completed after repairing the stale ABI contract: focused source/backend tests `40 passed, 6 skipped`; full suite `87 passed, 6 skipped`; Python compilation and `git diff --check` passed. The candidate is committed before notebook rebuild; CUDA compilation is deferred to the single Kaggle T4 run.

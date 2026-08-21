@@ -74,7 +74,7 @@ enum class CutlassConfig : int {
   kM64N64 = 3,
 };
 
-constexpr int kCutlassTuningAbi = 269;
+constexpr int kCutlassTuningAbi = 270;
 constexpr int kCutlassTuningWarmup = 2;
 constexpr int kCutlassTuningIterations = 4;
 std::mutex g_cutlass_tuning_mutex;
@@ -187,12 +187,6 @@ CutlassConfig select_cutlass_config(
     return CutlassConfig::kN128;
   }
 
-  // Isolate the lower-footprint legal family for all large-M integer
-  // partitions.  Other shapes retain measured tuning.
-  if (rows == 128 && channels >= 64 && width >= 2048) {
-    return CutlassConfig::kM64N64;
-  }
-
   CutlassConfig best = CutlassConfig::kN128;
   float best_ms = std::numeric_limits<float>::infinity();
   for (CutlassConfig candidate : {CutlassConfig::kN128, CutlassConfig::kN64,
@@ -284,10 +278,11 @@ __global__ void quantize_activation_sm75_kernel(
   if (lane == 0) {
     scales[group * rows + row] = __float2half(scale);
   }
+  const float inverse_scale = 1.0f / scale;
   uint32_t packed = 0;
 #pragma unroll
   for (int item = 0; item < 4; ++item) {
-    int value = __float2int_rn(values[item] / scale);
+    int value = __float2int_rn(values[item] * inverse_scale);
     value = max(-127, min(127, value));
     packed |= static_cast<uint32_t>(static_cast<uint8_t>(value)) << (item * 8);
   }
