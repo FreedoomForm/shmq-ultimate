@@ -1554,3 +1554,10 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 - Runner was updated to install Ninja inside the ephemeral VM and print captured unittest output.
 - Attempt 2: allocation was rejected before VM creation with official CLI `TooManyAssignmentsError` / HTTP `412 Precondition Failed` for `accelerator=T4`. The runner did not execute. The Colab assignment limit is now the blocker, analogous to the exhausted Kaggle quota.
 - Decision: retain v284 unchanged as the only T4-pending candidate; do not claim Colab correctness or performance until a complete T4 run passes.
+
+## v286 — compile-safe packed INT4 family after Colab T4 isolation
+
+- Deep research compared the original MixLLM packed layout and shape-family organization with SHMQ v284. The custom SM75 k32 warp adapter was valid, but the new `DefaultMmaCore<uint4b_t>` M128/N64 alias failed before the adapter was reached: CUTLASS `PitchLinearWarpRakedThreadMap` asserted that its iteration count was zero.
+- A temporary Colab T4 probe removed only the M128/N64 alias and dispatch, preserving the exact v284 source otherwise. The remaining M64/N64 runner compiled with nvcc on Tesla T4 / SM75 and passed all six native backend tests: CUDA graph capture, INT4 tile boundaries, mixed/empty partitions, activation quantizer equivalence, non-default stream dependency, and randomized rows/widths/determinism. Result: `COLAB_V285_M64_PROBE_PASS`.
+- Production v286 removes the unproven M128/N64 packed-INT4 alias and routes every native packed-INT4 prefill shape through measured M64/N64. The persistent packed layout, lazy expansion, unified three-level scheduler, INT4/INT8/FP16 arithmetic, quality contracts, and benchmark settings are unchanged. The CUTLASS tuning ABI is advanced to 286 to invalidate stale shape-cache entries.
+- Local validation after the change: 88 tests passed, 6 CUDA-only skipped, compileall passed, and `git diff --check` passed. Full v286 Colab validation remains pending and is required before acceptance.

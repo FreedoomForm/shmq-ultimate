@@ -74,7 +74,7 @@ enum class CutlassConfig : int {
   kM64N64 = 3,
 };
 
-constexpr int kCutlassTuningAbi = 283;
+constexpr int kCutlassTuningAbi = 286;
 constexpr int kCutlassTuningWarmup = 2;
 constexpr int kCutlassTuningIterations = 4;
 std::mutex g_cutlass_tuning_mutex;
@@ -1168,17 +1168,10 @@ void run_cutlass_packed_int4_partition(
   record_tensor_stream(matrix_scale, stream);
   record_tensor_stream(matrix_zero, stream);
   record_tensor_stream(output, stream);
-  if (rows >= 96) {
-    shmq_cutlass_sm75::PackedInt4RunnerM128N64::run(
-        rows, static_cast<int>(indices.numel()), width, input_int8,
-        weight_int4_interleaved, scale_act, matrix_scale, matrix_zero, indices,
-        output, stream);
-  } else {
-    shmq_cutlass_sm75::PackedInt4RunnerM64N64::run(
-        rows, static_cast<int>(indices.numel()), width, input_int8,
-        weight_int4_interleaved, scale_act, matrix_scale, matrix_zero, indices,
-        output, stream);
-  }
+  shmq_cutlass_sm75::PackedInt4RunnerM64N64::run(
+      rows, static_cast<int>(indices.numel()), width, input_int8,
+      weight_int4_interleaved, scale_act, matrix_scale, matrix_zero, indices,
+      output, stream);
 }
 
 void run_fp16_partition_cublas(
