@@ -251,7 +251,15 @@ def three_level_linear_prequantized(module, x, input_int8, scale_act, torch_modu
             module.weight_int8, module.scale_int8, module.indices_8,
             module.weight_fp16, module.indices_16,
         )
-    tensors = (input_int8, scale_act, *packed_tensors)
+        packed_argument_tensors = tuple(
+            tensor if tensor.is_contiguous() else tensor.contiguous()
+            for tensor in packed_tensors
+        )
+    else:
+        # The module cache proves device/shape/stride/contiguity for every
+        # persistent tensor, matching the original direct MixLLM wrapper.
+        packed_argument_tensors = packed_tensors
+    tensors = (input_int8, scale_act, *packed_argument_tensors)
     if any(tensor.device != x.device for tensor in tensors):
         raise ValueError("input and all operator tensors must be on the same device")
     if x.dtype != torch_module.float16:
@@ -295,10 +303,9 @@ def three_level_linear_prequantized(module, x, input_int8, scale_act, torch_modu
         x if x.is_contiguous() else x.contiguous(),
         input_int8 if input_int8.is_contiguous() else input_int8.contiguous(),
         scale_act if scale_act.is_contiguous() else scale_act.contiguous(),
-        module.weight_int4,
+        packed_argument_tensors[0],
         expanded_int4,
-        *(tensor if tensor.is_contiguous() else tensor.contiguous()
-          for tensor in packed_tensors[1:]),
+        *packed_argument_tensors[1:],
     )
     if _use_v188_mixed_prefill_path(module, x, torch_module):
         return torch_module.ops.mixllm_sm75._three_level_linear_v2_unchecked(*arguments)

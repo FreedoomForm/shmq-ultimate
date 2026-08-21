@@ -1583,3 +1583,9 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 - Complete embedded suite result: `Ran 89 tests in 86.721s — OK`; 6 CUDA-only skips remain part of the local/source selection, and the Colab run explicitly enabled `MIXLLM_TEST_SM75=1`. The new persistent-buffer stream-record contract passed alongside all prior SM75, model, vLLM, and quality-contract tests. Marker: `COLAB_V287_SM75_CHECK_PASS`.
 - Colab teardown was verified separately: `No active sessions found on server.`
 - v287 is accepted for the tested Colab compile/correctness scope only. No performance claim is made; Kaggle remains mandatory for same-condition T4 performance, timing integrity, full-model Qwen/Qwen2.5-0.5B quality, memory gates, and the >=2.6x target.
+
+## v288 — forward validated packed cache directly
+
+- Deep research compared original MixLLM’s direct GEMM wrapper with SHMQ v287. SHMQ already cached the immutable packed tuple, but `three_level_linear_prequantized()` rechecked every persistent tensor and rebuilt conditional `.contiguous()` arguments on every forward.
+- v288 now forwards the validated cached tuple directly. The fallback path still performs conditional contiguity conversion when no cache is available; dynamic activation/output checks and all kernel/quality contracts remain unchanged. No weight bytes, arithmetic, partition mapping, stream ordering, benchmark settings, or tuning configuration changed.
+- Local validation: 90 tests passed, 6 CUDA-only skipped, compileall passed, and `git diff --check` passed. Colab T4 compile/correctness validation is required before retaining v288; performance remains Kaggle-only.

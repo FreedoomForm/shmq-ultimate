@@ -207,6 +207,14 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertNotIn("if(rows>=96)", source_compact)
         self.assertIn("kCutlassTuningAbi=286", source_compact)
 
+    def test_v288_cached_packed_wrapper_contract(self):
+        backend = self.backend
+        self.assertIn("packed_argument_tensors=packed_tensors", "".join(backend.split()))
+        self.assertIn("packed_argument_tensors=tuple", "".join(backend.split()))
+        self.assertIn("tensoriftensor.is_contiguous()elsetensor.contiguous()", "".join(backend.split()))
+        self.assertIn("packed_argument_tensors[0]", "".join(backend.split()))
+        self.assertIn("*packed_argument_tensors[1:]", "".join(backend.split()))
+
     def test_v287_persistent_packed_stream_record_contract(self):
         source_compact = "".join(self.source.split())
         self.assertIn("Packedweightsandcachedmetadataarepersistentmodule-ownedbuffers", source_compact)
