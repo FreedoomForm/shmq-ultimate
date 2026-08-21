@@ -1652,3 +1652,8 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 - The persistent `colab exec` attempt exposed a second workflow issue: launching `jupyter nbconvert --execute` from inside the already-running remote Jupyter kernel remained BUSY for over 36 minutes and emitted no gate cells. This was a nested-kernel deadlock/indefinite wait, not a SHMQ result.
 - The runner now parses the committed gate notebook and executes its code cells directly, in order, inside the current Colab kernel namespace. This preserves the notebook’s exact embedded sources, benchmark cases, CUDA-event timing, thresholds, vLLM smoke, Qwen quality logic, and final gate decision while following the official `colab exec` execution model.
 - The stalled persistent T4 was stopped and `colab sessions` confirmed no active sessions before this fix.
+
+## v292 Colab direct-cell attempt — 2026-08-22 — ENVIRONMENT STOP
+
+- Direct in-kernel execution reached the exact notebook cells on Tesla T4 and loaded the Qwen model, but the embedded unittest setup failed because Colab’s base runtime did not contain the `ninja` executable required by `torch.utils.cpp_extension`. Result: 85 tests started, one `setUpClass` error in `test_sm75_backend`, and no valid benchmark result.
+- The runner was updated to install `ninja` when absent before importing or compiling the SM75 extension. The failed persistent session was explicitly stopped; no active Colab sessions remain. No Kaggle run was launched.

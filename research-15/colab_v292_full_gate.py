@@ -32,7 +32,7 @@ def run(*args: str, cwd: Path | None = None, env: dict[str, str] | None = None) 
 
 
 def install_runtime_dependencies() -> None:
-    """Install only dependencies absent from the Colab runtime."""
+    """Install dependencies absent from the Colab runtime."""
     missing = []
     for module, package in (
         ("transformers", "transformers>=4.45"),
@@ -42,6 +42,8 @@ def install_runtime_dependencies() -> None:
             __import__(module)
         except ModuleNotFoundError:
             missing.append(package)
+    if shutil.which("ninja") is None:
+        missing.append("ninja")
     if missing:
         run(sys.executable, "-m", "pip", "install", "--quiet", *missing)
 
@@ -77,7 +79,7 @@ def prepare_paths() -> None:
 
 
 def execute_gate_cells(colab_notebook: Path) -> int:
-    """Execute the gate notebook’s code cells in this Colab kernel."""
+    """Execute the gate notebook's code cells in this Colab kernel."""
     notebook = json.loads(colab_notebook.read_text(encoding="utf-8"))
     namespace = {"__name__": "__main__", "__file__": str(colab_notebook)}
     for index, cell in enumerate(notebook["cells"]):
