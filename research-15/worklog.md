@@ -1921,3 +1921,9 @@ Primary-source comparison confirms the original MixLLM packed launcher does not 
 The v290 run exposed a Python dispatch bug before packed GEMM: the v3 metadata helper was called for the pure-FP16 benchmark, where no integer partition exists, and raised `SM75 CUTLASS metadata requires an integer partition`. The original MixLLM path enters integer GEMM only when INT4/INT8 channels exist.
 
 v291 adds the narrow guard `rows >= 32 and (indices_4.numel() or indices_8.numel())` around v3 cache preparation. Pure FP16 remains on the existing v2 path; mixed and pure-integer cases retain the original packed v3 ABI. No computation, benchmark, model, threshold, or quality criterion changes.
+
+## v291 result — original packed v3 handoff rejected by large-M correctness
+
+Kaggle v291 passed compilation, explicit probes, allocator checks, and the embedded suite after repairing the v290 validation bug. The actual original-interleaved packed path then failed native correctness: smoke mixed rows=32/128 errors were 191.30/283.28, Qwen mixed rows=128 error was 800.87, and pure INT4 rows=128 error was 826.40. Mixed decode and prefill performance also failed; timing integrity failed at mixed rows=16. Although pure INT4 large-M E2E reached 0.708x versus dense FP16, these measurements are inadmissible because correctness failed. Full-model Qwen quality/throughput and vLLM apply remained unavailable. Terminal decision: `no_go`.
+
+The result shows that SHMQ’s original-equivalent interleave permutation is not sufficient for the current `PackedInt4RunnerM64N64` iterator/metadata contract; the packed path has a deeper layout or signedness mismatch. The v289-v291 packed-v3 exposure is reverted immediately. Preserve all v289-v291 research and raw logs, and restore the validated v299 expanded INT4 control.

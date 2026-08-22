@@ -78,21 +78,16 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("expanded_int4 = module.weight_int8[:0]", self.backend)
         self.assertIn("signed expanded copy lazy", self.linear)
 
-    def test_v289_prefill_uses_original_packed_v3_handoff(self):
+    def test_v299_large_m_uses_expanded_correctness_control(self):
         backend_compact = "".join(self.backend.split())
         dispatch = backend_compact[
             backend_compact.index("expanded_int4=None"):
         ]
+        self.assertIn("#v299control:usetheoriginal-safeexpandedINT4+stagedCUTLASS", dispatch)
         self.assertIn("native_v3=None", dispatch)
         self.assertIn("use_cached_v3=False", dispatch)
-        self.assertIn("ifx.shape[0]>=32", dispatch)
-        self.assertIn("native_v3=getattr(torch_module.ops.mixllm_sm75,", dispatch)
-        self.assertIn("_three_level_linear_v3_unchecked", dispatch)
-        self.assertIn("prefill_int4=module.prepare_sm75_prefill_int4()", dispatch)
-        self.assertIn("metadata=_prefill_metadata_for_cutlass(module,x,torch_module)", dispatch)
-        self.assertIn("use_cached_v3=prefill_int4isnotNoneandmetadataisnotNone", dispatch)
+        self.assertNotIn("_prefill_metadata_for_cutlass(module,x,torch_module)", dispatch)
         self.assertIn("expanded_int4=_expanded_int4_for_prefill(module,x,torch_module)", dispatch)
-        self.assertIn("ifuse_cached_v3andnative_v3isnotNoneandmetadataisnotNone", dispatch)
 
     def test_v196_timing_integrity_contract(self):
         self.assertIn("timing_integrity_ratio", self.backend)
@@ -173,14 +168,13 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertEqual(source_compact.count("a_low_packed[row][pair]=low0|(low1<<4)"), 1)
         self.assertEqual(source_compact.count("b_packed[local_channel][pair]=channel<channels?weight_int4[source]:0"), 1)
 
-    def test_v290_packed_v3_validation_contract(self):
+    def test_v283_fused_int4_isolated_from_production_dispatch(self):
         source_compact = "".join(self.source.split())
         self.assertIn("__global__voidsm75_int4_pair_gemm_kernel", source_compact)
         self.assertIn("voidrun_int4_pair_partition(", source_compact)
+        self.assertNotIn("n4>0&&n8==0&&n16==0&&!has_cached_metadata", source_compact)
         self.assertIn("begin_integer_prefill_overlap", source_compact)
         self.assertIn("cached_scale_int8, false);", self.source)
-        self.assertIn("constboolhas_packed_int4=weight_int4_interleaved.defined()&&", source_compact)
-        self.assertIn("rows==1||has_packed_int4||", source_compact)
         self.assertIn("low_mma(low_accum[row_tile][n_tile],low_a,weights,low_accum[row_tile][n_tile])", source_compact)
         self.assertIn("high_mma(high_accum[row_tile][n_tile],high_a,weights,high_accum[row_tile][n_tile])", source_compact)
         self.assertIn("16*high_accum[row_tile][n_tile][register_index]-correction", source_compact)
