@@ -199,6 +199,9 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("cudaEventElapsedTime", source_compact)
         self.assertIn("SHMQ_SM75_TUNE_CACHE", source_compact)
         self.assertIn("cudaStreamIsCapturing", source_compact)
+        self.assertIn("configured_devices", cutlass_compact)
+        self.assertIn("std::lock_guard<std::mutex>lock(attribute_mutex)", cutlass_compact)
+        self.assertIn("cudaFuncAttributePreferredSharedMemoryCarveout,100", cutlass_compact)
 
     def test_v271_boundary_corrected_quantizer_contract(self):
         source_compact = "".join(self.source.split())

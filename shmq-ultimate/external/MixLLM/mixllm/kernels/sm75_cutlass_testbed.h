@@ -3,6 +3,9 @@
 #include <cuda_runtime.h>
 #include <torch/extension.h>
 
+#include <mutex>
+#include <unordered_set>
+
 #include "cutlass/array.h"
 #include "cutlass/cutlass.h"
 #include "cutlass/gemm/gemm.h"
@@ -183,12 +186,25 @@ struct Runner {
               (channels + ThreadblockShape::kN - 1) / ThreadblockShape::kN);
     int shared_bytes = smem_size();
     if (shared_bytes >= (48 << 10)) {
-      C10_CUDA_CHECK(cudaFuncSetAttribute(
-          kernel<Mma, SharedStorage, ElementB>,
-          cudaFuncAttributeMaxDynamicSharedMemorySize, shared_bytes));
-      C10_CUDA_CHECK(cudaFuncSetAttribute(
-          kernel<Mma, SharedStorage, ElementB>,
-          cudaFuncAttributePreferredSharedMemoryCarveout, 100));
+      // Microsoft configures these attributes once in Testbed construction.
+      // Runner is a static deep-module entry point, so cache successful setup
+      // per CUDA device and avoid repeating host API calls for every partition.
+      static std::mutex attribute_mutex;
+      static std::unordered_set<int> configured_devices;
+      int device_index = -1;
+      C10_CUDA_CHECK(cudaGetDevice(&device_index));
+      {
+        std::lock_guard<std::mutex> lock(attribute_mutex);
+        if (configured_devices.find(device_index) == configured_devices.end()) {
+          C10_CUDA_CHECK(cudaFuncSetAttribute(
+              kernel<Mma, SharedStorage, ElementB>,
+              cudaFuncAttributeMaxDynamicSharedMemorySize, shared_bytes));
+          C10_CUDA_CHECK(cudaFuncSetAttribute(
+              kernel<Mma, SharedStorage, ElementB>,
+              cudaFuncAttributePreferredSharedMemoryCarveout, 100));
+          configured_devices.insert(device_index);
+        }
+      }
     }
     kernel<Mma, SharedStorage, ElementB><<<grid, block, shared_bytes, stream>>>(
         problem_size, params_A, matrix_A.data_ptr<int8_t>(), params_B,
