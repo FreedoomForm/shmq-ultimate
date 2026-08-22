@@ -207,6 +207,12 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertNotIn("if(rows>=96)", source_compact)
         self.assertIn("kCutlassTuningAbi=286", source_compact)
 
+    def test_v293_packed_prefill_allows_lazy_expansion_contract(self):
+        source_compact = "".join(self.source.split())
+        self.assertIn("constboolhas_packed_int4_prefill=", source_compact)
+        self.assertIn("rows==1||has_packed_int4_prefill||", source_compact)
+        self.assertIn("unlesspackedINT4ispresent", source_compact)
+
     def test_v291_single_partition_validation_contract(self):
         backend = "".join(self.backend.split())
         self.assertIn("partition_validated=False", backend)

@@ -1662,3 +1662,10 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 
 - The complete direct-cell run passed all 91 tests but remained at the Qwen model-loading cell for over 31 minutes without reaching the operator benchmark. It was stopped within the official bounded session workflow; no result was recorded as a performance or quality pass.
 - The runner now supports `SHMQ_OPERATOR_ONLY=1`, which skips only notebook cell 7 (full-model Qwen quality) while executing cells 1–6 and 8–9 unchanged. This isolates native operator benchmark feedback; the report remains `no_go` when full-model quality is not run, so operator-only data cannot be misreported as production readiness.
+
+## v293 — native packed INT4 lazy-expansion shape fix — 2026-08-22
+
+- The first real Colab operator benchmark exposed a bug that contract-only v291 validation could not see: native v3 passed an empty lazy-expansion placeholder, but the shared CUDA core unconditionally required `[n4, K]` for `expanded_int4`, even when the native packed/interleaved INT4 branch was selected.
+- Deep comparison of the original-style packed launcher and SHMQ’s `begin_integer_prefill_overlap` confirmed that the packed branch reads `weight_int4_interleaved` and does not dereference `expanded_int4`; the latter was only a common validation requirement. v293 therefore permits the empty expanded buffer only when a non-empty packed INT4 prefill tensor is present, retaining the old shape requirement for the legacy expanded path.
+- Added a source contract for the condition. Local full suite: `Ran 97 tests in 0.040s — OK (skipped=6)`. No CUDA benchmark claim yet; Colab T4 compile and operator benchmark are required next.
+- The failed Colab session was stopped cleanly and no Kaggle run was launched.

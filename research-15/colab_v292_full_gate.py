@@ -124,7 +124,10 @@ def main() -> int:
     if capability != (7, 5) or "T4" not in name.upper():
         raise RuntimeError(f"expected Tesla T4 / SM75, got {name} {capability}")
 
-    prepare_qwen_model()
+    if os.environ.get("SHMQ_OPERATOR_ONLY") == "1":
+        print("QWEN_MODEL_STAGE", "skipped_operator_only", flush=True)
+    else:
+        prepare_qwen_model()
     colab_notebook = Path("/content/mixllm_3level_gate_colab_v292.ipynb")
     notebook_text = NOTEBOOK.read_text(encoding="utf-8")
     notebook_text = notebook_text.replace(
