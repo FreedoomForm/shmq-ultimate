@@ -112,6 +112,29 @@ class SM75PythonDispatchTest(unittest.TestCase):
         third = sm75_backend._expanded_int4_for_prefill(module, x, torch)
         self.assertIsNot(first, third)
 
+    def test_packed_int4_guard_requires_complete_aligned_large_m_tiles(self):
+        module = self._module((128, 0, 128))
+        self.assertTrue(
+            sm75_backend._use_fused_int4_prefill(
+                module, torch.empty(32, 128, dtype=torch.float16),
+            )
+        )
+        for shape in ((16, 128), (32, 64), (32, 130), (31, 128)):
+            with self.subTest(shape=shape):
+                self.assertFalse(
+                    sm75_backend._use_fused_int4_prefill(
+                        module, torch.empty(*shape, dtype=torch.float16),
+                    )
+                )
+
+    def test_packed_int4_guard_rejects_small_int4_partition(self):
+        module = self._module((64, 0, 64))
+        self.assertFalse(
+            sm75_backend._use_fused_int4_prefill(
+                module, torch.empty(128, 128, dtype=torch.float16),
+            )
+        )
+
     def test_module_can_prepare_contiguous_packed_state_before_forward(self):
         module = self._module((2, 2, 0))
         first = module.prepare_sm75_packed_tensors()
