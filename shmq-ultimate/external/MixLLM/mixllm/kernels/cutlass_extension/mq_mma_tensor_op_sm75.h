@@ -139,10 +139,7 @@ class MQMmaPackedInputTensorOpSm75 {
     MmaOperandC *ptr_D = reinterpret_cast<MmaOperandC *>(&D);
 
     constexpr int kASecondK = MmaIterations::kRow;
-    // The SM75 B iterator emits two k16 register groups per N tile.  Its
-    // flattened fragment is N-major: [n0.k0,n0.k1,n1.k0,n1.k1,...], not
-    // [all N tiles.k0, all N tiles.k1].
-    constexpr int kBGroupsPerN = 2;
+    constexpr int kBSecondK = MmaIterations::kColumn;
 
     // CUTLASS uses vertical visitation for all pre-SM80 TensorOp paths.
     // Keep the two legal SM75 k16 MMAs, but follow the SM75 fragment/slot
@@ -161,13 +158,12 @@ class MQMmaPackedInputTensorOpSm75 {
           d_index = m_serpentine + n * MmaIterations::kRow;
         }
 
-        // The first and second calls consume the two k16 halves of the
-        // widened k32 fragment and accumulate into the same C fragment.
-        const int b_group = kBGroupsPerN * n;
-        mma(ptr_D[d_index], ptr_A[m_serpentine], ptr_B[b_group],
-            ptr_D[d_index]);
+        // The transformed fragment is half-major so that this order matches
+        // MmaTensorOpDequantizer::apply_zero(): all N tiles for K half 0,
+        // followed by all N tiles for K half 1.
+        mma(ptr_D[d_index], ptr_A[m_serpentine], ptr_B[n], ptr_D[d_index]);
         mma(ptr_D[d_index], ptr_A[kASecondK + m_serpentine],
-            ptr_B[b_group + 1], ptr_D[d_index]);
+            ptr_B[kBSecondK + n], ptr_D[d_index]);
       }
     }
   }
@@ -184,7 +180,23 @@ class MQMmaPackedInputTensorOpSm75 {
     // expands each loaded 32-value logical fragment to 32 signed int8 values.
     detail::FragmentConverter<ElementBMma, ElementB, FragmentB::kElements>
         convert_B;
-    dst_B = convert_B(tmp_B);
+    TransformedFragmentB converted_B = convert_B(tmp_B);
+
+    // The SM75 iterator emits each N tile's two k16 groups adjacently.  Keep
+    // the established CUTLASS/dequantizer ABI by transposing only these flat
+    // register groups to half-major order before zero-point application.
+    MmaOperandB const *src_B =
+        reinterpret_cast<MmaOperandB const *>(&converted_B);
+    MmaOperandB *dst_B_groups = reinterpret_cast<MmaOperandB *>(&dst_B);
+    constexpr int kBGroupsPerN = 2;
+    CUTLASS_PRAGMA_UNROLL
+    for (int n = 0; n < MmaIterations::kColumn; ++n) {
+      CUTLASS_PRAGMA_UNROLL
+      for (int k_group = 0; k_group < kBGroupsPerN; ++k_group) {
+        dst_B_groups[k_group * MmaIterations::kColumn + n] =
+            src_B[kBGroupsPerN * n + k_group];
+      }
+    }
 
     // On SM75, the vertical TensorOp iterator already produces the
     // instruction register layout expected by mma.sync; the generic CUTLASS

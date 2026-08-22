@@ -218,7 +218,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("intm_serpentine=((n%2)?(MmaIterations::kRow-1-m):m)", tensor_op)
         self.assertIn("d_index=n+m_serpentine*MmaIterations::kColumn", tensor_op)
         self.assertIn("ptr_A[m_serpentine]", tensor_op)
-        self.assertIn("ptr_B[b_group]", tensor_op)
+        self.assertIn("ptr_B[n]", tensor_op)
 
     def test_v294_packed_b_fragment_preserves_original_layout(self):
         tensor_op = "".join(self.cutlass_sm75_mixed.split())
@@ -233,13 +233,13 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("2*MmaIterations::kRow*MmaOperandA::kElements", tensor_op)
         self.assertNotIn("MatrixShape<ArchMmaOperator::Shape::kM,32>", tensor_op)
 
-    def test_v298_packed_b_fragment_uses_n_major_k16_groups(self):
+    def test_v300_packed_b_fragment_matches_dequantizer_order(self):
         tensor_op = "".join(self.cutlass_sm75_mixed.split())
-        self.assertIn("constexprintkBGroupsPerN=2", tensor_op)
-        self.assertIn("constintb_group=kBGroupsPerN*n", tensor_op)
-        self.assertIn("ptr_B[b_group]", tensor_op)
-        self.assertIn("ptr_B[b_group+1]", tensor_op)
-        self.assertNotIn("kBSecondK=MmaIterations::kColumn", tensor_op)
+        self.assertIn("constexprintkBSecondK=MmaIterations::kColumn", tensor_op)
+        self.assertIn("TransformedFragmentBconverted_B=convert_B(tmp_B)", tensor_op)
+        self.assertIn("dst_B_groups[k_group*MmaIterations::kColumn+n]", tensor_op)
+        self.assertIn("src_B[kBGroupsPerN*n+k_group]", tensor_op)
+        self.assertIn("ptr_B[kBSecondK+n]", tensor_op)
 
     def test_v299_prefill_control_forces_expanded_path(self):
         backend_compact = "".join(self.backend.split())
@@ -303,8 +303,9 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("MatrixShape<16,32>", mixed_compact)
         self.assertIn("MatrixShape<32,ArchMmaOperator::Shape::kN>", mixed_compact)
         self.assertIn("kASecondK=MmaIterations::kRow", mixed_compact)
+        self.assertIn("kBSecondK=MmaIterations::kColumn", mixed_compact)
+        self.assertIn("dst_B_groups[k_group*MmaIterations::kColumn+n]", mixed_compact)
         self.assertIn("kBGroupsPerN=2", mixed_compact)
-        self.assertIn("constintb_group=kBGroupsPerN*n", mixed_compact)
         self.assertIn("FragmentBtmp_B=B", mixed_compact)
         self.assertNotIn("FragmentBtmp_B=shuffler_B(B)", mixed_compact)
         dequantizer_compact = "".join(self.dequantizer.split())

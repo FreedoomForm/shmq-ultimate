@@ -1743,3 +1743,15 @@ v298 local validation completed after updating the stale v297 contract: `96 pass
 ## v299 — expanded-INT4 correctness control (pre-Colab)
 
 The v299 control disables only cached native-v3 selection in `sm75_backend.py`, forcing `_expanded_int4_for_prefill()` and the existing staged signed-INT8 CUTLASS runner for rows>=32. Local SM75 source/backend tests pass (`50 passed, 6 skipped, 3 subtests passed`); CUDA execution remains deferred to a fresh Colab T4. This candidate is diagnostic, not yet a performance claim: it is retained only long enough to prove whether the large-M corruption is below or above the packed adapter boundary.
+
+
+## v300 — replace synthetic k32 policy with native SM75 k16 policy (pre-Colab)
+
+The v299 expanded control restores all large-M operator correctness (`max_abs_error <= 0.124` in the tested Qwen/prefill cases) but fails performance and timing gates because it materializes an 8.6 MB signed INT8 copy and uses the slower staged route. The v298 native packed adapter still corrupts large-M output even after the B n-major fix.
+
+Deep comparison now isolates the highest-confidence remaining seam: `MQMmaPipelinedSm75` derives `kWarpGemmIterations` from `Operator::Policy::MmaShape::kK`. SHMQ advertises a synthetic `MmaShape=<8,8,32>` while the actual legal SM75 instruction is `<8,8,16>`, causing two pipeline iterations and widened `<16,32>/<32,8>` iterator fragments. Original CUTLASS SM75 uses the real k16 policy and four pipeline iterations; its iterator shapes are `<8,16>` for A and `<16,8>` for B, with one legal MMA per m/n slot. v300 will remove only this synthetic k32 collapse: use a native k16 policy, native iterator shapes, and one vertical-visit MMA per slot, while retaining packed uint4 loading, the original B layout, metadata, dequantization, output scatter, and benchmark conditions. This is the first candidate that follows the full CUTLASS SM75 iterator/pipeline contract rather than adapting the SM80 k32 fragment ABI.
+
+
+## v300 refinement — dequantizer-compatible B regrouping (local)
+
+The native adapter now converts the iterator-emitted n-major B fragment into the half-major register order required by `MmaTensorOpDequantizer::apply_zero()`, then uses the original `ptr_B[n]` / `ptr_B[kColumn+n]` MMA indexing. The v298 n-major operator mapping is no longer active. Local source/backend tests pass (`50 passed, 6 skipped, 3 subtests passed`). Fresh Colab validation is required; the v299 expanded control established the expected correctness reference but is not a performance candidate.
