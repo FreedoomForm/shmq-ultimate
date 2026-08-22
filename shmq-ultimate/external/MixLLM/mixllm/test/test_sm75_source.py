@@ -209,8 +209,16 @@ class SM75SourceContractTest(unittest.TestCase):
 
     def test_v295_packed_a_fragment_matches_original_transform(self):
         tensor_op = "".join(self.cutlass_sm75_mixed.split())
-        self.assertIn("FragmentShuffler<ElementAMma,ElementA,MmaIterations::kRow,FragmentA::kElements,MmaOperandA::kElements,Operand::kA>", tensor_op)
-        self.assertIn("FragmentAtmp_A=shuffler_A(A)", tensor_op)
+        self.assertIn("FragmentAtmp_A=A", tensor_op)
+        self.assertNotIn("shuffler_A(A)", tensor_op)
+
+    def test_v297_packed_adapter_uses_sm75_vertical_visit(self):
+        tensor_op = "".join(self.cutlass_sm75_mixed.split())
+        self.assertIn("for(intn=0;n<MmaIterations::kColumn;++n)", tensor_op)
+        self.assertIn("intm_serpentine=((n%2)?(MmaIterations::kRow-1-m):m)", tensor_op)
+        self.assertIn("d_index=n+m_serpentine*MmaIterations::kColumn", tensor_op)
+        self.assertIn("ptr_A[m_serpentine]", tensor_op)
+        self.assertIn("ptr_B[n]", tensor_op)
 
     def test_v294_packed_b_fragment_preserves_original_layout(self):
         tensor_op = "".join(self.cutlass_sm75_mixed.split())

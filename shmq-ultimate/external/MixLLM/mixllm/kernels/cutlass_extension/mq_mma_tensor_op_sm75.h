@@ -141,25 +141,28 @@ class MQMmaPackedInputTensorOpSm75 {
     constexpr int kASecondK = MmaIterations::kRow;
     constexpr int kBSecondK = MmaIterations::kColumn;
 
+    // CUTLASS uses vertical visitation for all pre-SM80 TensorOp paths.
+    // Keep the two legal SM75 k16 MMAs, but follow the SM75 fragment/slot
+    // order instead of the SM80 nonvertical m-outer traversal.
     CUTLASS_PRAGMA_UNROLL
-    for (int m = 0; m < MmaIterations::kRow; ++m) {
+    for (int n = 0; n < MmaIterations::kColumn; ++n) {
       CUTLASS_PRAGMA_UNROLL
-      for (int n = 0; n < MmaIterations::kColumn; ++n) {
-        int n_serpentine =
-            ((m % 2) ? (MmaIterations::kColumn - 1 - n) : n);
+      for (int m = 0; m < MmaIterations::kRow; ++m) {
+        int m_serpentine =
+            ((n % 2) ? (MmaIterations::kRow - 1 - m) : m);
 
         int d_index;
         if (AccumulatorsInRowMajor_) {
-          d_index = n_serpentine + m * MmaIterations::kColumn;
+          d_index = n + m_serpentine * MmaIterations::kColumn;
         } else {
-          d_index = m + n_serpentine * MmaIterations::kRow;
+          d_index = m_serpentine + n * MmaIterations::kRow;
         }
 
         // The first and second calls consume the two k16 halves of the
         // widened k32 fragment and accumulate into the same C fragment.
-        mma(ptr_D[d_index], ptr_A[m], ptr_B[n_serpentine], ptr_D[d_index]);
-        mma(ptr_D[d_index], ptr_A[kASecondK + m],
-            ptr_B[kBSecondK + n_serpentine], ptr_D[d_index]);
+        mma(ptr_D[d_index], ptr_A[m_serpentine], ptr_B[n], ptr_D[d_index]);
+        mma(ptr_D[d_index], ptr_A[kASecondK + m_serpentine],
+            ptr_B[kBSecondK + n], ptr_D[d_index]);
       }
     }
   }
@@ -178,11 +181,10 @@ class MQMmaPackedInputTensorOpSm75 {
         convert_B;
     dst_B = convert_B(tmp_B);
 
-    detail::FragmentShuffler<ElementAMma, ElementA, MmaIterations::kRow,
-                              FragmentA::kElements, MmaOperandA::kElements,
-                              Operand::kA>
-        shuffler_A;
-    FragmentA tmp_A = shuffler_A(A);
+    // On SM75, the vertical TensorOp iterator already produces the
+    // instruction register layout expected by mma.sync; the generic CUTLASS
+    // vertical transform likewise preserves A without an extra shuffle.
+    FragmentA tmp_A = A;
     Array<ElementA, FragmentA::kElements / 2> const *ptr_tmp_A =
         reinterpret_cast<Array<ElementA, FragmentA::kElements / 2> const *>(&tmp_A);
     Array<ElementAMma, FragmentA::kElements / 2> *ptr_dst_A =
