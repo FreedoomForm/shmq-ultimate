@@ -2019,3 +2019,7 @@ The v302 Kaggle run compiled the new native probe and executed the existing prob
 ## v303 result — native SM75 arithmetic decomposition cleanly passed
 
 The corrected v303 Kaggle run compiled and executed the isolated native probe successfully: `SM75_INT4_NATIVE_DECOMPOSITION_PROBE_PASS [-480, -480] [8128, 8128]`, with all embedded tests passing. The native U4/U4 plus S4/U4 arithmetic contract is therefore supported for the two tested fragments and signedness cases. The production operator remains the safe expanded v299 control; no native packed dispatcher was enabled. The full benchmark still reports the known mixed-prefill E2E failure, and full-model Qwen quality/throughput and vLLM production remain unavailable, so the terminal decision is correctly `no_go` for production. The probe and its evidence are retained as research infrastructure; no performance claim is made.
+
+## v304 implementation — compile-only native SM75 U4 core contract
+
+Extended the research-only probe header with CUTLASS’s genuine SM75 native U4/U4 core alias: 32x128x64 threadblock, 32x32x32 warp tile, m8n8k32 instruction, eight warps, and four-byte packed U4 fragments. Static assertions verify the geometry and packed fragment size. The alias is not connected to production dispatch or checkpoint loading. Local regression passed: 93 passed, 6 skipped, 3 subtests passed. A T4 run is required to confirm that nvcc accepts the complete derived iterator/policy instantiation.
