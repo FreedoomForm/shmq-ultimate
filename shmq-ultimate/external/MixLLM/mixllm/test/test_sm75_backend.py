@@ -146,6 +146,22 @@ class SM75PythonDispatchTest(unittest.TestCase):
         third = sm75_backend._prefill_metadata_for_cutlass(module, x, torch)
         self.assertIsNot(first, third)
 
+    def test_large_m_mixed_fused_path_skips_expanded_int4(self):
+        module = self._module((2, 2, 1))
+        x = torch.randn(32, 128, dtype=torch.float16)
+        input_int8 = torch.empty_like(x, dtype=torch.int8)
+        scale_act = torch.empty(1, 32, dtype=torch.float16)
+        operator = mock.Mock(return_value=torch.empty(32, 5))
+        with mock.patch.object(sm75_backend, "_LOADED", True), mock.patch.object(
+                sm75_backend, "_expanded_int4_for_prefill") as expand, mock.patch.object(
+                torch.ops.mixllm_sm75, "_three_level_linear_v2_unchecked",
+                operator, create=True):
+            three_level_linear_prequantized(
+                module, x, input_int8, scale_act, torch,
+            )
+        expand.assert_not_called()
+        self.assertEqual(operator.call_args.args[4].numel(), 0)
+
     def test_decode_keeps_packed_int4_and_does_not_expand_again(self):
         module = self._module((2, 0, 0))
         module.prepare_sm75_prefill_cache()
