@@ -136,6 +136,15 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("struct InstructionPair", probe)
         self.assertIn("mq_mma_sm75_int4_pair.h", self.cutlass_testbed)
 
+    def test_v304_native_sm75_core_compile_contract(self):
+        probe = (Path(__file__).parents[1] / "kernels" / "cutlass_extension" / "mq_mma_sm75_int4_pair.h").read_text(encoding="utf-8")
+        probe_compact = "".join(probe.split())
+        self.assertIn("usingNativeCore=cutlass::gemm::threadblock::DefaultMmaCore<", probe_compact)
+        self.assertIn("GemmShape<32,128,64>", probe_compact)
+        self.assertIn("GemmShape<32,32,32>", probe_compact)
+        self.assertIn("sizeof(typenameNativeCore::MmaPolicy::Operator::FragmentA)==4", probe_compact)
+        self.assertIn("intentionally not\n// wired", probe)
+
     def test_v232_native_int4_decomposition_probe_contract(self):
         source_compact = "".join(self.source.split())
         self.assertIn("sm75_int4_native_decomposition_probe_kernel", source_compact)
