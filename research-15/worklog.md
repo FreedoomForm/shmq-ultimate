@@ -2003,3 +2003,7 @@ The v299 N256 candidate failed during nvcc compilation before any benchmark. CUT
 ## v300 research conclusion — cache per-runner CUDA kernel attributes
 
 Fresh comparison of Microsoft’s persistent `Testbed` constructor with SHMQ’s static `Runner::run()` found one concrete hot-path difference: Microsoft applies dynamic-shared-memory size and preferred-carveout attributes during one-time testbed construction, whereas SHMQ currently calls both `cudaFuncSetAttribute` APIs for every partition launch. v300 will cache successful attribute setup per runner specialization and CUDA device, preserving the first-launch setup, all kernels, arithmetic, streams, layouts, scatter ABI, partitions, and gates. The row-major original epilogue remains excluded because it does not preserve SHMQ’s indexed scatter contract.
+
+## v300 result — attribute caching was correct but not performance-positive
+
+The v300 attribute-cache candidate compiled and passed SM75 native correctness, timing-integrity, allocator, and embedded-contract gates. It did not improve the target: Qwen mixed rows=128 E2E was 0.328x versus dense FP16, mixed rows=16 was 0.321x, and the mixed prefill E2E gate failed. The mixed decode E2E gate also failed. The full-model Qwen quality/throughput and vLLM production gates remained unavailable. Because no target speed improvement was demonstrated and one gate regressed, the per-device attribute-cache change is rolled back; the safe v299 expanded control remains authoritative.
