@@ -78,16 +78,21 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("expanded_int4 = module.weight_int8[:0]", self.backend)
         self.assertIn("signed expanded copy lazy", self.linear)
 
-    def test_v299_large_m_uses_expanded_correctness_control(self):
+    def test_v289_prefill_uses_original_packed_v3_handoff(self):
         backend_compact = "".join(self.backend.split())
         dispatch = backend_compact[
             backend_compact.index("expanded_int4=None"):
         ]
-        self.assertIn("#v299control:usetheoriginal-safeexpandedINT4+stagedCUTLASS", dispatch)
         self.assertIn("native_v3=None", dispatch)
         self.assertIn("use_cached_v3=False", dispatch)
-        self.assertNotIn("_prefill_metadata_for_cutlass(module,x,torch_module)", dispatch)
+        self.assertIn("ifx.shape[0]>=32", dispatch)
+        self.assertIn("native_v3=getattr(torch_module.ops.mixllm_sm75,", dispatch)
+        self.assertIn("_three_level_linear_v3_unchecked", dispatch)
+        self.assertIn("prefill_int4=module.prepare_sm75_prefill_int4()", dispatch)
+        self.assertIn("metadata=_prefill_metadata_for_cutlass(module,x,torch_module)", dispatch)
+        self.assertIn("use_cached_v3=prefill_int4isnotNoneandmetadataisnotNone", dispatch)
         self.assertIn("expanded_int4=_expanded_int4_for_prefill(module,x,torch_module)", dispatch)
+        self.assertIn("ifuse_cached_v3andnative_v3isnotNoneandmetadataisnotNone", dispatch)
 
     def test_v196_timing_integrity_contract(self):
         self.assertIn("timing_integrity_ratio", self.backend)
