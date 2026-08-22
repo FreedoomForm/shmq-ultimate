@@ -173,13 +173,14 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertEqual(source_compact.count("a_low_packed[row][pair]=low0|(low1<<4)"), 1)
         self.assertEqual(source_compact.count("b_packed[local_channel][pair]=channel<channels?weight_int4[source]:0"), 1)
 
-    def test_v283_fused_int4_isolated_from_production_dispatch(self):
+    def test_v290_packed_v3_validation_contract(self):
         source_compact = "".join(self.source.split())
         self.assertIn("__global__voidsm75_int4_pair_gemm_kernel", source_compact)
         self.assertIn("voidrun_int4_pair_partition(", source_compact)
-        self.assertNotIn("n4>0&&n8==0&&n16==0&&!has_cached_metadata", source_compact)
         self.assertIn("begin_integer_prefill_overlap", source_compact)
         self.assertIn("cached_scale_int8, false);", self.source)
+        self.assertIn("constboolhas_packed_int4=weight_int4_interleaved.defined()&&", source_compact)
+        self.assertIn("rows==1||has_packed_int4||", source_compact)
         self.assertIn("low_mma(low_accum[row_tile][n_tile],low_a,weights,low_accum[row_tile][n_tile])", source_compact)
         self.assertIn("high_mma(high_accum[row_tile][n_tile],high_a,weights,high_accum[row_tile][n_tile])", source_compact)
         self.assertIn("16*high_accum[row_tile][n_tile][register_index]-correction", source_compact)

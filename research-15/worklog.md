@@ -1909,3 +1909,9 @@ The stage-5 wrapper is therefore not retained. The experiment confirms that an a
 Fresh primary-source research found that Microsoft MixLLM’s original launcher directly consumes its two-step interleaved packed INT4 layout and transposed metadata. SHMQ already computes and caches the equivalent interleaved tensor and metadata, but the current v299 control routes only v2 and therefore materializes signed expanded INT4. The existing C++ v3 ABI and `run_cutlass_packed_int4_partition()` already provide the original-style packed route.
 
 The v289 candidate changes only the Python handoff: prepare `_sm75_int4_interleaved` and transposed metadata, resolve the registered v3 operator, and call the existing ABI with v2 expanded dispatch as fallback if the symbol/cache is unavailable. No direct pair, synthetic MMA adapter, quantizer, model, benchmark, or quality criterion changes. The first gate is correctness at small and large M; no performance claim is made.
+
+## v290 — repair v3 packed ABI validation (pending local validation)
+
+The v289 Kaggle run failed immediately at the C++ validation layer: the new v3 call supplied the original interleaved packed tensor and cached metadata, but `three_level_linear_v2_core()` still unconditionally required expanded `[n4,K]` INT4 for prefill. This is a concrete ABI plumbing defect, not a packed-kernel correctness result.
+
+Primary-source comparison confirms the original MixLLM packed launcher does not materialize expanded INT4. v290 therefore adds only a `has_packed_int4` validation predicate derived from the nonempty interleaved v3 tensor and exempts the expanded-shape check only for that path; v2 fallback remains unchanged. No arithmetic, shape threshold, benchmark, model, or quality criterion changes.
