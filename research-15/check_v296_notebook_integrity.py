@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FORK = ROOT / "shmq-ultimate" / "external" / "MixLLM"
 NOTEBOOKS = [
     ROOT / "shmq-ultimate" / "mixllm_3level_kaggle" / "mixllm_3level_gate.ipynb",
-    ROOT / "research-15" / "mixllm_3level_gate_colab_v296_operator.ipynb",
+    ROOT / "research-15" / "mixllm_3level_gate_colab_v297_operator.ipynb",
 ]
 
 for notebook_path in NOTEBOOKS:
