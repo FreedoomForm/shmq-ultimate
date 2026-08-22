@@ -16,6 +16,10 @@ Do not change benchmark conditions, arithmetic quality, or the packed memory per
 
 The current runner was still pinned to commit prefix `7be8661` (v291) and cloned the committed full gate notebook, while the helper script generated a v293 operator artifact. That would silently validate stale source. The v296 validation path therefore updates the runner’s immutable commit pin and workspace labels to the v296 commit, and updates the helper’s versioned source/output names. The gate cells, model, benchmark rows, thresholds, and operator-only quality skip remain unchanged.
 
+## Local Colab upload fallback
+
+The GitHub CLI credential helper is currently invalid in the sandbox, so a GitHub push cannot be used as the transport for this validation attempt. The official Colab CLI exposes `upload` and `exec -f` for an existing session. The runner is therefore made transport-independent: when `SHMQ_NOTEBOOK_PATH` is set, it skips the remote Git clone/pin and executes the explicitly uploaded v296 operator notebook, while retaining the same dependency installation, T4/SM75 assertion, notebook cells, benchmark inputs, thresholds, timing-integrity logic, and operator-only quality semantics. This changes only artifact transport and cannot change the measured kernel.
+
 ## Stronger iterator mismatch
 
 The direct type comparison found a concrete divergence: original `MQMmaMixedInputTensorOp` constructs `IteratorA` with `MatrixShape<ArchMmaOperator::Shape::kM, ArchMmaOperator::Shape::kK>`, which is `<16,32>` for the original SM80 `m16n8k32` operator. SHMQ’s SM75 adapter instead used `<8,32>` because its internal legal MMA is `m8n8k16`. The widened fragment still has the same total element count, so static assertions do not detect this difference, but the row-major crosswise iterator’s lane/LDSM mapping is instruction-shape dependent. The next candidate changes only SHMQ’s A iterator shape back to the original widened `<16,32>` contract while retaining the legal SM75 `m8n8k16` arithmetic and the two-half accumulation.

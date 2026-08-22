@@ -96,17 +96,25 @@ def execute_gate_cells(colab_notebook: Path) -> int:
 
 
 def main() -> int:
-    if ROOT.exists():
-        shutil.rmtree(ROOT)
-    run("git", "clone", "--depth", "1", "--branch", BRANCH, REPO_URL, str(ROOT))
-    run("git", "-C", str(ROOT), "fetch", "--unshallow")
-    run("git", "-C", str(ROOT), "checkout", "--detach", EXPECTED_COMMIT)
-    commit = subprocess.check_output(
-        ["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True,
-    ).strip()
-    print("SHMQ_COMMIT", commit, flush=True)
-    if not commit.startswith(EXPECTED_COMMIT):
-        raise RuntimeError(f"expected v296 commit prefix {EXPECTED_COMMIT}, got {commit}")
+    notebook_override = os.environ.get("SHMQ_NOTEBOOK_PATH")
+    if notebook_override:
+        notebook_source = Path(notebook_override)
+        if not notebook_source.is_file():
+            raise RuntimeError(f"uploaded notebook not found: {notebook_source}")
+        print("SHMQ_NOTEBOOK_SOURCE", notebook_source, flush=True)
+    else:
+        if ROOT.exists():
+            shutil.rmtree(ROOT)
+        run("git", "clone", "--depth", "1", "--branch", BRANCH, REPO_URL, str(ROOT))
+        run("git", "-C", str(ROOT), "fetch", "--unshallow")
+        run("git", "-C", str(ROOT), "checkout", "--detach", EXPECTED_COMMIT)
+        commit = subprocess.check_output(
+            ["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True,
+        ).strip()
+        print("SHMQ_COMMIT", commit, flush=True)
+        if not commit.startswith(EXPECTED_COMMIT):
+            raise RuntimeError(f"expected v296 commit prefix {EXPECTED_COMMIT}, got {commit}")
+        notebook_source = NOTEBOOK
 
     prepare_paths()
     install_runtime_dependencies()
@@ -129,7 +137,7 @@ def main() -> int:
     else:
         prepare_qwen_model()
     colab_notebook = Path("/content/mixllm_3level_gate_colab_v296.ipynb")
-    notebook_text = NOTEBOOK.read_text(encoding="utf-8")
+    notebook_text = notebook_source.read_text(encoding="utf-8")
     notebook_text = notebook_text.replace(
         "/kaggle/input/qwen2.5/transformers/0.5b/1", str(MODEL_ROOT),
     )
