@@ -251,7 +251,7 @@ using CorePackedInt4M64N64 = cutlass::gemm::threadblock::DefaultMmaCore<
     cutlass::gemm::GemmShape<8, 8, 16>,
     ElementA, LayoutA, cutlass::uint4b_t, LayoutB, ElementC, LayoutC,
     cutlass::arch::OpClassTensorOp, 2,
-    cutlass::arch::OpMultiplyAddSm75PackedInputUpcast>;
+    cutlass::arch::OpMultiplyAddSm75PackedInputUpcast, true>;
 
 using PackedInt4RunnerM64N64 = Runner<CorePackedInt4M64N64, 2, cutlass::uint4b_t>;
 

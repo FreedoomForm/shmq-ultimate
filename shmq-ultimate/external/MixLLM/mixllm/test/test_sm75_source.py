@@ -212,6 +212,7 @@ class SM75SourceContractTest(unittest.TestCase):
         cutlass_compact = "".join(self.cutlass_testbed.split())
         self.assertIn("CorePackedInt4M64N64", cutlass_compact)
         self.assertIn("PackedInt4RunnerM64N64=Runner<CorePackedInt4M64N64,2,cutlass::uint4b_t>", cutlass_compact)
+        self.assertIn("OpMultiplyAddSm75PackedInputUpcast,true>", cutlass_compact)
         self.assertIn("PackedInt4RunnerM64N64::run", source_compact)
         self.assertNotIn("CorePackedInt4M128N64", cutlass_compact)
         self.assertNotIn("PackedInt4RunnerM128N64", source_compact)
