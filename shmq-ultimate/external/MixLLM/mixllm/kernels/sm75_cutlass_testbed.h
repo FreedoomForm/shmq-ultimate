@@ -225,17 +225,6 @@ using CoreN64 = cutlass::gemm::threadblock::DefaultMmaCore<
 
 using Int8RunnerN64 = Runner<CoreN64, 2>;
 
-// v299: original MixLLM includes a 32x256 K64 family.  It retains an
-// eight-warp block and increases B-tile reuse for wide channel partitions.
-using CoreN256 = cutlass::gemm::threadblock::DefaultMmaCore<
-    cutlass::gemm::GemmShape<32, 256, 64>,
-    cutlass::gemm::GemmShape<32, 32, 64>,
-    cutlass::gemm::GemmShape<8, 8, 16>,
-    ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC,
-    cutlass::arch::OpClassTensorOp, 2, cutlass::arch::OpMultiplyAddSaturate>;
-
-using Int8RunnerN256 = Runner<CoreN256, 2>;
-
 // Upstream MixLLM also exposes the transposed large-M family. Keep the
 // same legal SM75 instruction and stage-2 core while changing only M/N.
 using CoreM128N64 = cutlass::gemm::threadblock::DefaultMmaCore<
