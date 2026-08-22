@@ -1985,3 +1985,9 @@ After v296’s compile-only failure was narrowed away, v297 compiled the remaini
 ## v298 research conclusion — test original 64x128 within the proven eight-warp envelope
 
 The v297 `128x128x64` addition compiled but failed at launch with too many resources because it created a 16-warp block. Fresh comparison with Microsoft’s row-major configuration table identifies `64x128x64x64` as an original family member that uses the same eight-warp count already proven launchable by SHMQ’s `128x64` runner. v298 will add only this M/N swap to the safe expanded K64/two-stage INT8 family; packed v3 stays disabled and all fallback/gates remain unchanged.
+
+## v298 result — M64N128 compiled and passed correctness but did not improve the target path
+
+The v298 `CoreM64N128` family compiled, launched, and passed the native SM75 correctness and timing-integrity gates. It did not rescue performance: Qwen mixed rows=128 E2E was 0.325x versus dense FP16 and the mixed prefill E2E gate failed. Pure INT4 rows=128 was 0.592x, also below dense FP16. The full-model quality/vLLM gates remained unavailable, so this was not a production GO. The candidate is rolled back because it supplied no evidence of a speed improvement and the unchanged safe four-family control remains the reference.
+
+The result also narrows the original-config hypothesis: importing an individual original M/N tuple into the SHMQ plain-layout K64 runner can be correct, but it does not reproduce the original performance dataflow. Future work must target a concrete launcher/dataflow difference, not continue adding isolated tile aliases.
