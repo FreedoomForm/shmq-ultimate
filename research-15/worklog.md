@@ -1951,3 +1951,9 @@ The v293 candidate changes only the packed adapter transform: leave B untouched 
 The v293 Kaggle notebook completed with the safe expanded-INT4 control, not the modified packed adapter: after the v291 rollback, Python still set `native_v3=None` and `use_cached_v3=False`, so `weight_int4_interleaved` was empty and `run_cutlass_packed_int4_partition()` was unreachable. The apparently good large-M errors (smoke 0.0308; Qwen mixed 0.1054; pure INT4 0.1240) therefore validate only the expanded fallback. Performance remained below dense FP16: Qwen mixed rows=128 E2E 0.544x with timing-integrity false, and pure INT4 rows=128 0.491x. Terminal decision: no packed-path conclusion; no-go for the candidate.
 
 Revert the isolated adapter edit. The next iteration must deliberately enable the v3 path together with the original A-shuffle/B-identity repair, under the existing fallback contract, and must identify the live path explicitly in the log before interpreting any measurement.
+
+## v294 — deliberately exercise the corrected packed path (pending local validation)
+
+The v293 T4 result was correctly classified as a no-conclusion experiment because Python production still disabled v3; the modified adapter never ran. Fresh differential review of the original launcher and mixed-input operator confirms that the meaningful next test must combine the adapter’s original A-shuffle/B-identity transform with the v3 handoff of the original-equivalent interleaved tensor and cached transposed metadata.
+
+v294 is the maximum compatible safe set for this seam: enable v3 only for rows>=32 with an integer partition and available caches, exempt expanded validation only when packed INT4 is present, and preserve v2 expanded fallback otherwise. No new synthetic permutation, accumulator flag, tile, quantizer, model, benchmark, or gate relaxation is included. The notebook must explicitly show packed dispatch before any v294 performance result is accepted.
