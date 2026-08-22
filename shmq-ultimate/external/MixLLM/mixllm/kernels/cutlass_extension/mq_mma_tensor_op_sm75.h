@@ -139,7 +139,10 @@ class MQMmaPackedInputTensorOpSm75 {
     MmaOperandC *ptr_D = reinterpret_cast<MmaOperandC *>(&D);
 
     constexpr int kASecondK = MmaIterations::kRow;
-    constexpr int kBSecondK = MmaIterations::kColumn;
+    // The SM75 B iterator emits two k16 register groups per N tile.  Its
+    // flattened fragment is N-major: [n0.k0,n0.k1,n1.k0,n1.k1,...], not
+    // [all N tiles.k0, all N tiles.k1].
+    constexpr int kBGroupsPerN = 2;
 
     // CUTLASS uses vertical visitation for all pre-SM80 TensorOp paths.
     // Keep the two legal SM75 k16 MMAs, but follow the SM75 fragment/slot
@@ -160,9 +163,11 @@ class MQMmaPackedInputTensorOpSm75 {
 
         // The first and second calls consume the two k16 halves of the
         // widened k32 fragment and accumulate into the same C fragment.
-        mma(ptr_D[d_index], ptr_A[m_serpentine], ptr_B[n], ptr_D[d_index]);
+        const int b_group = kBGroupsPerN * n;
+        mma(ptr_D[d_index], ptr_A[m_serpentine], ptr_B[b_group],
+            ptr_D[d_index]);
         mma(ptr_D[d_index], ptr_A[kASecondK + m_serpentine],
-            ptr_B[kBSecondK + n], ptr_D[d_index]);
+            ptr_B[b_group + 1], ptr_D[d_index]);
       }
     }
   }
