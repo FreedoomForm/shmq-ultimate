@@ -245,10 +245,10 @@ using CoreM64N64 = cutlass::gemm::threadblock::DefaultMmaCore<
 
 using Int8RunnerM64N64 = Runner<CoreM64N64, 2>;
 
-// v296: original MixLLM exposes larger row-major M/N families.  These keep
-// the validated SM75 INT8 instruction, K64 staging, two stages, and scatter
-// ABI unchanged while allowing the shape tuner to reduce grid-M or increase
-// channel reuse for large prefill matrices.
+// v297: retain the compiler-valid original-compatible 128x128 row-major
+// family.  It keeps the validated SM75 INT8 instruction, K64 staging, two
+// stages, and scatter ABI unchanged while allowing the shape tuner to reduce
+// grid-M or increase channel reuse for large prefill matrices.
 using CoreM128N128 = cutlass::gemm::threadblock::DefaultMmaCore<
     cutlass::gemm::GemmShape<128, 128, 64>,
     cutlass::gemm::GemmShape<32, 32, 64>,
@@ -257,15 +257,6 @@ using CoreM128N128 = cutlass::gemm::threadblock::DefaultMmaCore<
     cutlass::arch::OpClassTensorOp, 2, cutlass::arch::OpMultiplyAddSaturate>;
 
 using Int8RunnerM128N128 = Runner<CoreM128N128, 2>;
-
-using CoreM256N64 = cutlass::gemm::threadblock::DefaultMmaCore<
-    cutlass::gemm::GemmShape<256, 64, 64>,
-    cutlass::gemm::GemmShape<32, 32, 64>,
-    cutlass::gemm::GemmShape<8, 8, 16>,
-    ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC,
-    cutlass::arch::OpClassTensorOp, 2, cutlass::arch::OpMultiplyAddSaturate>;
-
-using Int8RunnerM256N64 = Runner<CoreM256N64, 2>;
 
 using CorePackedInt4M64N64 = cutlass::gemm::threadblock::DefaultMmaCore<
     cutlass::gemm::GemmShape<64, 64, 64>,
