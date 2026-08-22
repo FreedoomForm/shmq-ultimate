@@ -12,6 +12,10 @@ The SM75 `MmaTensorOpMultiplicandTileIterator` selected for row-major congruous 
 
 Do not change benchmark conditions, arithmetic quality, or the packed memory permutation. Add a Colab-only diagnostic/probe or a minimal alternative adapter that tests the two k16 halves against the proven SM75 `u4*u4` pair decomposition. Accept a production repair only if all large-M smoke, Qwen-shaped, pure INT4, timing-integrity, and existing regression checks pass. Until then v271 remains the safe baseline and v294/v295 remain rejected.
 
+## Colab artifact audit
+
+The current runner was still pinned to commit prefix `7be8661` (v291) and cloned the committed full gate notebook, while the helper script generated a v293 operator artifact. That would silently validate stale source. The v296 validation path therefore updates the runner’s immutable commit pin and workspace labels to the v296 commit, and updates the helper’s versioned source/output names. The gate cells, model, benchmark rows, thresholds, and operator-only quality skip remain unchanged.
+
 ## Stronger iterator mismatch
 
 The direct type comparison found a concrete divergence: original `MQMmaMixedInputTensorOp` constructs `IteratorA` with `MatrixShape<ArchMmaOperator::Shape::kM, ArchMmaOperator::Shape::kK>`, which is `<16,32>` for the original SM80 `m16n8k32` operator. SHMQ’s SM75 adapter instead used `<8,32>` because its internal legal MMA is `m8n8k16`. The widened fragment still has the same total element count, so static assertions do not detect this difference, but the row-major crosswise iterator’s lane/LDSM mapping is instruction-shape dependent. The next candidate changes only SHMQ’s A iterator shape back to the original widened `<16,32>` contract while retaining the legal SM75 `m8n8k16` arithmetic and the two-half accumulation.

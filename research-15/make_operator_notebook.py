@@ -2,8 +2,8 @@
 import json
 from pathlib import Path
 
-source = Path('/home/ubuntu/v204-shmq-unified/research-15/mixllm_3level_gate_colab_v293.ipynb')
-target = Path('/home/ubuntu/v204-shmq-unified/research-15/mixllm_3level_gate_colab_v293_operator.ipynb')
+source = Path('/home/ubuntu/v204-shmq-unified/shmq-ultimate/mixllm_3level_kaggle/mixllm_3level_gate.ipynb')
+target = Path('/home/ubuntu/v204-shmq-unified/research-15/mixllm_3level_gate_colab_v296_operator.ipynb')
 data = json.loads(source.read_text(encoding='utf-8'))
 replacement = """quality = {
     'status': 'not_run',
