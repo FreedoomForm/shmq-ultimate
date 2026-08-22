@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FORK = ROOT / "shmq-ultimate" / "external" / "MixLLM"
 NOTEBOOKS = [
     ROOT / "shmq-ultimate" / "mixllm_3level_kaggle" / "mixllm_3level_gate.ipynb",
-    ROOT / "research-15" / "mixllm_3level_gate_colab_v300_operator.ipynb",
+    ROOT / "research-15" / "mixllm_3level_gate_colab_v301_operator.ipynb",
 ]
 
 for notebook_path in NOTEBOOKS:
@@ -41,10 +41,10 @@ for notebook_path in NOTEBOOKS:
         current_digest.update(name.encode() + b"\0" + current[name].encode() + b"\0")
     assert digest.hexdigest() == current_digest.hexdigest(), notebook_path
     assert sources == current, notebook_path
-    print(f"V300_NOTEBOOK_SOURCE_MATCH {notebook_path.name} files={len(sources)} digest={digest.hexdigest()}")
-    print("V300_NOTEBOOK_HAS_WIDENED_A", "MatrixShape<16, 32>" in sources["mixllm/kernels/cutlass_extension/mq_mma_tensor_op_sm75.h"])
+    print(f"V301_NOTEBOOK_SOURCE_MATCH {notebook_path.name} files={len(sources)} digest={digest.hexdigest()}")
+    print("V301_NOTEBOOK_HAS_WIDENED_A", "MatrixShape<16, 32>" in sources["mixllm/kernels/cutlass_extension/mq_mma_tensor_op_sm75.h"])
 
 operator = json.loads(NOTEBOOKS[1].read_text(encoding="utf-8"))
 quality_cell = "".join(operator["cells"][7]["source"])
 assert "'status': 'not_run'" in quality_cell
-print("V300_OPERATOR_QUALITY_CELL_NOT_RUN true")
+print("V301_OPERATOR_QUALITY_CELL_NOT_RUN true")
