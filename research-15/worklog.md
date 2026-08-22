@@ -1881,3 +1881,9 @@ The v286 candidate changes only pair-kernel ownership: four warps cover a 128-ch
 Kaggle T4 v286 compiled and all explicit native INT4 probes, native correctness, allocator checks, T4 hardware, and embedded tests passed. The four-warp ownership change did not improve the production path: Qwen mixed 4/8/16 E2E speedup was 0.995x at rows=1, 0.284x at rows=16, and 0.182x at rows=128; pure INT4 was 0.907x, 0.614x, and 0.167x. The rows=128 mixed timing-integrity ratio failed at approximately 2.04, mixed prefill failed, and operator production failed. Full-model Qwen quality/throughput and vLLM apply remained unavailable. Terminal decision: `no_go`.
 
 The result disproves the hypothesis that redundant cross-warp A loads were the dominant bottleneck. The 4-warp/128-channel path also increased per-warp work and produced an invalid GEMM-vs-E2E timing relationship at rows=128. The v286 production exposure is reverted immediately; the research note and raw log remain evidence only. The direct pair family is now rejected as a production strategy, and the next iteration must return to the staged CUTLASS path or a substantially different self-consistent dataflow.
+
+## v287 — 64-wide packed pair staging (pending T4)
+
+Deep research compared the direct pair loop with the official CUTLASS hierarchy and Microsoft MixLLM’s K64 threadblock stage. The direct pair currently stages K32 and therefore executes four CTA barriers per 128-element group. v287 changes the pair staging tile to K64 and issues two legal m8n8k32 low/high MMA pairs within each stage, reducing barriers to two per group while preserving the same packed weights, exact low/high identity, zero correction, scales, scatter mapping, and guarded fallback policy.
+
+This is a new reachability/performance hypothesis after v284-v286 no-go results. It is pending complete local validation and one authoritative T4 gate; no performance claim is made.
