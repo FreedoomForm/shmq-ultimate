@@ -1981,3 +1981,7 @@ v297 retains the original-compatible `128x128x64` runner, keeps the tuner ABI at
 ## v297 result — 128x128 K64 runner compiled but exceeded T4 launch resources
 
 After v296’s compile-only failure was narrowed away, v297 compiled the remaining `128x128x64` alias successfully on Kaggle, but execution failed at the first operator benchmark with `AcceleratorError: CUDA error: too many resources requested for launch`. The current `Runner` maps the 128x128 tile to 16 warps and the two-stage SM75 pipeline’s register/shared-resource footprint is not launchable on the T4 configuration. No correctness or performance result exists for this candidate. The 128x128 alias and its tuner entry are rolled back; the safe v299 four-family expanded control remains authoritative.
+
+## v298 research conclusion — test original 64x128 within the proven eight-warp envelope
+
+The v297 `128x128x64` addition compiled but failed at launch with too many resources because it created a 16-warp block. Fresh comparison with Microsoft’s row-major configuration table identifies `64x128x64x64` as an original family member that uses the same eight-warp count already proven launchable by SHMQ’s `128x64` runner. v298 will add only this M/N swap to the safe expanded K64/two-stage INT8 family; packed v3 stays disabled and all fallback/gates remain unchanged.
