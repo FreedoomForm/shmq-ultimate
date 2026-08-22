@@ -1977,3 +1977,7 @@ The v296 notebook was submitted only after local tests, source audit, commit, re
 ## v297 — narrowed expanded tuner candidate (pending local validation)
 
 v297 retains the original-compatible `128x128x64` runner, keeps the tuner ABI at 296 because the cache family remains the same logical experiment lineage, and excludes the compiler-proven `256x64` shape. All arithmetic, K64 staging, two-stage pipeline, partitioning, output scatter, quality gates, and benchmark settings are unchanged.
+
+## v297 result — 128x128 K64 runner compiled but exceeded T4 launch resources
+
+After v296’s compile-only failure was narrowed away, v297 compiled the remaining `128x128x64` alias successfully on Kaggle, but execution failed at the first operator benchmark with `AcceleratorError: CUDA error: too many resources requested for launch`. The current `Runner` maps the 128x128 tile to 16 warps and the two-stage SM75 pipeline’s register/shared-resource footprint is not launchable on the T4 configuration. No correctness or performance result exists for this candidate. The 128x128 alias and its tuner entry are rolled back; the safe v299 four-family expanded control remains authoritative.
