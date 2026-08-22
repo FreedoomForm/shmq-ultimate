@@ -1,5 +1,5 @@
-import unittest
 from pathlib import Path
+import unittest
 
 
 class SM75SourceContractTest(unittest.TestCase):
@@ -207,62 +207,6 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertNotIn("if(rows>=96)", source_compact)
         self.assertIn("kCutlassTuningAbi=286", source_compact)
 
-    def test_v295_packed_a_fragment_matches_original_transform(self):
-        tensor_op = "".join(self.cutlass_sm75_mixed.split())
-        self.assertIn("FragmentAtmp_A=A", tensor_op)
-        self.assertNotIn("shuffler_A(A)", tensor_op)
-
-    def test_v297_packed_adapter_uses_sm75_vertical_visit(self):
-        tensor_op = "".join(self.cutlass_sm75_mixed.split())
-        self.assertIn("for(intn=0;n<MmaIterations::kColumn;++n)", tensor_op)
-        self.assertIn("intm_serpentine=((n%2)?(MmaIterations::kRow-1-m):m)", tensor_op)
-        self.assertIn("d_index=n+m_serpentine*MmaIterations::kColumn", tensor_op)
-        self.assertIn("ptr_A[m_serpentine]", tensor_op)
-        self.assertIn("ptr_B[n]", tensor_op)
-
-    def test_v294_packed_b_fragment_preserves_original_layout(self):
-        tensor_op = "".join(self.cutlass_sm75_mixed.split())
-        self.assertIn("FragmentBtmp_B=B", tensor_op)
-        self.assertIn("persistentmemorypermutationalreadymatchestheiteratorcontract", tensor_op)
-        self.assertNotIn("FragmentBtmp_B=shuffler_B(B)", tensor_op)
-
-    def test_v296_packed_a_iterator_restores_original_widened_shape(self):
-        tensor_op = "".join(self.cutlass_sm75_mixed.split())
-        self.assertIn("MatrixShape<16,32>", tensor_op)
-        self.assertIn("ArchMmaOperator::Shape::kK==16", tensor_op)
-        self.assertIn("2*MmaIterations::kRow*MmaOperandA::kElements", tensor_op)
-        self.assertNotIn("MatrixShape<ArchMmaOperator::Shape::kM,32>", tensor_op)
-
-    def test_v300_packed_b_fragment_matches_dequantizer_order(self):
-        tensor_op = "".join(self.cutlass_sm75_mixed.split())
-        self.assertIn("constexprintkBSecondK=MmaIterations::kColumn", tensor_op)
-        self.assertIn("TransformedFragmentBconverted_B=convert_B(tmp_B)", tensor_op)
-        self.assertIn("dst_B_groups[k_group*MmaIterations::kColumn+n]", tensor_op)
-        self.assertIn("src_B[kBGroupsPerN*n+k_group]", tensor_op)
-        self.assertIn("ptr_B[kBSecondK+n]", tensor_op)
-
-    def test_v301_native_prefill_dispatch_is_restored(self):
-        backend_compact = "".join(self.backend.split())
-        self.assertIn("native_v3=getattr(torch_module.ops.mixllm_sm75", backend_compact)
-        self.assertIn("ifx.shape[0]>=32and(module.indices_4.numel()ormodule.indices_8.numel())", backend_compact)
-        self.assertIn("use_cached_v3=True", backend_compact)
-        self.assertIn("ifuse_cached_v3andnative_v3isnotNoneandmetadataisnotNone", backend_compact)
-
-    def test_v302_packed_adapter_bypasses_incompatible_kgroup_setters(self):
-        tensor_op = "".join(self.cutlass_sm75_mixed.split())
-        pipeline = "".join(self.cutlass_pipeline.split())
-        self.assertIn("staticboolconstkSkipKgroupIndex=true", tensor_op)
-        self.assertIn("staticboolconstkSkipKgroupIndex=false", "".join((Path(__file__).parents[1] / "kernels" / "cutlass" / "include" / "cutlass" / "gemm" / "warp" / "mma_tensor_op.h").read_text(encoding="utf-8").split()))
-        self.assertGreaterEqual(pipeline.count("ifconstexpr(!Operator::kSkipKgroupIndex)"), 6)
-        self.assertIn("warp_tile_iterator_A_.load", pipeline)
-        self.assertIn("warp_tile_iterator_B_.load", pipeline)
-
-    def test_v293_packed_prefill_allows_lazy_expansion_contract(self):
-        source_compact = "".join(self.source.split())
-        self.assertIn("constboolhas_packed_int4_prefill=", source_compact)
-        self.assertIn("rows==1||has_packed_int4_prefill||", source_compact)
-        self.assertIn("unlesspackedINT4ispresent", source_compact)
-
     def test_v291_single_partition_validation_contract(self):
         backend = "".join(self.backend.split())
         self.assertIn("partition_validated=False", backend)
@@ -308,14 +252,11 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("structOpMultiplyAddSm75PackedInputUpcast", mixed_compact)
         self.assertIn("MmaTensorOpPolicyK32", mixed_compact)
         self.assertIn("MQMmaPackedInputTensorOpSm75", mixed_compact)
-        self.assertIn("MatrixShape<16,32>", mixed_compact)
+        self.assertIn("MatrixShape<ArchMmaOperator::Shape::kM,32>", mixed_compact)
         self.assertIn("MatrixShape<32,ArchMmaOperator::Shape::kN>", mixed_compact)
         self.assertIn("kASecondK=MmaIterations::kRow", mixed_compact)
         self.assertIn("kBSecondK=MmaIterations::kColumn", mixed_compact)
-        self.assertIn("dst_B_groups[k_group*MmaIterations::kColumn+n]", mixed_compact)
-        self.assertIn("kBGroupsPerN=2", mixed_compact)
-        self.assertIn("FragmentBtmp_B=B", mixed_compact)
-        self.assertNotIn("FragmentBtmp_B=shuffler_B(B)", mixed_compact)
+        self.assertIn("FragmentShuffler<ElementBMma,ElementB,MmaIterations::kColumn,FragmentB::kElements,2*MmaOperandB::kElements", mixed_compact)
         dequantizer_compact = "".join(self.dequantizer.split())
         self.assertIn("constexprintkKGroups", dequantizer_compact)
         self.assertIn("k_group<kKGroups", dequantizer_compact)

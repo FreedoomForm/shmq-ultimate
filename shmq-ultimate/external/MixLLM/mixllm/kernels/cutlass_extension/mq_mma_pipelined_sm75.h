@@ -645,14 +645,12 @@ public:
     for (int warp_mma_k = 0; warp_mma_k < Base::kWarpGemmIterations; ++warp_mma_k) {
 
       // Load the next warp-tile's A fragment from shared memory
-      if constexpr (!Operator::kSkipKgroupIndex)
-        this->warp_tile_iterator_A_.set_kgroup_index((warp_mma_k + 1) % Base::kWarpGemmIterations);
+      this->warp_tile_iterator_A_.set_kgroup_index((warp_mma_k + 1) % Base::kWarpGemmIterations);
       this->warp_tile_iterator_A_.load(pipe_state.warp_loaded_frag_A_[(warp_mma_k + 1) % 2]);
       ++this->warp_tile_iterator_A_;
 
       // Load the next warp-tile's B fragment from shared memory
-      if constexpr (!Operator::kSkipKgroupIndex)
-        this->warp_tile_iterator_B_.set_kgroup_index((warp_mma_k + 1) % Base::kWarpGemmIterations);
+      this->warp_tile_iterator_B_.set_kgroup_index((warp_mma_k + 1) % Base::kWarpGemmIterations);
       this->warp_tile_iterator_B_.load(pipe_state.warp_loaded_frag_B_[(warp_mma_k + 1) % 2]);
       ++this->warp_tile_iterator_B_;
 
@@ -783,14 +781,12 @@ public:
     iterator_zero.clear_mask(gemm_k_iterations == 0);
 
     // Load first warp-tile's A fragment from shared memory
-    if constexpr (!Operator::kSkipKgroupIndex)
-      this->warp_tile_iterator_A_.set_kgroup_index(0);
+    this->warp_tile_iterator_A_.set_kgroup_index(0);
     this->warp_tile_iterator_A_.load(pipe_state.warp_loaded_frag_A_[0]);
     ++this->warp_tile_iterator_A_;
 
     // Load first warp-tile's B fragment from shared memory
-    if constexpr (!Operator::kSkipKgroupIndex)
-      this->warp_tile_iterator_B_.set_kgroup_index(0);
+    this->warp_tile_iterator_B_.set_kgroup_index(0);
     this->warp_tile_iterator_B_.load(pipe_state.warp_loaded_frag_B_[0]);
     ++this->warp_tile_iterator_B_;
 
@@ -873,10 +869,8 @@ public:
     #pragma unroll
     for (int warp_mma_k = 1; warp_mma_k < Base::kWarpGemmIterations; ++warp_mma_k)
     {
-      if constexpr (!Operator::kSkipKgroupIndex)
-        this->warp_tile_iterator_A_.set_kgroup_index(warp_mma_k);
-      if constexpr (!Operator::kSkipKgroupIndex)
-        this->warp_tile_iterator_B_.set_kgroup_index(warp_mma_k);
+      this->warp_tile_iterator_A_.set_kgroup_index(warp_mma_k);
+      this->warp_tile_iterator_B_.set_kgroup_index(warp_mma_k);
 
       ++this->warp_tile_iterator_A_;
       ++this->warp_tile_iterator_B_;

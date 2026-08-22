@@ -79,18 +79,13 @@ class MQMmaPackedInputTensorOpSm75 {
   static ComplexTransform const kTransformB = ComplexTransform::kNone;
   static int const kThreadCount = 32;
   static int const kPartitionsK = PartitionsK_;
-  static bool const kSkipKgroupIndex = true;
 
   // MatrixShape is converted to the pitch-linear orientation expected by the
   // row/column-major iterator specializations.  k32 is intentional here:
   // int8 A uses 32/16 = 2 contiguous LDSM groups and uint4 B uses 32/32 = 1.
   using IteratorA = MmaTensorOpMultiplicandTileIterator<
       MatrixShape<Shape::kM, Shape::kK>, Operand::kA, ElementA, LayoutA,
-      // Keep the original MixLLM widened A iterator contract (16x32).
-      // The legal SM75 MMA remains m8n8k16; only the iterator shape is
-      // widened so its row-major crosswise lane/LDSM mapping matches the
-      // original k32 adapter before the two k16 calls consume the halves.
-      MatrixShape<16, 32>,
+      MatrixShape<ArchMmaOperator::Shape::kM, 32>,
       Policy::OpDelta::kRow, kThreadCount, kPartitionsK>;
   using FragmentA = typename IteratorA::Fragment;
   using TransformedFragmentA = Array<ElementAMma, FragmentA::kElements>;
@@ -142,29 +137,25 @@ class MQMmaPackedInputTensorOpSm75 {
     constexpr int kASecondK = MmaIterations::kRow;
     constexpr int kBSecondK = MmaIterations::kColumn;
 
-    // CUTLASS uses vertical visitation for all pre-SM80 TensorOp paths.
-    // Keep the two legal SM75 k16 MMAs, but follow the SM75 fragment/slot
-    // order instead of the SM80 nonvertical m-outer traversal.
     CUTLASS_PRAGMA_UNROLL
-    for (int n = 0; n < MmaIterations::kColumn; ++n) {
+    for (int m = 0; m < MmaIterations::kRow; ++m) {
       CUTLASS_PRAGMA_UNROLL
-      for (int m = 0; m < MmaIterations::kRow; ++m) {
-        int m_serpentine =
-            ((n % 2) ? (MmaIterations::kRow - 1 - m) : m);
+      for (int n = 0; n < MmaIterations::kColumn; ++n) {
+        int n_serpentine =
+            ((m % 2) ? (MmaIterations::kColumn - 1 - n) : n);
 
         int d_index;
         if (AccumulatorsInRowMajor_) {
-          d_index = n + m_serpentine * MmaIterations::kColumn;
+          d_index = n_serpentine + m * MmaIterations::kColumn;
         } else {
-          d_index = m_serpentine + n * MmaIterations::kRow;
+          d_index = m + n_serpentine * MmaIterations::kRow;
         }
 
-        // The transformed fragment is half-major so that this order matches
-        // MmaTensorOpDequantizer::apply_zero(): all N tiles for K half 0,
-        // followed by all N tiles for K half 1.
-        mma(ptr_D[d_index], ptr_A[m_serpentine], ptr_B[n], ptr_D[d_index]);
-        mma(ptr_D[d_index], ptr_A[kASecondK + m_serpentine],
-            ptr_B[kBSecondK + n], ptr_D[d_index]);
+        // The first and second calls consume the two k16 halves of the
+        // widened k32 fragment and accumulate into the same C fragment.
+        mma(ptr_D[d_index], ptr_A[m], ptr_B[n_serpentine], ptr_D[d_index]);
+        mma(ptr_D[d_index], ptr_A[kASecondK + m],
+            ptr_B[kBSecondK + n_serpentine], ptr_D[d_index]);
       }
     }
   }
@@ -172,36 +163,23 @@ class MQMmaPackedInputTensorOpSm75 {
   CUTLASS_DEVICE
   void transform(TransformedFragmentA &dst_A, TransformedFragmentB &dst_B,
                  FragmentA const &A, FragmentB const &B) const {
-    // The original MixLLM path intentionally preserves the loaded fragment:
-    // its persistent memory permutation already matches the iterator contract.
-    // Applying FragmentShuffler here would double-transform packed B data.
-    FragmentB tmp_B = B;
+    // The original MixLLM path shuffles the loaded B fragment across the warp
+    // before upcasting.  The ldmatrix fragment is not already in mma.sync's
+    // register layout.  v280 applies that same proven permutation to both
+    // internal k16 halves of the widened k32 fragment.
+    detail::FragmentShuffler<ElementBMma, ElementB,
+                             MmaIterations::kColumn,
+                             FragmentB::kElements, 2 * MmaOperandB::kElements,
+                             Operand::kB>
+        shuffler_B;
+    FragmentB tmp_B = shuffler_B(B);
 
     // The compact uint4 Array stores two nibbles per byte.  This conversion
     // expands each loaded 32-value logical fragment to 32 signed int8 values.
     detail::FragmentConverter<ElementBMma, ElementB, FragmentB::kElements>
         convert_B;
-    TransformedFragmentB converted_B = convert_B(tmp_B);
+    dst_B = convert_B(tmp_B);
 
-    // The SM75 iterator emits each N tile's two k16 groups adjacently.  Keep
-    // the established CUTLASS/dequantizer ABI by transposing only these flat
-    // register groups to half-major order before zero-point application.
-    MmaOperandB const *src_B =
-        reinterpret_cast<MmaOperandB const *>(&converted_B);
-    MmaOperandB *dst_B_groups = reinterpret_cast<MmaOperandB *>(&dst_B);
-    constexpr int kBGroupsPerN = 2;
-    CUTLASS_PRAGMA_UNROLL
-    for (int n = 0; n < MmaIterations::kColumn; ++n) {
-      CUTLASS_PRAGMA_UNROLL
-      for (int k_group = 0; k_group < kBGroupsPerN; ++k_group) {
-        dst_B_groups[k_group * MmaIterations::kColumn + n] =
-            src_B[kBGroupsPerN * n + k_group];
-      }
-    }
-
-    // On SM75, the vertical TensorOp iterator already produces the
-    // instruction register layout expected by mma.sync; the generic CUTLASS
-    // vertical transform likewise preserves A without an extra shuffle.
     FragmentA tmp_A = A;
     Array<ElementA, FragmentA::kElements / 2> const *ptr_tmp_A =
         reinterpret_cast<Array<ElementA, FragmentA::kElements / 2> const *>(&tmp_A);
