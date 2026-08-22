@@ -1887,3 +1887,9 @@ The result disproves the hypothesis that redundant cross-warp A loads were the d
 Deep research compared the direct pair loop with the official CUTLASS hierarchy and Microsoft MixLLM’s K64 threadblock stage. The direct pair currently stages K32 and therefore executes four CTA barriers per 128-element group. v287 changes the pair staging tile to K64 and issues two legal m8n8k32 low/high MMA pairs within each stage, reducing barriers to two per group while preserving the same packed weights, exact low/high identity, zero correction, scales, scatter mapping, and guarded fallback policy.
 
 This is a new reachability/performance hypothesis after v284-v286 no-go results. It is pending complete local validation and one authoritative T4 gate; no performance claim is made.
+
+## v287 result — K64 packed pair staging rejected on correctness
+
+Kaggle T4 v287 compiled and all instruction/load/fused probes passed, but the live K64 pair path failed native correctness at large M. Qwen mixed rows=128 reached `max_abs_error=1135.77` and pure INT4 rows=128 reached `max_abs_error=1095.61`; mixed prefill and operator production failed. Timing-integrity aggregate passed, but the measurements are inadmissible because correctness failed. The K64 change also did not improve performance: mixed rows=128 E2E was 0.149x versus dense FP16 and pure INT4 was 0.146x. Full-model Qwen quality/throughput and vLLM apply remained unavailable. Terminal decision: `no_go`.
+
+The failure proves that simply changing the direct pair staging width is not semantically equivalent to the existing K32 packed WMMA mapping; the packed pointer/WMMA fragment contract needs a new self-consistent design, not a local K-width substitution. The v287 production exposure is reverted immediately. Retain the K64 research and raw log as rejected evidence only, and restore the expanded INT4 correctness control.

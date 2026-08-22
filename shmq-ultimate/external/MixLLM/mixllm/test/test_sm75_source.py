@@ -78,16 +78,15 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("expanded_int4 = module.weight_int8[:0]", self.backend)
         self.assertIn("signed expanded copy lazy", self.linear)
 
-    def test_v287_large_m_uses_guarded_packed_correctness_control(self):
+    def test_v299_large_m_uses_expanded_correctness_control(self):
         backend_compact = "".join(self.backend.split())
         dispatch = backend_compact[
             backend_compact.index("expanded_int4=None"):
         ]
-        self.assertIn("#Keeptheexpandedcorrectnesscontrolforeveryshapeexceptthe", dispatch)
+        self.assertIn("#v299control:usetheoriginal-safeexpandedINT4+stagedCUTLASS", dispatch)
         self.assertIn("native_v3=None", dispatch)
         self.assertIn("use_cached_v3=False", dispatch)
-        self.assertIn("use_fused_int4=_use_fused_int4_prefill(module,x)", dispatch)
-        self.assertIn("ifuse_fused_int4:expanded_int4=module.weight_int8[:0]", dispatch)
+        self.assertNotIn("_prefill_metadata_for_cutlass(module,x,torch_module)", dispatch)
         self.assertIn("expanded_int4=_expanded_int4_for_prefill(module,x,torch_module)", dispatch)
 
     def test_v196_timing_integrity_contract(self):
@@ -148,7 +147,7 @@ class SM75SourceContractTest(unittest.TestCase):
         source_compact = "".join(self.source.split())
         self.assertIn("floatpartial[kPairRowTiles][kPairNSubtiles][2]", source_compact)
         self.assertIn("for(introw_tile=0;row_tile<kPairRowTiles;++row_tile)", source_compact)
-        self.assertIn("wmma::load_matrix_sync(a_low_u4,&a_low_packed[row_tile*8][packed_offset],kPairInstructionK)", source_compact)
+        self.assertIn("wmma::load_matrix_sync(a_low_u4,&a_low_packed[row_tile*8][0]", source_compact)
         self.assertIn("constintlocal_row=row_tile*8+(lane>>2)", source_compact)
         self.assertIn("constintlocal_channel_base=(lane&3)*2", source_compact)
         self.assertIn("low_accum[row_tile][n_tile][register_index]+16*high_accum[row_tile][n_tile][register_index]", source_compact)
@@ -159,28 +158,23 @@ class SM75SourceContractTest(unittest.TestCase):
         source_compact = "".join(self.source.split())
         self.assertIn("template<intkPairWarps,intkPairChannels>", source_compact)
         self.assertIn("constexprintkPairRowTiles=4", source_compact)
-        self.assertIn("constexprintkPairK=64", source_compact)
-        self.assertIn("constexprintkPairInstructionK=32", source_compact)
         self.assertIn("floatpartial[kPairRowTiles][kPairNSubtiles][2]", source_compact)
         self.assertIn("sm75_int4_pair_gemm_kernel<8,128>", source_compact)
         self.assertIn("sm75_int4_pair_gemm_kernel<4,64>", source_compact)
         self.assertIn("constexprintkPairNSubtiles=2", source_compact)
-        self.assertIn("wmma::load_matrix_sync(b_u4,&b_packed[warp*16+n_tile*8][packed_offset],kPairInstructionK)", source_compact)
+        self.assertIn("wmma::load_matrix_sync(b_u4,&b_packed[warp*16+n_tile*8][0]", source_compact)
         self.assertEqual(source_compact.count("channel_base+warp*16+n_tile*8+local_channel_base+register_index"), 2)
         self.assertIn("output[row*output_width+indices_int4[channel]]=__float2half_rn(partial[row_tile][n_tile][register_index])", source_compact)
         self.assertEqual(source_compact.count("a_low_packed[row][pair]=low0|(low1<<4)"), 1)
         self.assertEqual(source_compact.count("b_packed[local_channel][pair]=channel<channels?weight_int4[source]:0"), 1)
 
-    def test_v287_fused_int4_guarded_production_dispatch(self):
+    def test_v283_fused_int4_isolated_from_production_dispatch(self):
         source_compact = "".join(self.source.split())
         self.assertIn("__global__voidsm75_int4_pair_gemm_kernel", source_compact)
         self.assertIn("voidrun_int4_pair_partition(", source_compact)
-        self.assertIn("inlineboolcan_use_int4_pair_prefill(introws,intwidth,intchannels)", source_compact)
-        self.assertIn("rows>=32&&(rows%32)==0&&width>=128", source_compact)
+        self.assertNotIn("n4>0&&n8==0&&n16==0&&!has_cached_metadata", source_compact)
         self.assertIn("begin_integer_prefill_overlap", source_compact)
-        self.assertIn("can_use_int4_pair_prefill(plan.rows,plan.width,plan.n4)", source_compact)
-        self.assertIn("constbooluse_fused_int4=can_use_int4_pair_prefill(rows,width,n4)", source_compact)
-        self.assertIn("rows==1||use_fused_int4||", source_compact)
+        self.assertIn("cached_scale_int8, false);", self.source)
         self.assertIn("low_mma(low_accum[row_tile][n_tile],low_a,weights,low_accum[row_tile][n_tile])", source_compact)
         self.assertIn("high_mma(high_accum[row_tile][n_tile],high_a,weights,high_accum[row_tile][n_tile])", source_compact)
         self.assertIn("16*high_accum[row_tile][n_tile][register_index]-correction", source_compact)

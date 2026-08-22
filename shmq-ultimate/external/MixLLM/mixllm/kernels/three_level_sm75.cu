@@ -894,11 +894,6 @@ void run_int4_pair_partition(
     const at::Tensor& zero_int4, const at::Tensor& indices_int4,
     at::Tensor& output, int rows, int width, cudaStream_t stream);
 
-inline bool can_use_int4_pair_prefill(int rows, int width, int channels) {
-  return rows >= 32 && (rows % 32) == 0 && width >= 128 &&
-      (width % 128) == 0 && channels >= 128;
-}
-
 at::Tensor sm75_int4_pair_mixed_stride_probe_cuda(const at::Tensor& device_tensor) {
   TORCH_CHECK(device_tensor.is_cuda(), "SM75 mixed-stride probe requires a CUDA tensor argument");
   const auto options = device_tensor.options();
@@ -950,8 +945,7 @@ __global__ void sm75_int4_pair_gemm_kernel(
   constexpr int kPairRows = 32;
   constexpr int kPairRowTiles = 4;
   constexpr int kPairNSubtiles = 2;
-  constexpr int kPairK = 64;
-  constexpr int kPairInstructionK = 32;
+  constexpr int kPairK = 32;
   constexpr int kPairBytes = kPairK / 2;
   __shared__ __align__(16) uint8_t a_low_packed[kPairRows][kPairBytes];
   __shared__ __align__(16) uint8_t a_high_packed[kPairRows][kPairBytes];
@@ -1024,44 +1018,34 @@ __global__ void sm75_int4_pair_gemm_kernel(
       }
       __syncthreads();
 
-      for (int instruction_half = 0; instruction_half < kPairK / kPairInstructionK;
-           ++instruction_half) {
-        const int packed_offset = instruction_half * (kPairBytes / 2);
-        for (int row_tile = 0; row_tile < kPairRowTiles; ++row_tile) {
-          wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::u4,
-                         wmma::row_major> a_low_u4;
-          wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::u4,
-                         wmma::row_major> a_high_u4;
+      for (int row_tile = 0; row_tile < kPairRowTiles; ++row_tile) {
+        wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::u4,
+                       wmma::row_major> a_low_u4;
+        wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::u4,
+                       wmma::row_major> a_high_u4;
+        wmma::load_matrix_sync(a_low_u4, &a_low_packed[row_tile * 8][0], kPairK);
+        wmma::load_matrix_sync(a_high_u4, &a_high_packed[row_tile * 8][0], kPairK);
+        for (int n_tile = 0; n_tile < kPairNSubtiles; ++n_tile) {
+          wmma::fragment<wmma::matrix_b, 8, 8, 32, precision::u4,
+                         wmma::col_major> b_u4;
           wmma::load_matrix_sync(
-              a_low_u4, &a_low_packed[row_tile * 8][packed_offset],
-              kPairInstructionK);
-          wmma::load_matrix_sync(
-              a_high_u4, &a_high_packed[row_tile * 8][packed_offset],
-              kPairInstructionK);
-          for (int n_tile = 0; n_tile < kPairNSubtiles; ++n_tile) {
-            wmma::fragment<wmma::matrix_b, 8, 8, 32, precision::u4,
-                           wmma::col_major> b_u4;
-            wmma::load_matrix_sync(
-                b_u4,
-                &b_packed[warp * 16 + n_tile * 8][packed_offset],
-                kPairInstructionK);
+              b_u4, &b_packed[warp * 16 + n_tile * 8][0], kPairK);
 
-            PairProbeLowMma::FragmentA low_a;
-            PairProbeHighMma::FragmentA high_a;
-            PairProbeLowMma::FragmentB weights;
-            low_a.clear();
-            high_a.clear();
-            weights.clear();
-            reinterpret_cast<unsigned&>(low_a) = a_low_u4.x[0];
-            reinterpret_cast<unsigned&>(high_a) = a_high_u4.x[0];
-            reinterpret_cast<unsigned&>(weights) = b_u4.x[0];
-            PairProbeLowMma low_mma;
-            PairProbeHighMma high_mma;
-            low_mma(low_accum[row_tile][n_tile], low_a, weights,
-                    low_accum[row_tile][n_tile]);
-            high_mma(high_accum[row_tile][n_tile], high_a, weights,
-                     high_accum[row_tile][n_tile]);
-          }
+          PairProbeLowMma::FragmentA low_a;
+          PairProbeHighMma::FragmentA high_a;
+          PairProbeLowMma::FragmentB weights;
+          low_a.clear();
+          high_a.clear();
+          weights.clear();
+          reinterpret_cast<unsigned&>(low_a) = a_low_u4.x[0];
+          reinterpret_cast<unsigned&>(high_a) = a_high_u4.x[0];
+          reinterpret_cast<unsigned&>(weights) = b_u4.x[0];
+          PairProbeLowMma low_mma;
+          PairProbeHighMma high_mma;
+          low_mma(low_accum[row_tile][n_tile], low_a, weights,
+                  low_accum[row_tile][n_tile]);
+          high_mma(high_accum[row_tile][n_tile], high_a, weights,
+                   high_accum[row_tile][n_tile]);
         }
       }
       __syncthreads();
@@ -1321,8 +1305,7 @@ void run_unified_prefill(
         expanded_int4, scale_int4, zero_int4, indices_int4,
         weight_int8, scale_int8, indices_int8, output, plan.rows, plan.width,
         caller_stream, streams, cached_scale_int4, cached_zero_int4,
-        cached_scale_int8,
-        can_use_int4_pair_prefill(plan.rows, plan.width, plan.n4));
+        cached_scale_int8, false);
   }
   if (plan.n16 > 0) {
     run_fp16_partition_cublas(
@@ -1454,7 +1437,6 @@ at::Tensor three_level_linear_v2_core(
   const int n8 = indices_int8.numel();
   const int n16 = indices_fp16.numel();
   const int output_width = n4 + n8 + n16;
-  const bool use_fused_int4 = can_use_int4_pair_prefill(rows, width, n4);
   TORCH_CHECK(output_width > 0, "at least one precision partition is required");
   TORCH_CHECK(width % kGroupSize == 0,
               "SM75 Tensor Core backend requires K divisible by 128");
@@ -1463,10 +1445,10 @@ at::Tensor three_level_linear_v2_core(
               "scale_act must have shape [K/128, rows]");
   TORCH_CHECK(weight_int4.size(0) == n4 && weight_int4.size(1) == width / 2,
               "invalid packed INT4 weight shape");
-  TORCH_CHECK(rows == 1 || use_fused_int4 ||
+  TORCH_CHECK(rows == 1 ||
                   (expanded_int4.dim() == 2 && expanded_int4.size(0) == n4 &&
                    expanded_int4.size(1) == width),
-              "expanded_int4 must have shape [n4, K] unless aligned packed INT4 is selected");
+              "expanded_int4 must have shape [n4, K] for prefill");
   TORCH_CHECK(!weight_int4_interleaved.defined() ||
                   weight_int4_interleaved.numel() == 0 ||
                   (weight_int4_interleaved.dim() == 2 &&
