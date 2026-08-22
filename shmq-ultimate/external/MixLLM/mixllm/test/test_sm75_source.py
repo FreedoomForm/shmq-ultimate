@@ -241,6 +241,14 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("ptr_B[b_group+1]", tensor_op)
         self.assertNotIn("kBSecondK=MmaIterations::kColumn", tensor_op)
 
+    def test_v299_prefill_control_forces_expanded_path(self):
+        backend_compact = "".join(self.backend.split())
+        self.assertIn("#v299control", backend_compact)
+        self.assertIn("native_v3=None", backend_compact)
+        self.assertIn("use_cached_v3=False", backend_compact)
+        self.assertIn("ifnotuse_cached_v3:", backend_compact)
+        self.assertIn("expanded_int4=_expanded_int4_for_prefill", backend_compact)
+
     def test_v293_packed_prefill_allows_lazy_expansion_contract(self):
         source_compact = "".join(self.source.split())
         self.assertIn("constboolhas_packed_int4_prefill=", source_compact)

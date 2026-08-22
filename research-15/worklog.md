@@ -1738,3 +1738,8 @@ Deep research compared the original MixLLM `m16n8k32` path with CUTLASS’s SM75
 
 
 v298 local validation completed after updating the stale v297 contract: `96 passed, 6 skipped`; the only two failures are the known CUDA-only `test_linear_module` and `test_linear_module_e2e` tests because sandbox PyTorch has no CUDA. The v298 source contract, Python syntax, and `git diff --check` are ready for commit. No Colab result exists yet; the candidate remains provisional until a fresh T4 compiles the changed header and checks all correctness gates.
+
+
+## v299 — expanded-INT4 correctness control (pre-Colab)
+
+The v299 control disables only cached native-v3 selection in `sm75_backend.py`, forcing `_expanded_int4_for_prefill()` and the existing staged signed-INT8 CUTLASS runner for rows>=32. Local SM75 source/backend tests pass (`50 passed, 6 skipped, 3 subtests passed`); CUDA execution remains deferred to a fresh Colab T4. This candidate is diagnostic, not yet a performance claim: it is retained only long enough to prove whether the large-M corruption is below or above the packed adapter boundary.
