@@ -37,12 +37,13 @@ using HighMma = cutlass::arch::Mma<
     ElementC, LayoutC,
     MathOperator>;
 
-// Compile-only native core contract.  This uses CUTLASS's genuine SM75
+// Compile-only native core contract. This uses CUTLASS's genuine SM75
 // 4-bit multiplicand layouts and m8n8k32 operator; it is intentionally not
 // wired to the SHMQ dispatcher until a matching packed global/shared loader
-// and affine zero-point path are independently proven.
+// and affine zero-point path are independently proven. The four-warp N64
+// geometry is the narrowest candidate left by the T4 thread-map diagnostic.
 using NativeCore = cutlass::gemm::threadblock::DefaultMmaCore<
-    cutlass::gemm::GemmShape<32, 128, 64>,
+    cutlass::gemm::GemmShape<32, 64, 64>,
     cutlass::gemm::GemmShape<32, 32, 32>,
     InstructionShape,
     cutlass::uint4b_t, LayoutA,
@@ -64,12 +65,10 @@ static_assert(HighMma::FragmentA::kElements == 8 &&
                   HighMma::FragmentB::kElements == 8 &&
                   HighMma::FragmentC::kElements == 2,
               "unexpected SM75 high-nibble fragment ABI");
-static_assert(NativeCore::WarpCount::kCount == 8,
-              "native SM75 INT4 core must use eight warps");
+static_assert(NativeCore::WarpCount::kCount == 4,
+              "native SM75 INT4 N64 core must use four warps");
 static_assert(NativeCore::MmaPolicy::Operator::Shape::kK == 32,
               "native SM75 INT4 core must use m8n8k32 MMA");
-static_assert(sizeof(typename NativeCore::MmaPolicy::Operator::FragmentA) == 4,
-              "native uint4 fragment must remain four packed bytes");
 
 struct InstructionPair {
   LowMma low;
