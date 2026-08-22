@@ -1995,3 +1995,7 @@ The result also narrows the original-config hypothesis: importing an individual 
 ## v299 research conclusion — test original 32x256 within the proven eight-warp envelope
 
 The v298 M64N128 family was correct but slower and was rolled back. Fresh comparison with Microsoft’s row-major table identifies `32x256x32x64` as the next source-backed family. It preserves an eight-warp block, unlike the failed 16-warp 128x128 shape, while potentially improving wide-channel B reuse for Qwen’s 2400 INT4 and 896 INT8 partitions. v299 adds only this legal K64/two-stage expanded runner, bumps the tuning ABI, and leaves packed v3 and all computation/gates unchanged.
+
+## v299 result — original 32x256 family is incompatible with the current SM75 thread map
+
+The v299 N256 candidate failed during nvcc compilation before any benchmark. CUTLASS identified `CoreN256`’s A shared iterator as `PitchLinearShape<64,32>, Threads=256, WarpThreadArrangement=<4,8>, ElementsPerAccess=16`, which yields zero iterations and triggers `Number of iterations must be non-zero`. The original MixLLM configuration tuple is therefore not portable into SHMQ’s fixed plain-layout runner. No correctness or performance result exists; the candidate is rolled back and the safe four-family expanded control remains authoritative.
