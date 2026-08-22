@@ -283,12 +283,20 @@ def three_level_linear_prequantized(
     expanded_int4 = None
     prefill_int4 = module.weight_int4[:0]
     metadata = None
-    # v299 control: use the original-safe expanded INT4 + staged CUTLASS
-    # path while the native packed SM75 fragment contract is being repaired.
-    # Keep the v3 symbol lookup out of production selection so a loaded
-    # extension cannot silently bypass this correctness control.
     native_v3 = None
     use_cached_v3 = False
+    if x.shape[0] >= 32 and (module.indices_4.numel() or module.indices_8.numel()):
+        native_v3 = getattr(torch_module.ops.mixllm_sm75,
+                            "_three_level_linear_v3_unchecked", None)
+        if native_v3 is not None:
+            metadata = _prefill_metadata_for_cutlass(module, x, torch_module)
+            if module.indices_4.numel():
+                prepared_int4 = module.prepare_sm75_prefill_int4()
+                if prepared_int4 is not None:
+                    prefill_int4 = prepared_int4
+                    use_cached_v3 = True
+            else:
+                use_cached_v3 = True
     if not use_cached_v3:
         expanded_int4 = _expanded_int4_for_prefill(module, x, torch_module)
     else:

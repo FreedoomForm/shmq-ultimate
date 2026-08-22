@@ -241,13 +241,12 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("src_B[kBGroupsPerN*n+k_group]", tensor_op)
         self.assertIn("ptr_B[kBSecondK+n]", tensor_op)
 
-    def test_v299_prefill_control_forces_expanded_path(self):
+    def test_v301_native_prefill_dispatch_is_restored(self):
         backend_compact = "".join(self.backend.split())
-        self.assertIn("#v299control", backend_compact)
-        self.assertIn("native_v3=None", backend_compact)
-        self.assertIn("use_cached_v3=False", backend_compact)
-        self.assertIn("ifnotuse_cached_v3:", backend_compact)
-        self.assertIn("expanded_int4=_expanded_int4_for_prefill", backend_compact)
+        self.assertIn("native_v3=getattr(torch_module.ops.mixllm_sm75", backend_compact)
+        self.assertIn("ifx.shape[0]>=32and(module.indices_4.numel()ormodule.indices_8.numel())", backend_compact)
+        self.assertIn("use_cached_v3=True", backend_compact)
+        self.assertIn("ifuse_cached_v3andnative_v3isnotNoneandmetadataisnotNone", backend_compact)
 
     def test_v293_packed_prefill_allows_lazy_expansion_contract(self):
         source_compact = "".join(self.source.split())

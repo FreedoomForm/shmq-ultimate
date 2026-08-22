@@ -1755,3 +1755,13 @@ Deep comparison now isolates the highest-confidence remaining seam: `MQMmaPipeli
 ## v300 refinement — dequantizer-compatible B regrouping (local)
 
 The native adapter now converts the iterator-emitted n-major B fragment into the half-major register order required by `MmaTensorOpDequantizer::apply_zero()`, then uses the original `ptr_B[n]` / `ptr_B[kColumn+n]` MMA indexing. The v298 n-major operator mapping is no longer active. Local source/backend tests pass (`50 passed, 6 skipped, 3 subtests passed`). Fresh Colab validation is required; the v299 expanded control established the expected correctness reference but is not a performance candidate.
+
+
+## v300 execution audit correction
+
+The fresh v300 Colab report is valid for the expanded control only, not for the native packed-B repair: `sm75_backend.py` still contained the v299 forced-expanded dispatch, so large-M correctness passed while prefill performance remained poor. The v300 adapter changes were embedded and compiled but never selected by the benchmark. The report is therefore not evidence for or against the v300 native fragment repair. Next candidate v301 will restore the v298 native-v3 selection logic without changing the v300 adapter, then run a fresh T4 process.
+
+
+## v301 — execute the v300 native adapter (pre-Colab)
+
+The v300 Colab run was reclassified as an expanded-path control because v299’s forced-expanded backend dispatch was still active. v301 restores the original cached native-v3 selection while retaining only v300’s dequantizer-compatible B regrouping. Local source/backend tests pass (`50 passed, 6 skipped, 3 subtests passed`). A fresh T4 run is required to obtain the first valid native result for this B-order repair; no Kaggle run will be used during repair.
