@@ -163,24 +163,21 @@ class MQMmaPackedInputTensorOpSm75 {
   CUTLASS_DEVICE
   void transform(TransformedFragmentA &dst_A, TransformedFragmentB &dst_B,
                  FragmentA const &A, FragmentB const &B) const {
-    // The original MixLLM path shuffles the loaded B fragment across the warp
-    // before upcasting.  The ldmatrix fragment is not already in mma.sync's
-    // register layout.  v280 applies that same proven permutation to both
-    // internal k16 halves of the widened k32 fragment.
-    detail::FragmentShuffler<ElementBMma, ElementB,
-                             MmaIterations::kColumn,
-                             FragmentB::kElements, 2 * MmaOperandB::kElements,
-                             Operand::kB>
-        shuffler_B;
-    FragmentB tmp_B = shuffler_B(B);
+    // Match the original MixLLM transformation contract: ldmatrix's A
+    // fragment is shuffled within the warp before conversion, while B is
+    // already in the required packed layout and must remain unchanged.
+    detail::FragmentShuffler<ElementAMma, ElementA,
+                             MmaIterations::kRow,
+                             FragmentA::kElements, 2 * MmaOperandA::kElements,
+                             Operand::kA>
+        shuffler_A;
+    FragmentA tmp_A = shuffler_A(A);
 
     // The compact uint4 Array stores two nibbles per byte.  This conversion
     // expands each loaded 32-value logical fragment to 32 signed int8 values.
     detail::FragmentConverter<ElementBMma, ElementB, FragmentB::kElements>
         convert_B;
-    dst_B = convert_B(tmp_B);
-
-    FragmentA tmp_A = A;
+    dst_B = convert_B(B);
     Array<ElementA, FragmentA::kElements / 2> const *ptr_tmp_A =
         reinterpret_cast<Array<ElementA, FragmentA::kElements / 2> const *>(&tmp_A);
     Array<ElementAMma, FragmentA::kElements / 2> *ptr_dst_A =

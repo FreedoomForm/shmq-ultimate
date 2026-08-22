@@ -1939,3 +1939,9 @@ The v292 candidate changes only `CorePackedInt4M64N64` to `AccumulatorsInRowMajo
 Kaggle v292 failed CUDA compilation before any gates. Adding the final `AccumulatorsInRowMajor=true` argument to `CorePackedInt4M64N64` made `DefaultMmaCore` an incomplete type because SHMQ’s custom `OpMultiplyAddSm75PackedInputUpcast` specialization is not defined for that boolean specialization. The hypothesis was therefore not testable through the current core; no correctness or performance claim is made.
 
 The packed path remains rejected and v292’s header/test exposure is reverted. The original row-major flag is evidence about upstream organization, but SHMQ must implement a matching custom row-major packed core explicitly rather than passing the flag into an unsupported DefaultMmaCore specialization.
+
+## v293 — mirror original A/B fragment transformation responsibilities (pending local validation)
+
+Fresh source comparison found that Microsoft MixLLM’s `MQMmaMixedInputTensorOp::transform()` shuffles the loaded A fragment with `Operand::kA` and intentionally leaves B unchanged (`tmp_B = B`). SHMQ’s packed adapter currently shuffles B and copies A unchanged, reversing the original responsibilities. This is a concrete layout-contract mismatch and a stronger explanation for v291’s large-M corruption than the unsupported accumulator-flag experiment.
+
+The v293 candidate changes only the packed adapter transform: leave B untouched and apply the original A shuffler before the existing two-half INT8 conversion. Legal SM75 MMA decomposition, packed conversion, tile geometry, fallback, dispatch, benchmark, model, and quality gates remain unchanged.
