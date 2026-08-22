@@ -64,9 +64,7 @@ class V51AuditContractTest(unittest.TestCase):
         self.assertIn("_prefill_metadata_for_cutlass", self.backend)
         self.assertIn("_sm75_prefill_metadata", self.backend)
         dispatch = self.backend[self.backend.index("def three_level_linear_prequantized"):]
-        self.assertIn("_three_level_linear_v3_unchecked", dispatch)
-        self.assertIn("if x.shape[0] >= 32", dispatch)
-        self.assertIn("if not use_cached_v3", dispatch)
+        self.assertNotIn("three_level_linear_v3", dispatch)
         self.assertIn('m.def("three_level_linear_v3', self.cuda)
         self.assertIn('m.impl("three_level_linear_v3"', self.cuda)
         self.assertIn('m.def("_three_level_linear_v3_unchecked', self.cuda)
