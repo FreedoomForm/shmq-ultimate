@@ -1765,3 +1765,15 @@ The fresh v300 Colab report is valid for the expanded control only, not for the 
 ## v301 — execute the v300 native adapter (pre-Colab)
 
 The v300 Colab run was reclassified as an expanded-path control because v299’s forced-expanded backend dispatch was still active. v301 restores the original cached native-v3 selection while retaining only v300’s dequantizer-compatible B regrouping. Local source/backend tests pass (`50 passed, 6 skipped, 3 subtests passed`). A fresh T4 run is required to obtain the first valid native result for this B-order repair; no Kaggle run will be used during repair.
+
+
+## v302 — preserve iterator state for the synthetic k32 packed adapter (pre-Colab)
+
+Valid fresh-process v301 native testing showed that the v300 B regrouping did not repair large-M corruption (`mixed rows=128 max_abs_error 731.87`, `smoke rows=128 263.13`; decode and pure INT4 also remained corrupt). The v299/v300 expanded control passed the same large-M correctness checks, so the defect is inside the native packed adapter/pipeline.
+
+Deep comparison of `MQMmaPipelinedSm75::mac_loop_iter()` and CUTLASS’s SM75 iterator shows that the custom adapter advertises `MmaShape=<8,8,32>` but its widened A/B iterators each have `Policy::kGroupsPerTile == 1`. The pipeline nevertheless calls `set_kgroup_index((warp_mma_k+1)%2)` before each load, writing kgroup index 1 into an iterator whose internal tile has only one group. This is inconsistent with the iterator’s own `operator++()` progression and can select the wrong shared-memory swizzle for every second synthetic k32 fragment. v302 will add an explicit adapter trait and make only the SM75 packed pipeline skip these setter calls; the iterator will load the current k32 fragment and advance naturally once per loop. No arithmetic, tensor layout, metadata, quality, or benchmark setting changes.
+
+
+## v302 — packed-only kgroup setter bypass (local)
+
+The candidate adds `kSkipKgroupIndex` to the warp-operator contract, defaults it to false in generic CUTLASS, sets it true only for `MQMmaPackedInputTensorOpSm75`, and guards all six SM75 pipeline setter sites with `if constexpr`. This preserves natural iterator `operator++()` progression for the synthetic k32 packed adapter while leaving ordinary INT8/FP16 paths unchanged. Local source/backend tests pass (`51 passed, 6 skipped, 3 subtests passed`). Fresh Colab T4 validation is required before acceptance.

@@ -217,6 +217,11 @@ public:
   /// Number of partitions along K dimension
   static int const kPartitionsK = PartitionsK_;
 
+  /// Whether the threadblock pipeline must leave the iterator kgroup state
+  /// untouched.  The packed SM75 adapter uses a synthetic k32 policy while
+  /// its iterator advances one complete k32 tile per increment.
+  static bool const kSkipKgroupIndex = false;
+
   #if defined(__CUDA_ARCH__) && ((__CUDA_ARCH__ < 800) || (__CUDA_ARCH__ == 890)) 
     static int const kVerticalVisit = true;
   #elif defined(__CUDA_ARCH__) && (__CUDA_ARCH__ == 1200) 

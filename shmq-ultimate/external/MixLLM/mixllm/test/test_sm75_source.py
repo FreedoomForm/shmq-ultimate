@@ -1,5 +1,5 @@
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 
 class SM75SourceContractTest(unittest.TestCase):
@@ -247,6 +247,15 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("ifx.shape[0]>=32and(module.indices_4.numel()ormodule.indices_8.numel())", backend_compact)
         self.assertIn("use_cached_v3=True", backend_compact)
         self.assertIn("ifuse_cached_v3andnative_v3isnotNoneandmetadataisnotNone", backend_compact)
+
+    def test_v302_packed_adapter_bypasses_incompatible_kgroup_setters(self):
+        tensor_op = "".join(self.cutlass_sm75_mixed.split())
+        pipeline = "".join(self.cutlass_pipeline.split())
+        self.assertIn("staticboolconstkSkipKgroupIndex=true", tensor_op)
+        self.assertIn("staticboolconstkSkipKgroupIndex=false", "".join((Path(__file__).parents[1] / "kernels" / "cutlass" / "include" / "cutlass" / "gemm" / "warp" / "mma_tensor_op.h").read_text(encoding="utf-8").split()))
+        self.assertGreaterEqual(pipeline.count("ifconstexpr(!Operator::kSkipKgroupIndex)"), 6)
+        self.assertIn("warp_tile_iterator_A_.load", pipeline)
+        self.assertIn("warp_tile_iterator_B_.load", pipeline)
 
     def test_v293_packed_prefill_allows_lazy_expansion_contract(self):
         source_compact = "".join(self.source.split())

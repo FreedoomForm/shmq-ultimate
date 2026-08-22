@@ -79,6 +79,7 @@ class MQMmaPackedInputTensorOpSm75 {
   static ComplexTransform const kTransformB = ComplexTransform::kNone;
   static int const kThreadCount = 32;
   static int const kPartitionsK = PartitionsK_;
+  static bool const kSkipKgroupIndex = true;
 
   // MatrixShape is converted to the pitch-linear orientation expected by the
   // row/column-major iterator specializations.  k32 is intentional here:
