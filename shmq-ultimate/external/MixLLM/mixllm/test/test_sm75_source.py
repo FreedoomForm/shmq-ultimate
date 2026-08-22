@@ -207,6 +207,11 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertNotIn("if(rows>=96)", source_compact)
         self.assertIn("kCutlassTuningAbi=286", source_compact)
 
+    def test_v295_packed_a_fragment_matches_original_transform(self):
+        tensor_op = "".join(self.cutlass_sm75_mixed.split())
+        self.assertIn("FragmentShuffler<ElementAMma,ElementA,MmaIterations::kRow,FragmentA::kElements,MmaOperandA::kElements,Operand::kA>", tensor_op)
+        self.assertIn("FragmentAtmp_A=shuffler_A(A)", tensor_op)
+
     def test_v294_packed_b_fragment_preserves_original_layout(self):
         tensor_op = "".join(self.cutlass_sm75_mixed.split())
         self.assertIn("FragmentBtmp_B=B", tensor_op)

@@ -174,7 +174,11 @@ class MQMmaPackedInputTensorOpSm75 {
         convert_B;
     dst_B = convert_B(tmp_B);
 
-    FragmentA tmp_A = A;
+    detail::FragmentShuffler<ElementAMma, ElementA, MmaIterations::kRow,
+                              FragmentA::kElements, MmaOperandA::kElements,
+                              Operand::kA>
+        shuffler_A;
+    FragmentA tmp_A = shuffler_A(A);
     Array<ElementA, FragmentA::kElements / 2> const *ptr_tmp_A =
         reinterpret_cast<Array<ElementA, FragmentA::kElements / 2> const *>(&tmp_A);
     Array<ElementAMma, FragmentA::kElements / 2> *ptr_dst_A =

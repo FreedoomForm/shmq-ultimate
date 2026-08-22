@@ -1683,3 +1683,9 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 - Deep comparison found that original `MQMmaMixedInputTensorOp::transform` constructs a B `FragmentShuffler` but deliberately uses `tmp_B = B`; SHMQ v280–v293 instead applied `shuffler_B(B)`. Since the persistent memory permutation already matches the original iterator contract, this double-transform is the leading explanation for v293’s rows>=32 corruption.
 - v294 removes only that extra B-fragment shuffle, updates the stale v275 contract, and leaves the SM75 k32 widened load, two legal k16 MMAs, packed byte permutation, metadata, stream topology, and benchmark unchanged.
 - Local full suite: `Ran 98 tests in 0.039s — OK (skipped=6)`. Colab T4 compile and numerical benchmark are required before accepting the candidate.
+
+## v295 — restore original packed A-fragment shuffle — 2026-08-22
+
+- v294’s no-shuffle B correction still left large-M packed INT4 corruption. The original MixLLM transform also applies `FragmentShuffler` to A before conversion, while SHMQ’s widened SM75 adapter had used `FragmentA tmp_A = A`.
+- v295 adds the original A shuffle over the widened k32 fragment and preserves the v294 no-shuffle B behavior. No arithmetic, packed memory permutation, tile geometry, stream ordering, metadata, benchmark, or quality setting changed.
+- Local full suite: `Ran 99 tests in 0.039s — OK (skipped=6)`. Colab T4 numerical validation is required next.
