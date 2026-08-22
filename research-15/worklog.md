@@ -2011,3 +2011,7 @@ The v300 attribute-cache candidate compiled and passed SM75 native correctness, 
 ## v302 implementation — isolated native U4/U4 plus S4/U4 decomposition probe
 
 Added a research-only CUDA probe that invokes CUTLASS’s legal SM75 `m8n8k32` U4/U4 and S4/U4 instructions in two independent warps. It reconstructs two exact INT8 activation cases, `-15` and `127`, against unsigned weight codes `1` and `2`, and expects `-480` and `8128` for every lane output. The probe is registered and exercised by the notebook but is not connected to any production dispatcher or output path. Local regression passed: 92 passed, 6 skipped, 3 subtests passed. The next T4 run is justified only to validate this low-level arithmetic/instruction contract; it cannot be interpreted as a production performance result.
+
+## v302 result — native SM75 arithmetic passed; notebook assertion shape was wrong
+
+The v302 Kaggle run compiled the new native probe and executed the existing probe successfully. The raw assertion payload shows all 32 lanes of warp 0 returned `[-480, -480]` and all 32 lanes of warp 1 returned `[8128, 8128]`, exactly matching the decomposition cases. The run was nevertheless marked ERROR because the notebook compared the 64x2 result against a mistakenly constructed 32x4 expected tensor (`expected_native.repeat(32, 1)`). This is a gate-harness shape bug, not a CUDA arithmetic failure. The production dispatch remained unchanged and no performance claim is made. v303 will correct only the expected tensor shape and re-run the isolated probe.
