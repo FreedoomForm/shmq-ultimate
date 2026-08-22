@@ -42,3 +42,14 @@ The next candidate should not blindly set `kWarpGemmIterations=1`, because the t
 - SHMQ packed runner: `shmq-ultimate/external/MixLLM/mixllm/kernels/sm75_cutlass_testbed.h`, especially lines 205-256.
 - SHMQ base/pipeline: `shmq-ultimate/external/MixLLM/mixllm/kernels/cutlass_extension/mq_mma_base.h` lines 118-145 and `mq_mma_pipelined_sm75.h` lines 645-809, 785-809, and 871-953.
 - Original MixLLM mixed operator: `shmq-ultimate/external/MixLLM/mixllm/kernels/cutlass_extension/mq_mma_mixed_input_tensor_op.h`, lines 165-212 and 245-305.
+
+
+## Post-v302 Kaggle failure: artifact correction and large-M diagnosis
+
+The first v302 Kaggle submission failed only because the notebook’s embedded `cutlass_sm75_vendor.b64` was stale; after regeneration, version 277 compiled. The corrected run demonstrates that the remaining defect is functional and shape-dependent: mixed decode passes, rows 1/16 prefill are close, while rows 128 mixed and pure-INT4 prefill are badly corrupted. This rules out a general legal-instruction or basic dequantization failure and points to the large-M warp/tile visitation or shared-memory fragment mapping.
+
+The original Microsoft MixLLM repository exposes a compact upstream organization: the mixed-input operator is selected by `DefaultMmaTensorOp` and delegates to `MQMmaMixedInputTensorOp`, while the SM80 path uses a real `GemmShape<16,8,32>` policy. In contrast, SHMQ’s SM75 path uses a custom `MmaTensorOp<GemmShape<32,32,64>,...>` with an underlying legal `m8n8k16` instruction and a synthetic policy shape. The local vendored CUTLASS policy is deliberately identity-based (`MmaShape = Operator::Shape`), so the synthetic K contract is introduced only by SHMQ’s custom adapter and pipeline.
+
+The authoritative upstream CUTLASS iterator source confirms that crosswise A/B wrappers forward `operator++`, `add_tile_offset`, and `set_kgroup_index` to an underlying pitch-linear iterator; ordinary CUTLASS does not introduce the SHMQ synthetic-K layer. Kaggle’s compile traceback showed the pipeline’s `kSkipKgroupIndex` trait must be present on every `MmaTensorOp` instantiation, including ordinary INT8, which is why refreshing the embedded vendor bundle was necessary. The successful compile plus persistent large-M error now narrows the next code audit to the custom SM75 adapter’s fragment transform/visitation and the pipeline’s two-call `gemm_iters()` batching, not to missing headers.
+
+References: Microsoft MixLLM repository [https://github.com/microsoft/MixLLM]; NVIDIA CUTLASS warp iterator source [https://github.com/NVIDIA/cutlass/blob/main/include/cutlass/gemm/warp/mma_tensor_op_tile_iterator.h]; CUTLASS GEMM API documentation [https://docs.nvidia.com/cutlass/latest/media/docs/cpp/gemm_api.html].
