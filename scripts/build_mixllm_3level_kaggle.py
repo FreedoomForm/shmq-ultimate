@@ -308,6 +308,10 @@ if capability == (7, 5):
     assert tuple(pair_probe.shape) == (2,), pair_probe.shape
     assert torch.equal(pair_probe, torch.zeros_like(pair_probe)), pair_probe
     print('SM75_INT4_PAIR_INSTRUCTION_PROBE_PASS', pair_probe.tolist(), flush=True)
+    native_probe = torch.ops.mixllm_sm75.sm75_int4_native_decomposition_probe(torch.empty(0, device='cuda'))
+    expected_native = torch.tensor([-480, -480, 8128, 8128], device='cuda', dtype=torch.int32)
+    assert torch.equal(native_probe, expected_native.repeat(32, 1)), (native_probe, expected_native)
+    print('SM75_INT4_NATIVE_DECOMPOSITION_PROBE_PASS', native_probe[0].tolist(), native_probe[32].tolist(), flush=True)
     packed_probe = torch.ops.mixllm_sm75.sm75_int4_pair_wmma_load_probe(torch.empty(0, device='cuda'))
     expected_probe = 32 * (torch.arange(1, 9, device='cuda', dtype=torch.int32)[:, None] * torch.arange(1, 9, device='cuda', dtype=torch.int32)[None, :])
     assert torch.equal(packed_probe, expected_probe), (packed_probe, expected_probe)

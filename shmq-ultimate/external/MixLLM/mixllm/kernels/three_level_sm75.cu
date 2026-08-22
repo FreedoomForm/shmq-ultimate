@@ -806,6 +806,48 @@ at::Tensor sm75_int4_pair_instruction_probe_cuda(const at::Tensor& device_tensor
   return output;
 }
 
+__global__ void sm75_int4_native_decomposition_probe_kernel(int* output) {
+#if __CUDA_ARCH__ >= 750
+  const int case_id = threadIdx.x / kWarpSize;
+  const int lane = threadIdx.x % kWarpSize;
+  const int low_value = case_id == 0 ? 1 : 15;
+  const int high_value = case_id == 0 ? -1 : 7;
+  const int weight_value = case_id == 0 ? 1 : 2;
+
+  PairProbeLowMma::FragmentA low_a;
+  PairProbeHighMma::FragmentA high_a;
+  PairProbeLowMma::FragmentB weights;
+  PairProbeLowMma::FragmentC low_accum;
+  PairProbeHighMma::FragmentC high_accum;
+  for (int i = 0; i < low_a.kElements; ++i) {
+    low_a[i] = cutlass::uint4b_t(static_cast<uint8_t>(low_value));
+    high_a[i] = cutlass::int4b_t(high_value);
+    weights[i] = cutlass::uint4b_t(static_cast<uint8_t>(weight_value));
+  }
+  low_accum.clear();
+  high_accum.clear();
+  PairProbeLowMma low_mma;
+  PairProbeHighMma high_mma;
+  low_mma(low_accum, low_a, weights, low_accum);
+  high_mma(high_accum, high_a, weights, high_accum);
+  output[(case_id * kWarpSize + lane) * 2 + 0] =
+      low_accum[0] + 16 * high_accum[0];
+  output[(case_id * kWarpSize + lane) * 2 + 1] =
+      low_accum[1] + 16 * high_accum[1];
+#endif
+}
+
+at::Tensor sm75_int4_native_decomposition_probe_cuda(
+    const at::Tensor& device_tensor) {
+  TORCH_CHECK(device_tensor.is_cuda(), "SM75 INT4 probe requires a CUDA tensor argument");
+  auto output = at::zeros({2 * kWarpSize, 2}, device_tensor.options().dtype(at::kInt));
+  auto stream = at::cuda::getCurrentCUDAStream();
+  sm75_int4_native_decomposition_probe_kernel<<<1, 2 * kWarpSize, 0, stream>>>(
+      output.data_ptr<int>());
+  C10_CUDA_KERNEL_LAUNCH_CHECK();
+  return output;
+}
+
 __global__ void sm75_int4_pair_wmma_load_probe_kernel(int* output) {
 #if __CUDA_ARCH__ >= 750
   namespace precision = wmma::experimental::precision;
@@ -1666,6 +1708,7 @@ at::Tensor three_level_linear_legacy_cuda(
 TORCH_LIBRARY(mixllm_sm75, m) {
   m.def("quantize_activation(Tensor input) -> (Tensor, Tensor)");
   m.def("sm75_int4_pair_instruction_probe(Tensor device_tensor) -> Tensor");
+  m.def("sm75_int4_native_decomposition_probe(Tensor device_tensor) -> Tensor");
   m.def("sm75_int4_pair_wmma_load_probe(Tensor device_tensor) -> Tensor");
   m.def("sm75_int4_pair_fused_probe(Tensor device_tensor) -> Tensor");
   m.def("sm75_int4_pair_mixed_stride_probe(Tensor device_tensor) -> Tensor");
@@ -1706,6 +1749,7 @@ TORCH_LIBRARY(mixllm_sm75, m) {
 TORCH_LIBRARY_IMPL(mixllm_sm75, CUDA, m) {
   m.impl("quantize_activation", &quantize_activation_sm75);
   m.impl("sm75_int4_pair_instruction_probe", &sm75_int4_pair_instruction_probe_cuda);
+  m.impl("sm75_int4_native_decomposition_probe", &sm75_int4_native_decomposition_probe_cuda);
   m.impl("sm75_int4_pair_wmma_load_probe", &sm75_int4_pair_wmma_load_probe_cuda);
   m.impl("sm75_int4_pair_fused_probe", &sm75_int4_pair_fused_probe_cuda);
   m.impl("sm75_int4_pair_mixed_stride_probe", &sm75_int4_pair_mixed_stride_probe_cuda);
