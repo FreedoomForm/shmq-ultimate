@@ -1689,3 +1689,11 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 - v294’s no-shuffle B correction still left large-M packed INT4 corruption. The original MixLLM transform also applies `FragmentShuffler` to A before conversion, while SHMQ’s widened SM75 adapter had used `FragmentA tmp_A = A`.
 - v295 adds the original A shuffle over the widened k32 fragment and preserves the v294 no-shuffle B behavior. No arithmetic, packed memory permutation, tile geometry, stream ordering, metadata, benchmark, or quality setting changed.
 - Local full suite: `Ran 99 tests in 0.039s — OK (skipped=6)`. Colab T4 numerical validation is required next.
+
+## v294 Colab operator benchmark — 2026-08-22 — NO-GO
+- Official Colab CLI T4 compiled v294 and completed the operator notebook. The no-shuffle B change did not repair native packed INT4 at large M: smoke mixed max error 212.165 (rows 32) and 266.186 (rows 128); Qwen-shaped mixed max error 818.567 (rows 128); pure INT4 max error 877.446 (rows 128) with `timing_integrity=False`.
+- Qwen-shaped mixed end-to-end speedups versus dense FP16 were 1.0467x (rows 1), 0.2857x (rows 16), and 0.4910x (rows 128). v294 rejected. Colab session was stopped; no Kaggle run was launched.
+
+## v295 Colab operator benchmark — 2026-08-22 — NO-GO
+- Official Colab CLI T4 compiled v295 and completed the operator notebook with the A-fragment shuffle restored. The numerical failure was unchanged: smoke mixed max error 212.165 (rows 32) and 266.186 (rows 128); Qwen-shaped mixed max error 818.567 (rows 128); pure INT4 max error 877.446 (rows 128) with `timing_integrity=False`.
+- Qwen-shaped mixed end-to-end speedups versus dense FP16 were 1.0890x (rows 1), 0.2505x (rows 16), and 0.5433x (rows 128). v295 rejected. The A/B transform edits are not the root cause; next investigation targets the SM75 packed runner’s widened-fragment split and manual accumulator/output mapping. Colab session was stopped; no Kaggle run was launched.
