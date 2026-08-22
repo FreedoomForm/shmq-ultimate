@@ -163,16 +163,10 @@ class MQMmaPackedInputTensorOpSm75 {
   CUTLASS_DEVICE
   void transform(TransformedFragmentA &dst_A, TransformedFragmentB &dst_B,
                  FragmentA const &A, FragmentB const &B) const {
-    // The original MixLLM path shuffles the loaded B fragment across the warp
-    // before upcasting.  The ldmatrix fragment is not already in mma.sync's
-    // register layout.  v280 applies that same proven permutation to both
-    // internal k16 halves of the widened k32 fragment.
-    detail::FragmentShuffler<ElementBMma, ElementB,
-                             MmaIterations::kColumn,
-                             FragmentB::kElements, 2 * MmaOperandB::kElements,
-                             Operand::kB>
-        shuffler_B;
-    FragmentB tmp_B = shuffler_B(B);
+    // The original MixLLM path intentionally preserves the loaded fragment:
+    // its persistent memory permutation already matches the iterator contract.
+    // Applying FragmentShuffler here would double-transform packed B data.
+    FragmentB tmp_B = B;
 
     // The compact uint4 Array stores two nibbles per byte.  This conversion
     // expands each loaded 32-value logical fragment to 32 signed int8 values.

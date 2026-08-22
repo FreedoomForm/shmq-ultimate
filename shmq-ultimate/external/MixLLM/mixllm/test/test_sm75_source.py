@@ -207,6 +207,12 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertNotIn("if(rows>=96)", source_compact)
         self.assertIn("kCutlassTuningAbi=286", source_compact)
 
+    def test_v294_packed_b_fragment_preserves_original_layout(self):
+        tensor_op = "".join(self.cutlass_sm75_mixed.split())
+        self.assertIn("FragmentBtmp_B=B", tensor_op)
+        self.assertIn("persistentmemorypermutationalreadymatchestheiteratorcontract", tensor_op)
+        self.assertNotIn("FragmentBtmp_B=shuffler_B(B)", tensor_op)
+
     def test_v293_packed_prefill_allows_lazy_expansion_contract(self):
         source_compact = "".join(self.source.split())
         self.assertIn("constboolhas_packed_int4_prefill=", source_compact)
@@ -262,7 +268,8 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("MatrixShape<32,ArchMmaOperator::Shape::kN>", mixed_compact)
         self.assertIn("kASecondK=MmaIterations::kRow", mixed_compact)
         self.assertIn("kBSecondK=MmaIterations::kColumn", mixed_compact)
-        self.assertIn("FragmentShuffler<ElementBMma,ElementB,MmaIterations::kColumn,FragmentB::kElements,2*MmaOperandB::kElements", mixed_compact)
+        self.assertIn("FragmentBtmp_B=B", mixed_compact)
+        self.assertNotIn("FragmentBtmp_B=shuffler_B(B)", mixed_compact)
         dequantizer_compact = "".join(self.dequantizer.split())
         self.assertIn("constexprintkKGroups", dequantizer_compact)
         self.assertIn("k_group<kKGroups", dequantizer_compact)

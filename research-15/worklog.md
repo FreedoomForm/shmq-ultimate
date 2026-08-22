@@ -1677,3 +1677,9 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 - Representative Qwen-shaped mixed end-to-end speedups versus dense FP16 were 0.5269x (rows 1), 0.2862x (rows 16), and 0.4795x (rows 128); these are not performance improvements. Peak GEMM allocations were 48.70 MB, 58.11 MB, and 64.39 MB respectively. Full-model Qwen quality was intentionally not run in this operator-isolation pass.
 - Deep-research conclusion: the shape-check repair was necessary but exposed a deeper packed INT4 layout/iterator correctness mismatch at large M. The next iteration must compare the original packed iterator’s physical B layout against SHMQ’s permutation and either correct it with independent probes or disable the unsafe v3 path; no speed claim is allowed.
 - Colab session teardown was completed and `colab sessions` reported no active sessions. No Kaggle run was launched.
+
+## v294 — restore original packed B-fragment semantics — 2026-08-22
+
+- Deep comparison found that original `MQMmaMixedInputTensorOp::transform` constructs a B `FragmentShuffler` but deliberately uses `tmp_B = B`; SHMQ v280–v293 instead applied `shuffler_B(B)`. Since the persistent memory permutation already matches the original iterator contract, this double-transform is the leading explanation for v293’s rows>=32 corruption.
+- v294 removes only that extra B-fragment shuffle, updates the stale v275 contract, and leaves the SM75 k32 widened load, two legal k16 MMAs, packed byte permutation, metadata, stream topology, and benchmark unchanged.
+- Local full suite: `Ran 98 tests in 0.039s — OK (skipped=6)`. Colab T4 compile and numerical benchmark are required before accepting the candidate.
