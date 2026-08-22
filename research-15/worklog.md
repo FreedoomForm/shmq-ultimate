@@ -1999,3 +1999,7 @@ The v298 M64N128 family was correct but slower and was rolled back. Fresh compar
 ## v299 result — original 32x256 family is incompatible with the current SM75 thread map
 
 The v299 N256 candidate failed during nvcc compilation before any benchmark. CUTLASS identified `CoreN256`’s A shared iterator as `PitchLinearShape<64,32>, Threads=256, WarpThreadArrangement=<4,8>, ElementsPerAccess=16`, which yields zero iterations and triggers `Number of iterations must be non-zero`. The original MixLLM configuration tuple is therefore not portable into SHMQ’s fixed plain-layout runner. No correctness or performance result exists; the candidate is rolled back and the safe four-family expanded control remains authoritative.
+
+## v300 research conclusion — cache per-runner CUDA kernel attributes
+
+Fresh comparison of Microsoft’s persistent `Testbed` constructor with SHMQ’s static `Runner::run()` found one concrete hot-path difference: Microsoft applies dynamic-shared-memory size and preferred-carveout attributes during one-time testbed construction, whereas SHMQ currently calls both `cudaFuncSetAttribute` APIs for every partition launch. v300 will cache successful attribute setup per runner specialization and CUDA device, preserving the first-launch setup, all kernels, arithmetic, streams, layouts, scatter ABI, partitions, and gates. The row-major original epilogue remains excluded because it does not preserve SHMQ’s indexed scatter contract.
