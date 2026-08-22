@@ -290,7 +290,9 @@ def three_level_linear_prequantized(
     # for the staged packed runner, and transposed metadata for CUTLASS.
     # Limit it to prefill shapes because the metadata cache is not a decode
     # representation; every other case retains the v2 expanded fallback.
-    if x.shape[0] >= 32:
+    if x.shape[0] >= 32 and (
+        module.indices_4.numel() or module.indices_8.numel()
+    ):
         native_v3 = getattr(
             torch_module.ops.mixllm_sm75,
             "_three_level_linear_v3_unchecked",

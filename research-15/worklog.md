@@ -1915,3 +1915,9 @@ The v289 candidate changes only the Python handoff: prepare `_sm75_int4_interlea
 The v289 Kaggle run failed immediately at the C++ validation layer: the new v3 call supplied the original interleaved packed tensor and cached metadata, but `three_level_linear_v2_core()` still unconditionally required expanded `[n4,K]` INT4 for prefill. This is a concrete ABI plumbing defect, not a packed-kernel correctness result.
 
 Primary-source comparison confirms the original MixLLM packed launcher does not materialize expanded INT4. v290 therefore adds only a `has_packed_int4` validation predicate derived from the nonempty interleaved v3 tensor and exempts the expanded-shape check only for that path; v2 fallback remains unchanged. No arithmetic, shape threshold, benchmark, model, or quality criterion changes.
+
+## v291 — preserve pure-FP16 fallback in packed v3 handoff (pending local validation)
+
+The v290 run exposed a Python dispatch bug before packed GEMM: the v3 metadata helper was called for the pure-FP16 benchmark, where no integer partition exists, and raised `SM75 CUTLASS metadata requires an integer partition`. The original MixLLM path enters integer GEMM only when INT4/INT8 channels exist.
+
+v291 adds the narrow guard `rows >= 32 and (indices_4.numel() or indices_8.numel())` around v3 cache preparation. Pure FP16 remains on the existing v2 path; mixed and pure-integer cases retain the original packed v3 ABI. No computation, benchmark, model, threshold, or quality criterion changes.
