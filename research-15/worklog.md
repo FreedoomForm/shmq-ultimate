@@ -2023,3 +2023,7 @@ The corrected v303 Kaggle run compiled and executed the isolated native probe su
 ## v304 implementation — compile-only native SM75 U4 core contract
 
 Extended the research-only probe header with CUTLASS’s genuine SM75 native U4/U4 core alias: 32x128x64 threadblock, 32x32x32 warp tile, m8n8k32 instruction, eight warps, and four-byte packed U4 fragments. Static assertions verify the geometry and packed fragment size. The alias is not connected to production dispatch or checkpoint loading. Local regression passed: 93 passed, 6 skipped, 3 subtests passed. A T4 run is required to confirm that nvcc accepts the complete derived iterator/policy instantiation.
+
+## v305 implementation — narrowed native SM75 N64 core candidate
+
+v304’s T4 compiler diagnostic rejected the eight-warp 32x128x64 native subbyte core because its derived A thread map had zero iterations, and it disproved the assumed four-byte fragment-size assertion. v305 replaces that research-only alias with the compiler-backed narrower 32x64x64, 32x32x32, m8n8k32, four-warp core and retains only geometry/policy assertions. Production dispatch remains unchanged. Local regression passed: 93 passed, 6 skipped, 3 subtests passed. The next T4 run is solely a compile/probe validation; it is not a production performance experiment.
