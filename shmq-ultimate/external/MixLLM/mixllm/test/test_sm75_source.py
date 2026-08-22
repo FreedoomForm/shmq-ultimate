@@ -136,6 +136,15 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("struct InstructionPair", probe)
         self.assertIn("mq_mma_sm75_int4_pair.h", self.cutlass_testbed)
 
+    def test_v232_native_int4_decomposition_probe_contract(self):
+        source_compact = "".join(self.source.split())
+        self.assertIn("sm75_int4_native_decomposition_probe_kernel", source_compact)
+        self.assertIn("sm75_int4_native_decomposition_probe_cuda", source_compact)
+        self.assertIn("sm75_int4_native_decomposition_probe(Tensordevice_tensor)->Tensor", source_compact)
+        self.assertIn("low_accum[0]+16*high_accum[0]", source_compact)
+        self.assertIn("low_accum[1]+16*high_accum[1]", source_compact)
+        self.assertIn("sm75_int4_native_decomposition_probe", source_compact)
+
     def test_v233_mixed_stride_probe_contract(self):
         source_compact = "".join(self.source.split())
         self.assertIn("sm75_int4_pair_mixed_stride_probe_cuda", source_compact)
@@ -199,9 +208,6 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("cudaEventElapsedTime", source_compact)
         self.assertIn("SHMQ_SM75_TUNE_CACHE", source_compact)
         self.assertIn("cudaStreamIsCapturing", source_compact)
-        self.assertIn("configured_devices", cutlass_compact)
-        self.assertIn("std::lock_guard<std::mutex>lock(attribute_mutex)", cutlass_compact)
-        self.assertIn("cudaFuncAttributePreferredSharedMemoryCarveout,100", cutlass_compact)
 
     def test_v271_boundary_corrected_quantizer_contract(self):
         source_compact = "".join(self.source.split())

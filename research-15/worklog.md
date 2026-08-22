@@ -2007,3 +2007,7 @@ Fresh comparison of Microsoft’s persistent `Testbed` constructor with SHMQ’s
 ## v300 result — attribute caching was correct but not performance-positive
 
 The v300 attribute-cache candidate compiled and passed SM75 native correctness, timing-integrity, allocator, and embedded-contract gates. It did not improve the target: Qwen mixed rows=128 E2E was 0.328x versus dense FP16, mixed rows=16 was 0.321x, and the mixed prefill E2E gate failed. The mixed decode E2E gate also failed. The full-model Qwen quality/throughput and vLLM production gates remained unavailable. Because no target speed improvement was demonstrated and one gate regressed, the per-device attribute-cache change is rolled back; the safe v299 expanded control remains authoritative.
+
+## v302 implementation — isolated native U4/U4 plus S4/U4 decomposition probe
+
+Added a research-only CUDA probe that invokes CUTLASS’s legal SM75 `m8n8k32` U4/U4 and S4/U4 instructions in two independent warps. It reconstructs two exact INT8 activation cases, `-15` and `127`, against unsigned weight codes `1` and `2`, and expects `-480` and `8128` for every lane output. The probe is registered and exercised by the notebook but is not connected to any production dispatcher or output path. Local regression passed: 92 passed, 6 skipped, 3 subtests passed. The next T4 run is justified only to validate this low-level arithmetic/instruction contract; it cannot be interpreted as a production performance result.
