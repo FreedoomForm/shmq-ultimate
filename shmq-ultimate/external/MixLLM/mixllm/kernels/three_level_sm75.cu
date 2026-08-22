@@ -19,6 +19,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <vector>
 #include <mma.h>
 #include "sm75_cutlass_testbed.h"
 
@@ -72,6 +73,7 @@ enum class CutlassConfig : int {
   kN64 = 1,
   kM128N64 = 2,
   kM64N64 = 3,
+  kN128Stage5 = 4,
 };
 
 constexpr int kCutlassTuningAbi = 286;
@@ -110,7 +112,8 @@ bool load_cutlass_tuning_from_disk(
         (stored_config == static_cast<int>(CutlassConfig::kN128) ||
          stored_config == static_cast<int>(CutlassConfig::kN64) ||
          stored_config == static_cast<int>(CutlassConfig::kM128N64) ||
-         stored_config == static_cast<int>(CutlassConfig::kM64N64))) {
+         stored_config == static_cast<int>(CutlassConfig::kM64N64) ||
+         stored_config == static_cast<int>(CutlassConfig::kN128Stage5))) {
       config = static_cast<CutlassConfig>(stored_config);
       return true;
     }
@@ -144,6 +147,10 @@ void run_cutlass_config(
     at::Tensor& output, cudaStream_t stream) {
   if (config == CutlassConfig::kM64N64) {
     shmq_cutlass_sm75::Int8RunnerM64N64::run(
+        rows, channels, width, input_int8, weight, scale_act, matrix_scale,
+        matrix_zero, indices, output, stream);
+  } else if (config == CutlassConfig::kN128Stage5) {
+    shmq_cutlass_sm75::Int8RunnerStage5::run(
         rows, channels, width, input_int8, weight, scale_act, matrix_scale,
         matrix_zero, indices, output, stream);
   } else if (config == CutlassConfig::kM128N64) {
@@ -189,9 +196,13 @@ CutlassConfig select_cutlass_config(
 
   CutlassConfig best = CutlassConfig::kN128;
   float best_ms = std::numeric_limits<float>::infinity();
-  for (CutlassConfig candidate : {CutlassConfig::kN128, CutlassConfig::kN64,
-                                  CutlassConfig::kM128N64,
-                                  CutlassConfig::kM64N64}) {
+  std::vector<CutlassConfig> candidates = {
+      CutlassConfig::kN128, CutlassConfig::kN64,
+      CutlassConfig::kM128N64, CutlassConfig::kM64N64};
+  if (rows >= 128) {
+    candidates.push_back(CutlassConfig::kN128Stage5);
+  }
+  for (CutlassConfig candidate : candidates) {
     cudaEvent_t begin = nullptr;
     cudaEvent_t end = nullptr;
     C10_CUDA_CHECK(cudaEventCreate(&begin));

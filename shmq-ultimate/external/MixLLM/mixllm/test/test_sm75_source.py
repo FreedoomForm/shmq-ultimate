@@ -218,6 +218,16 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertNotIn("if(rows>=96)", source_compact)
         self.assertIn("kCutlassTuningAbi=286", source_compact)
 
+    def test_v288_stage5_uses_existing_sm75_core_contract(self):
+        source_compact = "".join(self.source.split())
+        cutlass_compact = "".join(self.cutlass_testbed.split())
+        self.assertIn("kN128Stage5=4", source_compact)
+        self.assertIn("candidates.push_back(CutlassConfig::kN128Stage5)", source_compact)
+        self.assertIn("Int8RunnerStage5=Runner<Core,5>", cutlass_compact)
+        self.assertIn("Int8RunnerStage5::run", source_compact)
+        self.assertNotIn("OpClassTensorOp,5", cutlass_compact)
+        self.assertIn("if(rows>=128)", source_compact)
+
     def test_v291_single_partition_validation_contract(self):
         backend = "".join(self.backend.split())
         self.assertIn("partition_validated=False", backend)

@@ -212,6 +212,10 @@ using Core = cutlass::gemm::threadblock::DefaultMmaCore<
 
 
 using Int8Runner = Runner<Core, 2>;
+// Stage count is independent of the legal SM75 Core geometry.  This wrapper
+// enables a guarded original-style stage-depth experiment without requesting
+// an unsupported DefaultMmaCore<..., 5> specialization.
+using Int8RunnerStage5 = Runner<Core, 5>;
 
 // Candidate family for channel partitions smaller than the v200 N=128 tile.
 // It remains K=64 and NumStages=2, the only TensorOp family provided by the
