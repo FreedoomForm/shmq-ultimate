@@ -63,10 +63,10 @@ class V51AuditContractTest(unittest.TestCase):
     def test_v189_metadata_cache_and_v3_operator_contract(self):
         self.assertIn("_prefill_metadata_for_cutlass", self.backend)
         self.assertIn("_sm75_prefill_metadata", self.backend)
-        self.assertIn("three_level_linear_v3", self.backend)
+        dispatch = self.backend[self.backend.index("def three_level_linear_prequantized"):]
+        self.assertNotIn("three_level_linear_v3", dispatch)
         self.assertIn('m.def("three_level_linear_v3', self.cuda)
         self.assertIn('m.impl("three_level_linear_v3"', self.cuda)
-        self.assertIn("_three_level_linear_v3_unchecked", self.backend)
         self.assertIn('m.def("_three_level_linear_v3_unchecked', self.cuda)
         self.assertIn('m.impl("_three_level_linear_v3_unchecked"', self.cuda)
         self.assertIn("cached_scale_int4", self.cuda)

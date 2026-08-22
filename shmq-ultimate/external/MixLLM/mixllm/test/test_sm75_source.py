@@ -78,6 +78,17 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("expanded_int4 = module.weight_int8[:0]", self.backend)
         self.assertIn("signed expanded copy lazy", self.linear)
 
+    def test_v299_large_m_uses_expanded_correctness_control(self):
+        backend_compact = "".join(self.backend.split())
+        dispatch = backend_compact[
+            backend_compact.index("expanded_int4=None"):
+        ]
+        self.assertIn("#v299control:usetheoriginal-safeexpandedINT4+stagedCUTLASS", dispatch)
+        self.assertIn("native_v3=None", dispatch)
+        self.assertIn("use_cached_v3=False", dispatch)
+        self.assertNotIn("_prefill_metadata_for_cutlass(module,x,torch_module)", dispatch)
+        self.assertIn("expanded_int4=_expanded_int4_for_prefill(module,x,torch_module)", dispatch)
+
     def test_v196_timing_integrity_contract(self):
         self.assertIn("timing_integrity_ratio", self.backend)
         self.assertIn("timing_integrity", self.backend)
