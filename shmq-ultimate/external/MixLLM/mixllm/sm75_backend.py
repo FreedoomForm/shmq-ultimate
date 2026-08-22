@@ -207,6 +207,15 @@ def _expanded_int4_for_prefill(module, x, torch_module):
     return prepared
 
 
+def _use_fused_int4_prefill(module, x):
+    """Select only complete aligned large-M shapes for the packed INT4 probe."""
+    rows, width = x.shape
+    return (
+        rows >= 32 and rows % 32 == 0 and width >= 128 and
+        width % 128 == 0 and module.indices_4.numel() >= 128
+    )
+
+
 def _prefill_metadata_for_cutlass(module, x, torch_module):
     """Cache CUTLASS's [groups, channels] prefill metadata layout.
 
@@ -284,12 +293,15 @@ def three_level_linear_prequantized(
     prefill_int4 = module.weight_int4[:0]
     metadata = None
     # v299 control: use the original-safe expanded INT4 + staged CUTLASS
-    # path while the native packed SM75 fragment contract is being repaired.
-    # Keep the v3 symbol lookup out of production selection so a loaded
-    # extension cannot silently bypass this correctness control.
+    # path by default.  The independently probed packed pair kernel is live
+    # only for complete aligned large-M shapes; all other shapes retain the
+    # expanded fallback and its established validation contract.
     native_v3 = None
     use_cached_v3 = False
-    if not use_cached_v3:
+    use_fused_int4 = _use_fused_int4_prefill(module, x)
+    if use_fused_int4:
+        expanded_int4 = module.weight_int8[:0]
+    elif not use_cached_v3:
         expanded_int4 = _expanded_int4_for_prefill(module, x, torch_module)
     else:
         # v3 receives this ABI slot but the native packed branch does not read
