@@ -1945,3 +1945,9 @@ The packed path remains rejected and v292’s header/test exposure is reverted. 
 Fresh source comparison found that Microsoft MixLLM’s `MQMmaMixedInputTensorOp::transform()` shuffles the loaded A fragment with `Operand::kA` and intentionally leaves B unchanged (`tmp_B = B`). SHMQ’s packed adapter currently shuffles B and copies A unchanged, reversing the original responsibilities. This is a concrete layout-contract mismatch and a stronger explanation for v291’s large-M corruption than the unsupported accumulator-flag experiment.
 
 The v293 candidate changes only the packed adapter transform: leave B untouched and apply the original A shuffler before the existing two-half INT8 conversion. Legal SM75 MMA decomposition, packed conversion, tile geometry, fallback, dispatch, benchmark, model, and quality gates remain unchanged.
+
+## v293 result — adapter repair was not exercised because production v3 remained disabled
+
+The v293 Kaggle notebook completed with the safe expanded-INT4 control, not the modified packed adapter: after the v291 rollback, Python still set `native_v3=None` and `use_cached_v3=False`, so `weight_int4_interleaved` was empty and `run_cutlass_packed_int4_partition()` was unreachable. The apparently good large-M errors (smoke 0.0308; Qwen mixed 0.1054; pure INT4 0.1240) therefore validate only the expanded fallback. Performance remained below dense FP16: Qwen mixed rows=128 E2E 0.544x with timing-integrity false, and pure INT4 rows=128 0.491x. Terminal decision: no packed-path conclusion; no-go for the candidate.
+
+Revert the isolated adapter edit. The next iteration must deliberately enable the v3 path together with the original A-shuffle/B-identity repair, under the existing fallback contract, and must identify the live path explicitly in the log before interpreting any measurement.
