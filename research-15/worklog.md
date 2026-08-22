@@ -1991,3 +1991,7 @@ The v297 `128x128x64` addition compiled but failed at launch with too many resou
 The v298 `CoreM64N128` family compiled, launched, and passed the native SM75 correctness and timing-integrity gates. It did not rescue performance: Qwen mixed rows=128 E2E was 0.325x versus dense FP16 and the mixed prefill E2E gate failed. Pure INT4 rows=128 was 0.592x, also below dense FP16. The full-model quality/vLLM gates remained unavailable, so this was not a production GO. The candidate is rolled back because it supplied no evidence of a speed improvement and the unchanged safe four-family control remains the reference.
 
 The result also narrows the original-config hypothesis: importing an individual original M/N tuple into the SHMQ plain-layout K64 runner can be correct, but it does not reproduce the original performance dataflow. Future work must target a concrete launcher/dataflow difference, not continue adding isolated tile aliases.
+
+## v299 research conclusion — test original 32x256 within the proven eight-warp envelope
+
+The v298 M64N128 family was correct but slower and was rolled back. Fresh comparison with Microsoft’s row-major table identifies `32x256x32x64` as the next source-backed family. It preserves an eight-warp block, unlike the failed 16-warp 128x128 shape, while potentially improving wide-channel B reuse for Qwen’s 2400 INT4 and 896 INT8 partitions. v299 adds only this legal K64/two-stage expanded runner, bumps the tuning ABI, and leaves packed v3 and all computation/gates unchanged.
