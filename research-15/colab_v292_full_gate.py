@@ -18,8 +18,8 @@ import sys
 
 REPO_URL = "https://github.com/FreedoomForm/shmq-ultimate.git"
 BRANCH = "unified-three-level-sm75"
-EXPECTED_COMMIT = "0ff20f6"
-ROOT = Path("/content/shmq-ultimate-v299")
+EXPECTED_COMMIT = "d4d841a"
+ROOT = Path("/content/shmq-ultimate-v300")
 REPO_ROOT = ROOT / "shmq-ultimate"
 NOTEBOOK = REPO_ROOT / "mixllm_3level_kaggle" / "mixllm_3level_gate.ipynb"
 ARTIFACT_DIR = Path("/kaggle/working")
@@ -113,7 +113,7 @@ def main() -> int:
         ).strip()
         print("SHMQ_COMMIT", commit, flush=True)
         if not commit.startswith(EXPECTED_COMMIT):
-            raise RuntimeError(f"expected v299 commit prefix {EXPECTED_COMMIT}, got {commit}")
+            raise RuntimeError(f"expected v300 commit prefix {EXPECTED_COMMIT}, got {commit}")
         notebook_source = NOTEBOOK
 
     prepare_paths()
@@ -136,7 +136,7 @@ def main() -> int:
         print("QWEN_MODEL_STAGE", "skipped_operator_only", flush=True)
     else:
         prepare_qwen_model()
-    colab_notebook = Path("/content/mixllm_3level_gate_colab_v299.ipynb")
+    colab_notebook = Path("/content/mixllm_3level_gate_colab_v300.ipynb")
     notebook_text = notebook_source.read_text(encoding="utf-8")
     notebook_text = notebook_text.replace(
         "/kaggle/input/qwen2.5/transformers/0.5b/1", str(MODEL_ROOT),
