@@ -1291,7 +1291,8 @@ void run_unified_prefill(
         expanded_int4, scale_int4, zero_int4, indices_int4,
         weight_int8, scale_int8, indices_int8, output, plan.rows, plan.width,
         caller_stream, streams, cached_scale_int4, cached_zero_int4,
-        cached_scale_int8, false);
+        cached_scale_int8, plan.rows >= 32 && plan.n4 > 0 &&
+            cached_scale_int4 == nullptr);
   }
   if (plan.n16 > 0) {
     run_fp16_partition_cublas(
@@ -1431,10 +1432,12 @@ at::Tensor three_level_linear_v2_core(
               "scale_act must have shape [K/128, rows]");
   TORCH_CHECK(weight_int4.size(0) == n4 && weight_int4.size(1) == width / 2,
               "invalid packed INT4 weight shape");
-  TORCH_CHECK(rows == 1 ||
-                  (expanded_int4.dim() == 2 && expanded_int4.size(0) == n4 &&
-                   expanded_int4.size(1) == width),
-              "expanded_int4 must have shape [n4, K] for prefill");
+  const bool use_fused_int4 = rows >= 32 && n4 > 0 && !has_cached_metadata;
+  TORCH_CHECK(
+      rows == 1 || use_fused_int4 ||
+          (expanded_int4.dim() == 2 && expanded_int4.size(0) == n4 &&
+           expanded_int4.size(1) == width),
+      "expanded_int4 must have shape [n4, K] for prefill unless fused packed INT4 is selected");
   TORCH_CHECK(!weight_int4_interleaved.defined() ||
                   weight_int4_interleaved.numel() == 0 ||
                   (weight_int4_interleaved.dim() == 2 &&

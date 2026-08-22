@@ -173,7 +173,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("use_fused_int4", source_compact)
         self.assertIn("n4>0&&n8==0&&n16==0&&!has_cached_metadata", source_compact)
         self.assertIn("has_cached_metadata?&cached_scale_int8:nullptr", source_compact)
-        self.assertIn("false);", source_compact)
+        self.assertIn("cached_scale_int8,plan.rows>=32&&plan.n4>0&&cached_scale_int4==nullptr", source_compact)
         self.assertIn("n4>0&&n8==0&&n16==0&&!has_cached_metadata", source_compact)
         self.assertIn("low_mma(low_accum[row_tile][n_tile],low_a,weights,low_accum[row_tile][n_tile])", source_compact)
         self.assertIn("high_mma(high_accum[row_tile][n_tile],high_a,weights,high_accum[row_tile][n_tile])", source_compact)
@@ -280,6 +280,18 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("prefill_int4", backend_compact)
         self.assertIn("*arguments[:4],prefill_int4,*arguments[4:]", backend_compact)
         self.assertNotIn("weight_int4_interleaved.data_ptr<int8_t>()", source_compact)
+
+    def test_mixed_prefill_uses_guarded_fused_packed_int4_contract(self):
+        source_compact = "".join(self.source.split())
+        self.assertIn(
+            "cached_scale_int8,plan.rows>=32&&plan.n4>0&&cached_scale_int4==nullptr",
+            source_compact,
+        )
+        self.assertIn("constbooluse_fused_int4=rows>=32&&n4>0&&!has_cached_metadata", source_compact)
+        self.assertIn(
+            "rows==1||use_fused_int4||(expanded_int4.dim()==2&&expanded_int4.size(0)==n4",
+            source_compact,
+        )
 
     def test_v200_integer_prefill_overlap_contract(self):
         source_compact = "".join(self.source.split())
