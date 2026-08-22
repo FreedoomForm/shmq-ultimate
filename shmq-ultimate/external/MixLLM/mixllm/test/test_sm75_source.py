@@ -218,6 +218,13 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("persistentmemorypermutationalreadymatchestheiteratorcontract", tensor_op)
         self.assertNotIn("FragmentBtmp_B=shuffler_B(B)", tensor_op)
 
+    def test_v296_packed_a_iterator_restores_original_widened_shape(self):
+        tensor_op = "".join(self.cutlass_sm75_mixed.split())
+        self.assertIn("MatrixShape<16,32>", tensor_op)
+        self.assertIn("ArchMmaOperator::Shape::kK==16", tensor_op)
+        self.assertIn("2*MmaIterations::kRow*MmaOperandA::kElements", tensor_op)
+        self.assertNotIn("MatrixShape<ArchMmaOperator::Shape::kM,32>", tensor_op)
+
     def test_v293_packed_prefill_allows_lazy_expansion_contract(self):
         source_compact = "".join(self.source.split())
         self.assertIn("constboolhas_packed_int4_prefill=", source_compact)
@@ -269,7 +276,7 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("structOpMultiplyAddSm75PackedInputUpcast", mixed_compact)
         self.assertIn("MmaTensorOpPolicyK32", mixed_compact)
         self.assertIn("MQMmaPackedInputTensorOpSm75", mixed_compact)
-        self.assertIn("MatrixShape<ArchMmaOperator::Shape::kM,32>", mixed_compact)
+        self.assertIn("MatrixShape<16,32>", mixed_compact)
         self.assertIn("MatrixShape<32,ArchMmaOperator::Shape::kN>", mixed_compact)
         self.assertIn("kASecondK=MmaIterations::kRow", mixed_compact)
         self.assertIn("kBSecondK=MmaIterations::kColumn", mixed_compact)

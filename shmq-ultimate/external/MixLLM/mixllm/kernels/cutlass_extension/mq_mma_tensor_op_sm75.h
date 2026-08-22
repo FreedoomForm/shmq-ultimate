@@ -85,7 +85,11 @@ class MQMmaPackedInputTensorOpSm75 {
   // int8 A uses 32/16 = 2 contiguous LDSM groups and uint4 B uses 32/32 = 1.
   using IteratorA = MmaTensorOpMultiplicandTileIterator<
       MatrixShape<Shape::kM, Shape::kK>, Operand::kA, ElementA, LayoutA,
-      MatrixShape<ArchMmaOperator::Shape::kM, 32>,
+      // Keep the original MixLLM widened A iterator contract (16x32).
+      // The legal SM75 MMA remains m8n8k16; only the iterator shape is
+      // widened so its row-major crosswise lane/LDSM mapping matches the
+      // original k32 adapter before the two k16 calls consume the halves.
+      MatrixShape<16, 32>,
       Policy::OpDelta::kRow, kThreadCount, kPartitionsK>;
   using FragmentA = typename IteratorA::Fragment;
   using TransformedFragmentA = Array<ElementAMma, FragmentA::kElements>;
