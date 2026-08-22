@@ -1933,3 +1933,9 @@ The result shows that SHMQ’s original-equivalent interleave permutation is not
 Fresh primary-source audit found a concrete mismatch: Microsoft MixLLM’s row-major `gemm_rm()` constructs `Testbed<MmaCore, true>`, enabling `AccumulatorsInRowMajor=true`. SHMQ’s packed core uses `LayoutC=RowMajor` but omits this final template argument, so it defaults to `false`; the custom packed adapter uses the flag in its M/N fragment mapping. This matches v291’s shape-dependent failure: packed rows>=32 corrupt while expanded rows<32 remain correct, and opcode/WMMA probes pass.
 
 The v292 candidate changes only `CorePackedInt4M64N64` to `AccumulatorsInRowMajor=true`, retaining the existing legal instruction, packed permutation, tile, fallback, dispatch, benchmark, model, and quality gates. Large-M smoke/Qwen correctness is mandatory before performance is considered.
+
+## v292 result — row-major accumulator flag is unsupported by SHMQ’s packed core
+
+Kaggle v292 failed CUDA compilation before any gates. Adding the final `AccumulatorsInRowMajor=true` argument to `CorePackedInt4M64N64` made `DefaultMmaCore` an incomplete type because SHMQ’s custom `OpMultiplyAddSm75PackedInputUpcast` specialization is not defined for that boolean specialization. The hypothesis was therefore not testable through the current core; no correctness or performance claim is made.
+
+The packed path remains rejected and v292’s header/test exposure is reverted. The original row-major flag is evidence about upstream organization, but SHMQ must implement a matching custom row-major packed core explicitly rather than passing the flag into an unsupported DefaultMmaCore specialization.
