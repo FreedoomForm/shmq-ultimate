@@ -894,6 +894,11 @@ void run_int4_pair_partition(
     const at::Tensor& zero_int4, const at::Tensor& indices_int4,
     at::Tensor& output, int rows, int width, cudaStream_t stream);
 
+inline bool can_use_int4_pair_prefill(int rows, int width, int channels) {
+  return rows >= 32 && (rows % 32) == 0 && width >= 128 &&
+      (width % 128) == 0 && channels >= 128;
+}
+
 at::Tensor sm75_int4_pair_mixed_stride_probe_cuda(const at::Tensor& device_tensor) {
   TORCH_CHECK(device_tensor.is_cuda(), "SM75 mixed-stride probe requires a CUDA tensor argument");
   const auto options = device_tensor.options();
@@ -944,8 +949,12 @@ __global__ void sm75_int4_pair_gemm_kernel(
   namespace precision = wmma::experimental::precision;
   constexpr int kPairRows = 32;
   constexpr int kPairRowTiles = 4;
-  constexpr int kPairNSubtiles = 2;
+  constexpr int kPairChannelsPerWarp = kPairChannels / kPairWarps;
+  constexpr int kPairNSubtiles = kPairChannelsPerWarp / 8;
   constexpr int kPairK = 32;
+  static_assert(kPairChannels % kPairWarps == 0 &&
+                    kPairChannelsPerWarp % 8 == 0,
+                "pair channel ownership must use complete 8-column subtiles");
   constexpr int kPairBytes = kPairK / 2;
   __shared__ __align__(16) uint8_t a_low_packed[kPairRows][kPairBytes];
   __shared__ __align__(16) uint8_t a_high_packed[kPairRows][kPairBytes];
@@ -1029,7 +1038,7 @@ __global__ void sm75_int4_pair_gemm_kernel(
           wmma::fragment<wmma::matrix_b, 8, 8, 32, precision::u4,
                          wmma::col_major> b_u4;
           wmma::load_matrix_sync(
-              b_u4, &b_packed[warp * 16 + n_tile * 8][0], kPairK);
+              b_u4, &b_packed[warp * kPairChannelsPerWarp + n_tile * 8][0], kPairK);
 
           PairProbeLowMma::FragmentA low_a;
           PairProbeHighMma::FragmentA high_a;
@@ -1057,7 +1066,7 @@ __global__ void sm75_int4_pair_gemm_kernel(
       const int row = row_base + local_row;
       for (int n_tile = 0; n_tile < kPairNSubtiles; ++n_tile) {
         for (int register_index = 0; register_index < 2; ++register_index) {
-          const int channel = channel_base + warp * 16 + n_tile * 8 +
+          const int channel = channel_base + warp * kPairChannelsPerWarp + n_tile * 8 +
                               local_channel_base + register_index;
           if (row < rows && channel < channels) {
             const int correction = static_cast<int>(zero_int4[channel * groups + group]) *
@@ -1080,7 +1089,7 @@ __global__ void sm75_int4_pair_gemm_kernel(
     const int row = row_base + row_tile * 8 + (lane >> 2);
     for (int n_tile = 0; n_tile < kPairNSubtiles; ++n_tile) {
       for (int register_index = 0; register_index < 2; ++register_index) {
-        const int channel = channel_base + warp * 16 + n_tile * 8 +
+        const int channel = channel_base + warp * kPairChannelsPerWarp + n_tile * 8 +
                             local_channel_base + register_index;
         if (row < rows && channel < channels) {
               output[row * output_width + indices_int4[channel]] =
@@ -1113,7 +1122,7 @@ void run_int4_pair_partition(
           (channels >= 128 ? 128 : 64),
       (rows + 31) / 32);
   if (channels >= 128) {
-    sm75_int4_pair_gemm_kernel<8, 128><<<grid, 256, 0, stream>>>(
+    sm75_int4_pair_gemm_kernel<4, 128><<<grid, 128, 0, stream>>>(
         input_int8.data_ptr<int8_t>(), weight_int4.data_ptr<uint8_t>(),
         reinterpret_cast<const __half*>(scale_act.data_ptr<at::Half>()),
         reinterpret_cast<const __half*>(scale_int4.data_ptr<at::Half>()),
@@ -1305,7 +1314,8 @@ void run_unified_prefill(
         expanded_int4, scale_int4, zero_int4, indices_int4,
         weight_int8, scale_int8, indices_int8, output, plan.rows, plan.width,
         caller_stream, streams, cached_scale_int4, cached_zero_int4,
-        cached_scale_int8, false);
+        cached_scale_int8,
+        can_use_int4_pair_prefill(plan.rows, plan.width, plan.n4));
   }
   if (plan.n16 > 0) {
     run_fp16_partition_cublas(
@@ -1437,6 +1447,7 @@ at::Tensor three_level_linear_v2_core(
   const int n8 = indices_int8.numel();
   const int n16 = indices_fp16.numel();
   const int output_width = n4 + n8 + n16;
+  const bool use_fused_int4 = can_use_int4_pair_prefill(rows, width, n4);
   TORCH_CHECK(output_width > 0, "at least one precision partition is required");
   TORCH_CHECK(width % kGroupSize == 0,
               "SM75 Tensor Core backend requires K divisible by 128");
@@ -1445,10 +1456,10 @@ at::Tensor three_level_linear_v2_core(
               "scale_act must have shape [K/128, rows]");
   TORCH_CHECK(weight_int4.size(0) == n4 && weight_int4.size(1) == width / 2,
               "invalid packed INT4 weight shape");
-  TORCH_CHECK(rows == 1 ||
+  TORCH_CHECK(rows == 1 || use_fused_int4 ||
                   (expanded_int4.dim() == 2 && expanded_int4.size(0) == n4 &&
                    expanded_int4.size(1) == width),
-              "expanded_int4 must have shape [n4, K] for prefill");
+              "expanded_int4 must have shape [n4, K] unless aligned packed INT4 is selected");
   TORCH_CHECK(!weight_int4_interleaved.defined() ||
                   weight_int4_interleaved.numel() == 0 ||
                   (weight_int4_interleaved.dim() == 2 &&
