@@ -1669,3 +1669,11 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 - Deep comparison of the original-style packed launcher and SHMQ’s `begin_integer_prefill_overlap` confirmed that the packed branch reads `weight_int4_interleaved` and does not dereference `expanded_int4`; the latter was only a common validation requirement. v293 therefore permits the empty expanded buffer only when a non-empty packed INT4 prefill tensor is present, retaining the old shape requirement for the legacy expanded path.
 - Added a source contract for the condition. Local full suite: `Ran 97 tests in 0.040s — OK (skipped=6)`. No CUDA benchmark claim yet; Colab T4 compile and operator benchmark are required next.
 - The failed Colab session was stopped cleanly and no Kaggle run was launched.
+
+## v293 Colab operator benchmark — 2026-08-22 — NO-GO
+
+- The official Colab CLI T4 notebook run compiled the v293 source successfully and executed 97 local/embedded tests with 6 expected skips. The first real native benchmark then reached the packed INT4 v3 path after the v293 shape-contract fix.
+- Timing integrity was true for all reported shapes, but correctness failed for the native packed INT4 path at rows >= 32: smoke mixed rows 32/128 had max absolute errors 191.298/283.277; Qwen-shaped mixed rows 128 had 800.873; pure INT4 rows 128 had 826.405. Rows 1 and 16 remained within the existing operator tolerance. Therefore v293 is rejected and cannot become a baseline.
+- Representative Qwen-shaped mixed end-to-end speedups versus dense FP16 were 0.5269x (rows 1), 0.2862x (rows 16), and 0.4795x (rows 128); these are not performance improvements. Peak GEMM allocations were 48.70 MB, 58.11 MB, and 64.39 MB respectively. Full-model Qwen quality was intentionally not run in this operator-isolation pass.
+- Deep-research conclusion: the shape-check repair was necessary but exposed a deeper packed INT4 layout/iterator correctness mismatch at large M. The next iteration must compare the original packed iterator’s physical B layout against SHMQ’s permutation and either correct it with independent probes or disable the unsafe v3 path; no speed claim is allowed.
+- Colab session teardown was completed and `colab sessions` reported no active sessions. No Kaggle run was launched.
