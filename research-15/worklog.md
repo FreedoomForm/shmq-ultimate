@@ -1657,3 +1657,8 @@ Local validation passed after the source-contract update: 93 tests, 6 CUDA-only 
 
 - Direct in-kernel execution reached the exact notebook cells on Tesla T4 and loaded the Qwen model, but the embedded unittest setup failed because Colab’s base runtime did not contain the `ninja` executable required by `torch.utils.cpp_extension`. Result: 85 tests started, one `setUpClass` error in `test_sm75_backend`, and no valid benchmark result.
 - The runner was updated to install `ninja` when absent before importing or compiling the SM75 extension. The failed persistent session was explicitly stopped; no active Colab sessions remain. No Kaggle run was launched.
+
+## v292 Colab quality-gate split — 2026-08-22
+
+- The complete direct-cell run passed all 91 tests but remained at the Qwen model-loading cell for over 31 minutes without reaching the operator benchmark. It was stopped within the official bounded session workflow; no result was recorded as a performance or quality pass.
+- The runner now supports `SHMQ_OPERATOR_ONLY=1`, which skips only notebook cell 7 (full-model Qwen quality) while executing cells 1–6 and 8–9 unchanged. This isolates native operator benchmark feedback; the report remains `no_go` when full-model quality is not run, so operator-only data cannot be misreported as production readiness.

@@ -82,8 +82,12 @@ def execute_gate_cells(colab_notebook: Path) -> int:
     """Execute the gate notebook's code cells in this Colab kernel."""
     notebook = json.loads(colab_notebook.read_text(encoding="utf-8"))
     namespace = {"__name__": "__main__", "__file__": str(colab_notebook)}
+    operator_only = os.environ.get("SHMQ_OPERATOR_ONLY") == "1"
     for index, cell in enumerate(notebook["cells"]):
         if cell.get("cell_type") != "code":
+            continue
+        if operator_only and index == 7:
+            print("COLAB_SKIP_GATE_CELL 7 operator_only", flush=True)
             continue
         print(f"COLAB_EXEC_GATE_CELL {index}", flush=True)
         source = "".join(cell.get("source", []))
