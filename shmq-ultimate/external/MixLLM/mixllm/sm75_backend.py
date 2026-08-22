@@ -290,14 +290,7 @@ def three_level_linear_prequantized(
     native_v3 = None
     use_cached_v3 = False
     if not use_cached_v3:
-        # The v2 C++ dispatcher uses the proven packed pair kernel for every
-        # rows>=32 call with an INT4 partition and no cached metadata.  Keep
-        # the ABI placeholder empty in that branch; expansion is still
-        # required for rows<32 and any future legacy fallback.
-        if x.shape[0] >= 32 and module.indices_4.numel():
-            expanded_int4 = module.weight_int8[:0]
-        else:
-            expanded_int4 = _expanded_int4_for_prefill(module, x, torch_module)
+        expanded_int4 = _expanded_int4_for_prefill(module, x, torch_module)
     else:
         # v3 receives this ABI slot but the native packed branch does not read
         # it.  Use the existing empty, device-correct placeholder instead of
