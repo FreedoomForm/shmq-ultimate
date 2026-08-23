@@ -136,6 +136,19 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("struct InstructionPair", probe)
         self.assertIn("mq_mma_sm75_int4_pair.h", self.cutlass_testbed)
 
+    def test_v307_native_sm75_warp_iterator_contract(self):
+        probe = (Path(__file__).parents[1] / "kernels" / "cutlass_extension" / "mq_mma_sm75_int4_pair.h").read_text(encoding="utf-8")
+        probe_compact = "".join(probe.split())
+        self.assertIn("MmaTensorOpMultiplicandTileIterator", probe_compact)
+        self.assertIn("TensorOpMultiplicandCongruous<4,64>", probe_compact)
+        self.assertIn("NativeWarpU4AIterator", probe_compact)
+        self.assertIn("NativeWarpS4AIterator", probe_compact)
+        self.assertIn("NativeWarpU4BIterator", probe_compact)
+        self.assertIn("notconnectedtoproductiondispatch", probe_compact.lower())
+        backend_compact = "".join(self.backend.split())
+        self.assertIn("native_v3=None", backend_compact)
+        self.assertIn("use_cached_v3=False", backend_compact)
+
     def test_v232_native_int4_decomposition_probe_contract(self):
         source_compact = "".join(self.source.split())
         self.assertIn("sm75_int4_native_decomposition_probe_kernel", source_compact)

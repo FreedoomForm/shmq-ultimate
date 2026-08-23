@@ -9,6 +9,7 @@
 
 #include "cutlass/arch/mma_sm75.h"
 #include "cutlass/gemm/gemm.h"
+#include "cutlass/gemm/warp/mma_tensor_op_tile_iterator.h"
 #include "cutlass/layout/matrix.h"
 #include "cutlass/numeric_types.h"
 
@@ -50,6 +51,28 @@ static_assert(HighMma::FragmentA::kElements == 8 &&
                   HighMma::FragmentB::kElements == 8 &&
                   HighMma::FragmentC::kElements == 2,
               "unexpected SM75 high-nibble fragment ABI");
+
+// Research-only loader contract. This deliberately bypasses the generic
+// threadblock DefaultMmaCore, whose derived subbyte thread map failed on T4.
+// The explicit warp iterator is the same CUTLASS family used by the existing
+// manual SM75 adapter and is not connected to production dispatch.
+using NativeWarpTile = cutlass::MatrixShape<32, 32>;
+using NativeWarpInstruction = cutlass::MatrixShape<8, 32>;
+using NativeWarpU4Layout = cutlass::layout::TensorOpMultiplicandCongruous<4, 64>;
+using NativeWarpU4AIterator = cutlass::gemm::warp::MmaTensorOpMultiplicandTileIterator<
+    NativeWarpTile, cutlass::Operand::kA, cutlass::uint4b_t,
+    NativeWarpU4Layout, NativeWarpInstruction, 1, 32, 1>;
+using NativeWarpS4AIterator = cutlass::gemm::warp::MmaTensorOpMultiplicandTileIterator<
+    NativeWarpTile, cutlass::Operand::kA, cutlass::int4b_t,
+    NativeWarpU4Layout, NativeWarpInstruction, 1, 32, 1>;
+using NativeWarpU4BIterator = cutlass::gemm::warp::MmaTensorOpMultiplicandTileIterator<
+    NativeWarpTile, cutlass::Operand::kB, cutlass::uint4b_t,
+    NativeWarpU4Layout, NativeWarpInstruction, 1, 32, 1>;
+
+static_assert(NativeWarpU4AIterator::Fragment::kElements > 0 &&
+                  NativeWarpS4AIterator::Fragment::kElements > 0 &&
+                  NativeWarpU4BIterator::Fragment::kElements > 0,
+              "native SM75 subbyte warp iterators must expose fragments");
 
 struct InstructionPair {
   LowMma low;
