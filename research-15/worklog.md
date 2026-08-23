@@ -2027,3 +2027,7 @@ Extended the research-only probe header with CUTLASS’s genuine SM75 native U4/
 ## v305 implementation — narrowed native SM75 N64 core candidate
 
 v304’s T4 compiler diagnostic rejected the eight-warp 32x128x64 native subbyte core because its derived A thread map had zero iterations, and it disproved the assumed four-byte fragment-size assertion. v305 replaces that research-only alias with the compiler-backed narrower 32x64x64, 32x32x32, m8n8k32, four-warp core and retains only geometry/policy assertions. Production dispatch remains unchanged. Local regression passed: 93 passed, 6 skipped, 3 subtests passed. The next T4 run is solely a compile/probe validation; it is not a production performance experiment.
+
+## v305 T4 result — native DefaultMmaCore still rejected; rollback
+
+The v305 T4 run failed during nvcc compilation. CUTLASS rejected the proposed four-warp 32x64x64 native U4 core because its derived A `PitchLinearWarpRakedThreadMap<Shape=<64,32>, Threads=128, WarpThreadArrangement=<2,16>, ElementsPerAccess=32>` had zero iterations. This is the same structural iterator mismatch seen in v304 with 256 threads; reducing the N tile and warp count did not make the generic native subbyte core compatible with SHMQ’s aliases. The existing native arithmetic probe was not reached in v305, but it had already passed cleanly in v303. The compile-only v304/v305 aliases are rolled back. Production remains the safe v299 expanded control, and all v305 logs/research are retained as negative design evidence.
