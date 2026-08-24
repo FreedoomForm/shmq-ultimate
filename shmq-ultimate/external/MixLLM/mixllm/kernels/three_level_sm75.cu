@@ -971,23 +971,25 @@ __global__ void sm75_int4_pair_warp_iterator_probe_kernel(int* output) {
   using U4AIterator = shmq_cutlass_sm75::int4_pair_probe::NativeWarpU4AIterator;
   using S4AIterator = shmq_cutlass_sm75::int4_pair_probe::NativeWarpS4AIterator;
   using U4BIterator = shmq_cutlass_sm75::int4_pair_probe::NativeWarpU4BIterator;
-  __shared__ __align__(16) cutlass::uint4b_t a_storage[32 * 32];
-  __shared__ __align__(16) cutlass::uint4b_t b_storage[32 * 32];
+  __shared__ __align__(16) uint8_t a_storage[32 * 16];
+  __shared__ __align__(16) uint8_t b_storage[32 * 16];
   const int lane = threadIdx.x;
-  for (int item = lane; item < 32 * 32; item += kWarpSize) {
-    a_storage[item] = cutlass::uint4b_t(1);
-    b_storage[item] = cutlass::uint4b_t(2);
+  for (int item = lane; item < 32 * 16; item += kWarpSize) {
+    a_storage[item] = 0x11;
+    b_storage[item] = 0x22;
   }
   __syncwarp();
 
   U4AIterator::TensorCoord extent(32, 32);
   U4AIterator::Layout layout = U4AIterator::Layout::packed(extent);
-  U4AIterator u4a(U4AIterator::TensorRef(a_storage, layout), lane);
+  U4AIterator u4a(U4AIterator::TensorRef(
+      reinterpret_cast<cutlass::uint4b_t*>(a_storage), layout), lane);
   S4AIterator s4a(
       S4AIterator::TensorRef(reinterpret_cast<cutlass::int4b_t*>(a_storage),
                               S4AIterator::Layout::packed(extent)),
       lane);
-  U4BIterator u4b(U4BIterator::TensorRef(b_storage, layout), lane);
+  U4BIterator u4b(U4BIterator::TensorRef(
+      reinterpret_cast<cutlass::uint4b_t*>(b_storage), layout), lane);
   U4AIterator::Fragment u4a_fragment;
   S4AIterator::Fragment s4a_fragment;
   U4BIterator::Fragment u4b_fragment;
