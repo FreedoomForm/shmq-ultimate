@@ -157,9 +157,13 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("NativeWarpU4AIterator", source_compact)
         self.assertIn("NativeWarpS4AIterator", source_compact)
         self.assertIn("NativeWarpU4BIterator", source_compact)
-        self.assertIn("output[lane*3+0]", source_compact)
-        self.assertIn("output[lane*3+1]", source_compact)
-        self.assertIn("output[lane*3+2]", source_compact)
+        self.assertIn("LowMma::FragmentAlow_a", source_compact)
+        self.assertIn("HighMma::FragmentAhigh_a", source_compact)
+        self.assertIn("low_mma(low_accum,low_a,weights,low_accum)", source_compact)
+        self.assertIn("high_mma(high_accum,high_a,weights,high_accum)", source_compact)
+        self.assertIn("output[lane*7+0]", source_compact)
+        self.assertIn("output[lane*7+3]", source_compact)
+        self.assertIn("output[lane*7+6]", source_compact)
 
     def test_v232_native_int4_decomposition_probe_contract(self):
         source_compact = "".join(self.source.split())

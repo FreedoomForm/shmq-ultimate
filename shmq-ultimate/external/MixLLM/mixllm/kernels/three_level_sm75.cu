@@ -1014,9 +1014,33 @@ __global__ void sm75_int4_pair_warp_iterator_probe_kernel(int* output) {
   u4a.load(u4a_fragment);
   s4a.load(s4a_fragment);
   u4b.load(u4b_fragment);
-  output[lane * 3 + 0] = static_cast<int>(u4a_fragment[0]);
-  output[lane * 3 + 1] = static_cast<int>(s4a_fragment[0]);
-  output[lane * 3 + 2] = static_cast<int>(u4b_fragment[0]);
+
+  shmq_cutlass_sm75::int4_pair_probe::LowMma::FragmentA low_a;
+  shmq_cutlass_sm75::int4_pair_probe::HighMma::FragmentA high_a;
+  shmq_cutlass_sm75::int4_pair_probe::LowMma::FragmentB weights;
+  low_a.clear();
+  high_a.clear();
+  weights.clear();
+  for (int i = 0; i < 8; ++i) {
+    low_a[i] = cutlass::uint4b_t(static_cast<unsigned>(u4a_fragment[i]));
+    high_a[i] = cutlass::int4b_t(static_cast<int>(s4a_fragment[i]));
+    weights[i] = cutlass::uint4b_t(static_cast<unsigned>(u4b_fragment[i]));
+  }
+  shmq_cutlass_sm75::int4_pair_probe::LowMma::FragmentC low_accum;
+  shmq_cutlass_sm75::int4_pair_probe::HighMma::FragmentC high_accum;
+  low_accum.clear();
+  high_accum.clear();
+  shmq_cutlass_sm75::int4_pair_probe::LowMma low_mma;
+  shmq_cutlass_sm75::int4_pair_probe::HighMma high_mma;
+  low_mma(low_accum, low_a, weights, low_accum);
+  high_mma(high_accum, high_a, weights, high_accum);
+  output[lane * 7 + 0] = static_cast<int>(u4a_fragment[0]);
+  output[lane * 7 + 1] = static_cast<int>(s4a_fragment[0]);
+  output[lane * 7 + 2] = static_cast<int>(u4b_fragment[0]);
+  output[lane * 7 + 3] = low_accum[0];
+  output[lane * 7 + 4] = low_accum[1];
+  output[lane * 7 + 5] = high_accum[0];
+  output[lane * 7 + 6] = high_accum[1];
 #endif
 }
 
@@ -1024,7 +1048,7 @@ at::Tensor sm75_int4_pair_warp_iterator_probe_cuda(
     const at::Tensor& device_tensor) {
   TORCH_CHECK(device_tensor.is_cuda(),
               "SM75 warp iterator probe requires a CUDA tensor argument");
-  auto output = at::empty({kWarpSize, 3}, device_tensor.options().dtype(at::kInt));
+  auto output = at::empty({kWarpSize, 7}, device_tensor.options().dtype(at::kInt));
   auto stream = at::cuda::getCurrentCUDAStream();
   sm75_int4_pair_warp_iterator_probe_kernel<<<1, kWarpSize, 0, stream>>>(
       output.data_ptr<int>());
