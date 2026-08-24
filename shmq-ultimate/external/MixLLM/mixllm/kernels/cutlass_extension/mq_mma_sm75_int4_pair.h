@@ -56,7 +56,7 @@ static_assert(HighMma::FragmentA::kElements == 8 &&
 // threadblock DefaultMmaCore, whose derived subbyte thread map failed on T4.
 // The explicit warp iterator is the same CUTLASS family used by the existing
 // manual SM75 adapter and is not connected to production dispatch.
-using NativeWarpTile = cutlass::layout::PitchLinearShape<32, 32>;
+using NativeWarpTile = cutlass::layout::PitchLinearShape<32, 8>;
 using NativeWarpInstruction = cutlass::layout::PitchLinearShape<32, 8>;
 using NativeWarpU4Layout = cutlass::layout::TensorOpMultiplicandCongruous<4, 64>;
 using NativeWarpU4AIterator = cutlass::gemm::warp::MmaTensorOpMultiplicandTileIterator<
