@@ -1,0 +1,23 @@
+gate_status= {'execution': 'passed', 'model_vllm_production': 'failed', 'operator_production': 'failed', 'reason': 'gate evaluation complete', 't4_production': 'failed', 'terminal_decision': 'no_go'}
+gates= {'auto_allocator': 'passed', 'embedded_contract_tests': 'passed', 'fixed_allocator': 'passed', 'full_model_qwen_quality': 'unavailable_environment', 'full_model_qwen_throughput': 'unavailable_environment', 'mixed_decode_end_to_end_performance': 'passed', 'mixed_decode_gemm_performance': 'passed', 'mixed_prefill_end_to_end_performance': 'failed', 'model_gate_import': 'passed', 'model_vllm_production': 'failed', 'operator_production': 'failed', 'sm75_native_benchmarks': 'passed', 'sm75_native_correctness': 'passed', 't4_hardware': 'passed', 'timing_integrity': 'passed', 'vllm_apply_path': 'unavailable_environment'}
+[qwen_qkv_mixed_4_8_16]
+0 rows= 1 gemm_ms= 0.08782399818301201 e2e_ms= 0.10847999900579453 gemm_ratio= 0.7799090445342362 e2e_ratio= 0.9633418442118858 max_abs= 0.125 expanded= 0 gemm_peak= 48701440 e2e_peak= 48705536
+1 rows= 16 gemm_ms= 0.49355199933052063 e2e_ms= 0.49009600281715393 gemm_ratio= 3.54400269039228 e2e_ratio= 3.51918653939305 max_abs= 0.125 expanded= 8601600 gemm_peak= 58109952 e2e_peak= 58168320
+2 rows= 128 gemm_ms= 0.7322399914264679 e2e_ms= 0.7463040053844452 gemm_ratio= 3.032401256865858 e2e_ratio= 3.0906440926875782 max_abs= 0.105438232421875 expanded= 8601600 gemm_peak= 64569856 e2e_peak= 65035776
+[qwen_qkv_pure_fp16]
+0 rows= 1 gemm_ms= 0.10993600264191628 e2e_ms= 0.1093439981341362 gemm_ratio= 1.05254293653232 e2e_ratio= 1.0468750011145769 max_abs= 0.125 expanded= 0 gemm_peak= 60013056 e2e_peak= 60013056
+1 rows= 16 gemm_ms= 0.32152000069618225 e2e_ms= 0.317440003156662 gemm_ratio= 2.7572722037464903 e2e_ratio= 2.7222832021829344 max_abs= 0.0 expanded= 0 gemm_peak= 60874240 e2e_peak= 60874240
+2 rows= 128 gemm_ms= 1.1281279921531677 e2e_ms= 1.159712016582489 gemm_ratio= 6.881514832648484 e2e_ratio= 7.074175536129722 max_abs= 0.0 expanded= 0 gemm_peak= 67309056 e2e_peak= 67309056
+[qwen_qkv_pure_int4]
+0 rows= 1 gemm_ms= 0.08396799862384796 e2e_ms= 0.1085439994931221 gemm_ratio= 0.787160628034381 e2e_ratio= 1.0175491164571244 max_abs= 0.062103271484375 expanded= 0 gemm_peak= 47766016 e2e_peak= 47770112
+1 rows= 16 gemm_ms= 0.26156800985336304 e2e_ms= 0.27291199564933777 gemm_ratio= 2.189659862061722 e2e_ratio= 2.284623578714876 max_abs= 0.11767578125 expanded= 12845056 gemm_peak= 61417984 e2e_peak= 61476352
+2 rows= 128 gemm_ms= 0.2953280061483383 e2e_ms= 0.3052160143852234 gemm_ratio= 1.755230165357581 e2e_ratio= 1.8139978066627114 max_abs= 0.12396240234375 expanded= 12845056 gemm_peak= 67746304 e2e_peak= 68212224
+[qwen_qkv_pure_int8]
+0 rows= 1 gemm_ms= 0.08486399799585342 e2e_ms= 0.11059200018644333 gemm_ratio= 0.7962768209210761 e2e_ratio= 1.037682037229344 max_abs= 0.062286376953125 expanded= 0 gemm_peak= 47565312 e2e_peak= 47569408
+1 rows= 16 gemm_ms= 0.2581920027732849 e2e_ms= 0.26388800144195557 gemm_ratio= 2.15073976872528 e2e_ratio= 2.1981874461425908 max_abs= 0.062530517578125 expanded= 0 gemm_peak= 48372224 e2e_peak= 48430592
+2 rows= 128 gemm_ms= 0.29078400135040283 e2e_ms= 0.30108800530433655 gemm_ratio= 1.6658112327749068 e2e_ratio= 1.72483967123544 max_abs= 0.091766357421875 expanded= 0 gemm_peak= 54600192 e2e_peak= 55066112
+[smoke_mixed_4_8_16]
+0 rows= 1 gemm_ms= 0.0737760029733181 e2e_ms= 0.09961600229144096 gemm_ratio= 2.3854113116423026 e2e_ratio= 3.220900145166831 max_abs= 0.015625 expanded= 0 gemm_peak= 8720384 e2e_peak= 8721408
+1 rows= 8 gemm_ms= 0.10444799810647964 e2e_ms= 0.12212799862027168 gemm_ratio= 2.684210596858318 e2e_ratio= 3.1385691828716293 max_abs= 0.027862548828125 expanded= 32768 gemm_peak= 8771072 e2e_peak= 8775680
+2 rows= 32 gemm_ms= 0.23852799832820892 e2e_ms= 0.2845599949359894 gemm_ratio= 7.167307622561826 e2e_ratio= 8.55048059378978 max_abs= 0.03061676025390625 expanded= 32768 gemm_peak= 8837120 e2e_peak= 8854016
+3 rows= 128 gemm_ms= 0.23268800228834152 e2e_ms= 0.27539201080799103 gemm_ratio= 7.10107430651313 e2e_ratio= 8.40429722605252 max_abs= 0.03082275390625 expanded= 32768 gemm_peak= 9096192 e2e_peak= 9162752
