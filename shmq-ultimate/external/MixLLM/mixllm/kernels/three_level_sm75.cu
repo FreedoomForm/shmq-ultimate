@@ -975,13 +975,22 @@ __global__ void sm75_int4_pair_warp_iterator_probe_kernel(int* output) {
   __shared__ __align__(16) uint8_t b_storage[32 * 16];
   const int lane = threadIdx.x;
   for (int item = lane; item < 32 * 16; item += kWarpSize) {
-    a_storage[item] = 0x11;
-    b_storage[item] = 0x22;
+    a_storage[item] = 0;
+    b_storage[item] = 0;
   }
-  __syncwarp();
 
   U4AIterator::TensorCoord extent(32, 32);
   U4AIterator::Layout layout = U4AIterator::Layout::packed(extent);
+  for (int logical = lane; logical < 32 * 32; logical += kWarpSize) {
+    U4AIterator::TensorCoord coord(logical % 32, logical / 32);
+    const int physical = static_cast<int>(layout(coord));
+    const int byte_index = physical / 2;
+    const int shift = (physical & 1) * 4;
+    a_storage[byte_index] |= static_cast<uint8_t>(1 << shift);
+    b_storage[byte_index] |= static_cast<uint8_t>(2 << shift);
+  }
+  __syncwarp();
+
   U4AIterator u4a(U4AIterator::TensorRef(
       reinterpret_cast<cutlass::uint4b_t*>(a_storage), layout), lane);
   S4AIterator s4a(
