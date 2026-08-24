@@ -982,26 +982,32 @@ __global__ void sm75_int4_pair_warp_iterator_probe_kernel(int* output) {
     b_storage[item] = 0;
   }
 
-  U4AIterator::TensorCoord extent(128, 64);
-  U4AIterator::Layout layout = U4AIterator::Layout::packed(extent);
-  for (int logical = lane; logical < 128 * 64; logical += kWarpSize) {
-    U4AIterator::TensorCoord coord(logical % 128, logical / 128);
-    const int physical = static_cast<int>(layout(coord));
+  U4AIterator::TensorCoord a_extent(64, 128);
+  U4AIterator::Layout a_layout = U4AIterator::Layout::packed(a_extent);
+  U4BIterator::TensorCoord b_extent(128, 64);
+  U4BIterator::Layout b_layout = U4BIterator::Layout::packed(b_extent);
+  for (int logical = lane; logical < 64 * 128; logical += kWarpSize) {
+    U4AIterator::TensorCoord coord(logical / 128, logical % 128);
+    const int physical = static_cast<int>(a_layout(coord));
     const int byte_index = physical / 2;
     const int shift = (physical & 1) * 4;
     a_storage[byte_index] |= static_cast<uint8_t>(1 << shift);
+  }
+  for (int logical = lane; logical < 128 * 64; logical += kWarpSize) {
+    U4BIterator::TensorCoord coord(logical / 64, logical % 64);
+    const int physical = static_cast<int>(b_layout(coord));
+    const int byte_index = physical / 2;
+    const int shift = (physical & 1) * 4;
     b_storage[byte_index] |= static_cast<uint8_t>(2 << shift);
   }
   __syncwarp();
 
   U4AIterator u4a(U4AIterator::TensorRef(
-      reinterpret_cast<cutlass::uint4b_t*>(a_storage), layout), lane);
-  S4AIterator s4a(
-      S4AIterator::TensorRef(reinterpret_cast<cutlass::int4b_t*>(a_storage),
-                              S4AIterator::Layout::packed(extent)),
-      lane);
+      reinterpret_cast<cutlass::uint4b_t*>(a_storage), a_layout), lane);
+  S4AIterator s4a(S4AIterator::TensorRef(
+      reinterpret_cast<cutlass::int4b_t*>(a_storage), a_layout), lane);
   U4BIterator u4b(U4BIterator::TensorRef(
-      reinterpret_cast<cutlass::uint4b_t*>(b_storage), layout), lane);
+      reinterpret_cast<cutlass::uint4b_t*>(b_storage), b_layout), lane);
   U4AIterator::Fragment u4a_fragment;
   S4AIterator::Fragment s4a_fragment;
   U4BIterator::Fragment u4b_fragment;
