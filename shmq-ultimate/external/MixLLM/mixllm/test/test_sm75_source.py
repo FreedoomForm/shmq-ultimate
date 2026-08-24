@@ -149,6 +149,18 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("native_v3=None", backend_compact)
         self.assertIn("use_cached_v3=False", backend_compact)
 
+    def test_v310_warp_iterator_probe_contract(self):
+        source_compact = "".join(self.source.split())
+        self.assertIn("sm75_int4_pair_warp_iterator_probe_kernel", source_compact)
+        self.assertIn("sm75_int4_pair_warp_iterator_probe_cuda", source_compact)
+        self.assertIn("sm75_int4_pair_warp_iterator_probe(Tensordevice_tensor)->Tensor", source_compact)
+        self.assertIn("NativeWarpU4AIterator", source_compact)
+        self.assertIn("NativeWarpS4AIterator", source_compact)
+        self.assertIn("NativeWarpU4BIterator", source_compact)
+        self.assertIn("output[lane*3+0]", source_compact)
+        self.assertIn("output[lane*3+1]", source_compact)
+        self.assertIn("output[lane*3+2]", source_compact)
+
     def test_v232_native_int4_decomposition_probe_contract(self):
         source_compact = "".join(self.source.split())
         self.assertIn("sm75_int4_native_decomposition_probe_kernel", source_compact)

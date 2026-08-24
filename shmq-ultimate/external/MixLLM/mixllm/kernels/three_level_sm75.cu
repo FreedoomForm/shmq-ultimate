@@ -966,6 +966,52 @@ at::Tensor sm75_int4_pair_fused_probe_cuda(const at::Tensor& device_tensor) {
   return output;
 }
 
+__global__ void sm75_int4_pair_warp_iterator_probe_kernel(int* output) {
+#if __CUDA_ARCH__ >= 750
+  using U4AIterator = shmq_cutlass_sm75::int4_pair_probe::NativeWarpU4AIterator;
+  using S4AIterator = shmq_cutlass_sm75::int4_pair_probe::NativeWarpS4AIterator;
+  using U4BIterator = shmq_cutlass_sm75::int4_pair_probe::NativeWarpU4BIterator;
+  __shared__ __align__(16) cutlass::uint4b_t a_storage[32 * 32];
+  __shared__ __align__(16) cutlass::uint4b_t b_storage[32 * 32];
+  const int lane = threadIdx.x;
+  for (int item = lane; item < 32 * 32; item += kWarpSize) {
+    a_storage[item] = cutlass::uint4b_t(1);
+    b_storage[item] = cutlass::uint4b_t(2);
+  }
+  __syncwarp();
+
+  U4AIterator::TensorCoord extent(32, 32);
+  U4AIterator::Layout layout = U4AIterator::Layout::packed(extent);
+  U4AIterator u4a(U4AIterator::TensorRef(a_storage, layout), lane);
+  S4AIterator s4a(
+      S4AIterator::TensorRef(reinterpret_cast<cutlass::int4b_t*>(a_storage),
+                              S4AIterator::Layout::packed(extent)),
+      lane);
+  U4BIterator u4b(U4BIterator::TensorRef(b_storage, layout), lane);
+  U4AIterator::Fragment u4a_fragment;
+  S4AIterator::Fragment s4a_fragment;
+  U4BIterator::Fragment u4b_fragment;
+  u4a.load(u4a_fragment);
+  s4a.load(s4a_fragment);
+  u4b.load(u4b_fragment);
+  output[lane * 3 + 0] = reinterpret_cast<unsigned*>(&u4a_fragment)[0];
+  output[lane * 3 + 1] = reinterpret_cast<unsigned*>(&s4a_fragment)[0];
+  output[lane * 3 + 2] = reinterpret_cast<unsigned*>(&u4b_fragment)[0];
+#endif
+}
+
+at::Tensor sm75_int4_pair_warp_iterator_probe_cuda(
+    const at::Tensor& device_tensor) {
+  TORCH_CHECK(device_tensor.is_cuda(),
+              "SM75 warp iterator probe requires a CUDA tensor argument");
+  auto output = at::empty({kWarpSize, 3}, device_tensor.options().dtype(at::kInt));
+  auto stream = at::cuda::getCurrentCUDAStream();
+  sm75_int4_pair_warp_iterator_probe_kernel<<<1, kWarpSize, 0, stream>>>(
+      output.data_ptr<int>());
+  C10_CUDA_KERNEL_LAUNCH_CHECK();
+  return output;
+}
+
 at::Tensor sm75_int4_pair_wmma_load_probe_cuda(const at::Tensor& device_tensor) {
   TORCH_CHECK(device_tensor.is_cuda(), "SM75 WMMA probe requires a CUDA tensor argument");
   auto output = at::empty({8, 8}, device_tensor.options().dtype(at::kInt));
@@ -1710,6 +1756,7 @@ TORCH_LIBRARY(mixllm_sm75, m) {
   m.def("sm75_int4_pair_instruction_probe(Tensor device_tensor) -> Tensor");
   m.def("sm75_int4_native_decomposition_probe(Tensor device_tensor) -> Tensor");
   m.def("sm75_int4_pair_wmma_load_probe(Tensor device_tensor) -> Tensor");
+  m.def("sm75_int4_pair_warp_iterator_probe(Tensor device_tensor) -> Tensor");
   m.def("sm75_int4_pair_fused_probe(Tensor device_tensor) -> Tensor");
   m.def("sm75_int4_pair_mixed_stride_probe(Tensor device_tensor) -> Tensor");
   m.def("_three_level_linear_v2_unchecked(Tensor input_fp16, Tensor input_int8, "
@@ -1751,6 +1798,7 @@ TORCH_LIBRARY_IMPL(mixllm_sm75, CUDA, m) {
   m.impl("sm75_int4_pair_instruction_probe", &sm75_int4_pair_instruction_probe_cuda);
   m.impl("sm75_int4_native_decomposition_probe", &sm75_int4_native_decomposition_probe_cuda);
   m.impl("sm75_int4_pair_wmma_load_probe", &sm75_int4_pair_wmma_load_probe_cuda);
+  m.impl("sm75_int4_pair_warp_iterator_probe", &sm75_int4_pair_warp_iterator_probe_cuda);
   m.impl("sm75_int4_pair_fused_probe", &sm75_int4_pair_fused_probe_cuda);
   m.impl("sm75_int4_pair_mixed_stride_probe", &sm75_int4_pair_mixed_stride_probe_cuda);
   m.impl("_three_level_linear_v2_unchecked", &three_level_linear_v2_unchecked_cuda);
