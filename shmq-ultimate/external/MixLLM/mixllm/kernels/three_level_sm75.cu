@@ -1022,9 +1022,9 @@ __global__ void sm75_int4_pair_warp_iterator_probe_kernel(int* output) {
   high_a.clear();
   weights.clear();
   for (int i = 0; i < 8; ++i) {
-    low_a[i] = cutlass::uint4b_t(static_cast<unsigned>(u4a_fragment[i]));
-    high_a[i] = cutlass::int4b_t(static_cast<int>(s4a_fragment[i]));
-    weights[i] = cutlass::uint4b_t(static_cast<unsigned>(u4b_fragment[i]));
+    low_a[i] = cutlass::uint4b_t(static_cast<unsigned>(u4a_fragment[i].get()));
+    high_a[i] = cutlass::int4b_t(static_cast<int>(s4a_fragment[i].get()));
+    weights[i] = cutlass::uint4b_t(static_cast<unsigned>(u4b_fragment[i].get()));
   }
   shmq_cutlass_sm75::int4_pair_probe::LowMma::FragmentC low_accum;
   shmq_cutlass_sm75::int4_pair_probe::HighMma::FragmentC high_accum;
