@@ -996,9 +996,9 @@ __global__ void sm75_int4_pair_warp_iterator_probe_kernel(int* output) {
   u4a.load(u4a_fragment);
   s4a.load(s4a_fragment);
   u4b.load(u4b_fragment);
-  output[lane * 3 + 0] = reinterpret_cast<unsigned*>(&u4a_fragment)[0];
-  output[lane * 3 + 1] = reinterpret_cast<unsigned*>(&s4a_fragment)[0];
-  output[lane * 3 + 2] = reinterpret_cast<unsigned*>(&u4b_fragment)[0];
+  output[lane * 3 + 0] = static_cast<int>(u4a_fragment[0]);
+  output[lane * 3 + 1] = static_cast<int>(s4a_fragment[0]);
+  output[lane * 3 + 2] = static_cast<int>(u4b_fragment[0]);
 #endif
 }
 
