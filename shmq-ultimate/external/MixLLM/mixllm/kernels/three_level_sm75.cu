@@ -971,18 +971,21 @@ __global__ void sm75_int4_pair_warp_iterator_probe_kernel(int* output) {
   using U4AIterator = shmq_cutlass_sm75::int4_pair_probe::NativeWarpU4AIterator;
   using S4AIterator = shmq_cutlass_sm75::int4_pair_probe::NativeWarpS4AIterator;
   using U4BIterator = shmq_cutlass_sm75::int4_pair_probe::NativeWarpU4BIterator;
-  __shared__ __align__(16) uint8_t a_storage[32 * 16];
-  __shared__ __align__(16) uint8_t b_storage[32 * 16];
+  // The warp iterator addresses the full congruous backing tile through
+  // lane-dependent LDSM pointers.  Keep a production-sized K-major extent,
+  // rather than allocating only the visible K32xN8 fragment.
+  __shared__ __align__(16) uint8_t a_storage[128 * 64 / 2];
+  __shared__ __align__(16) uint8_t b_storage[128 * 64 / 2];
   const int lane = threadIdx.x;
-  for (int item = lane; item < 32 * 16; item += kWarpSize) {
+  for (int item = lane; item < 128 * 64 / 2; item += kWarpSize) {
     a_storage[item] = 0;
     b_storage[item] = 0;
   }
 
-  U4AIterator::TensorCoord extent(32, 32);
+  U4AIterator::TensorCoord extent(128, 64);
   U4AIterator::Layout layout = U4AIterator::Layout::packed(extent);
-  for (int logical = lane; logical < 32 * 32; logical += kWarpSize) {
-    U4AIterator::TensorCoord coord(logical % 32, logical / 32);
+  for (int logical = lane; logical < 128 * 64; logical += kWarpSize) {
+    U4AIterator::TensorCoord coord(logical % 128, logical / 128);
     const int physical = static_cast<int>(layout(coord));
     const int byte_index = physical / 2;
     const int shift = (physical & 1) * 4;
