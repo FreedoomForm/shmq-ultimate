@@ -60,13 +60,13 @@ using NativeWarpTile = cutlass::MatrixShape<32, 32>;
 using NativeWarpInstruction = cutlass::MatrixShape<8, 32>;
 using NativeWarpU4Layout = cutlass::layout::TensorOpMultiplicandCongruous<4, 64>;
 using NativeWarpU4AIterator = cutlass::gemm::warp::MmaTensorOpMultiplicandTileIterator<
-    NativeWarpTile, cutlass::Operand::kA, cutlass::uint4b_t,
+    NativeWarpTile, cutlass::gemm::Operand::kA, cutlass::uint4b_t,
     NativeWarpU4Layout, NativeWarpInstruction, 1, 32, 1>;
 using NativeWarpS4AIterator = cutlass::gemm::warp::MmaTensorOpMultiplicandTileIterator<
-    NativeWarpTile, cutlass::Operand::kA, cutlass::int4b_t,
+    NativeWarpTile, cutlass::gemm::Operand::kA, cutlass::int4b_t,
     NativeWarpU4Layout, NativeWarpInstruction, 1, 32, 1>;
 using NativeWarpU4BIterator = cutlass::gemm::warp::MmaTensorOpMultiplicandTileIterator<
-    NativeWarpTile, cutlass::Operand::kB, cutlass::uint4b_t,
+    NativeWarpTile, cutlass::gemm::Operand::kB, cutlass::uint4b_t,
     NativeWarpU4Layout, NativeWarpInstruction, 1, 32, 1>;
 
 static_assert(NativeWarpU4AIterator::Fragment::kElements > 0 &&
