@@ -169,7 +169,8 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("sm75_int4_pair_wmma_native_store_probe_kernel", source_compact)
         self.assertIn("sm75_int4_pair_wmma_native_store_probe_cuda", source_compact)
         self.assertIn("sm75_int4_pair_wmma_native_store_probe(Tensordevice_tensor)->Tensor", source_compact)
-        self.assertIn("MmaTensorOpAccumulatorTileIterator", source_compact)
+        self.assertIn("DefaultMmaTensorOpWmma", source_compact)
+        self.assertIn("CompleteWmma::IteratorC", source_compact)
         self.assertIn("NativeWarpU16AIterator", source_compact)
         self.assertIn("NativeWarpU16BIterator", source_compact)
         self.assertIn("sm75_int4_pair_crosswise_u16_probe_kernel", source_compact)
@@ -178,7 +179,8 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("static_cast<unsigned>(u16a_fragment[i])&0xf", source_compact)
         self.assertIn("output[lane*28+24]", source_compact)
         self.assertIn("autooutput=at::empty({kWarpSize,28}", source_compact)
-        self.assertIn("MmaTensorOpAccumulatorTileIterator", source_compact)
+        self.assertIn("DefaultMmaTensorOpWmma", source_compact)
+        self.assertIn("CompleteWmma::IteratorC", source_compact)
 
     def test_v232_native_int4_decomposition_probe_contract(self):
         source_compact = "".join(self.source.split())
