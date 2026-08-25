@@ -343,6 +343,19 @@ if capability == (7, 5):
     nonuniform_matrix_ref = nonuniform_ref.reshape(8, 8)
     assert torch.equal(crosswise_native_store_probe, nonuniform_matrix_ref), (crosswise_native_store_probe, nonuniform_matrix_ref)
     print('SM75_INT4_CROSSWISE_U16_NATIVE_STORE_REFERENCE_PASS', crosswise_native_store_probe[:2, :4].tolist(), flush=True)
+    k64_ref_a_rows = torch.arange(8, dtype=torch.int32)[:, None]
+    k64_ref_a_k = torch.arange(64, dtype=torch.int32)[None, :]
+    k64_ref_b_k = torch.arange(64, dtype=torch.int32)[:, None]
+    k64_ref_b_cols = torch.arange(8, dtype=torch.int32)[None, :]
+    k64_low_ref = ((k64_ref_a_rows * 3 + k64_ref_a_k * 5 + 1) & 15)
+    k64_high_raw_ref = ((k64_ref_a_rows * 5 + k64_ref_a_k * 3 + 7) & 15)
+    k64_high_ref = torch.where(k64_high_raw_ref >= 8, k64_high_raw_ref - 16, k64_high_raw_ref)
+    k64_b_ref = ((k64_ref_b_k * 7 + k64_ref_b_cols * 3 + 2) & 15)
+    k64_matrix_ref = ((k64_low_ref + 16 * k64_high_ref).to(torch.int64) @ k64_b_ref.to(torch.int64)).to(torch.int32)
+    k64_native_store_probe = torch.ops.mixllm_sm75.sm75_int4_pair_crosswise_u16_k64_native_store_probe(torch.empty(0, device='cuda'))
+    k64_matrix_ref = k64_matrix_ref.to('cuda')
+    assert torch.equal(k64_native_store_probe, k64_matrix_ref), (k64_native_store_probe, k64_matrix_ref)
+    print('SM75_INT4_CROSSWISE_U16_K64_NATIVE_STORE_REFERENCE_PASS', k64_native_store_probe[:2, :4].tolist(), flush=True)
     packed_probe = torch.ops.mixllm_sm75.sm75_int4_pair_wmma_load_probe(torch.empty(0, device='cuda'))
     expected_probe = 32 * (torch.arange(1, 9, device='cuda', dtype=torch.int32)[:, None] * torch.arange(1, 9, device='cuda', dtype=torch.int32)[None, :])
     assert torch.equal(packed_probe, expected_probe), (packed_probe, expected_probe)
