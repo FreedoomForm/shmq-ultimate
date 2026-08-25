@@ -1147,7 +1147,7 @@ at::Tensor sm75_int4_pair_crosswise_u16_probe_cuda(
 __global__ void sm75_int4_pair_wmma_native_store_probe_kernel(int* output) {
 #if __CUDA_ARCH__ >= 750
   namespace precision = wmma::experimental::precision;
-  constexpr int kCases = 3;
+  constexpr int kCases = 4;
   constexpr int kMatrixElements = 8 * 8;
   __shared__ __align__(16) uint8_t a_low_packed[kCases * 8 * 16];
   __shared__ __align__(16) uint8_t a_high_packed[kCases * 8 * 16];
@@ -1162,9 +1162,26 @@ __global__ void sm75_int4_pair_wmma_native_store_probe_kernel(int* output) {
   uint8_t* a_high_case = a_high_packed + case_id * 8 * 16;
   uint8_t* b_case = b_packed + case_id * 8 * 16;
   for (int item = lane; item < 8 * 16; item += kWarpSize) {
-    a_low_case[item] = static_cast<uint8_t>(low_value | (low_value << 4));
-    a_high_case[item] = static_cast<uint8_t>(high_bits | (high_bits << 4));
-    b_case[item] = static_cast<uint8_t>(weight_value | (weight_value << 4));
+    const int row = item / 16;
+    const int byte = item % 16;
+    const int k0 = 2 * byte;
+    const int k1 = k0 + 1;
+    if (case_id == 3) {
+      const int low0 = (row * 3 + k0 * 5 + 1) & 15;
+      const int low1 = (row * 3 + k1 * 5 + 1) & 15;
+      const int high0 = (row * 5 + k0 * 3 + 7) & 15;
+      const int high1 = (row * 5 + k1 * 3 + 7) & 15;
+      const int col = row;
+      const int b0 = (k0 * 7 + col * 3 + 2) & 15;
+      const int b1 = (k1 * 7 + col * 3 + 2) & 15;
+      a_low_case[item] = static_cast<uint8_t>(low0 | (low1 << 4));
+      a_high_case[item] = static_cast<uint8_t>(high0 | (high1 << 4));
+      b_case[item] = static_cast<uint8_t>(b0 | (b1 << 4));
+    } else {
+      a_low_case[item] = static_cast<uint8_t>(low_value | (low_value << 4));
+      a_high_case[item] = static_cast<uint8_t>(high_bits | (high_bits << 4));
+      b_case[item] = static_cast<uint8_t>(weight_value | (weight_value << 4));
+    }
   }
   __syncwarp();
 
@@ -1223,9 +1240,9 @@ at::Tensor sm75_int4_pair_wmma_native_store_probe_cuda(
     const at::Tensor& device_tensor) {
   TORCH_CHECK(device_tensor.is_cuda(),
               "SM75 WMMA/native store probe requires a CUDA tensor argument");
-  auto output = at::empty({3, 64}, device_tensor.options().dtype(at::kInt));
+  auto output = at::empty({4, 64}, device_tensor.options().dtype(at::kInt));
   auto stream = at::cuda::getCurrentCUDAStream();
-  sm75_int4_pair_wmma_native_store_probe_kernel<<<1, 3 * kWarpSize, 0, stream>>>(
+  sm75_int4_pair_wmma_native_store_probe_kernel<<<1, 4 * kWarpSize, 0, stream>>>(
       output.data_ptr<int>());
   C10_CUDA_KERNEL_LAUNCH_CHECK();
   return output;
