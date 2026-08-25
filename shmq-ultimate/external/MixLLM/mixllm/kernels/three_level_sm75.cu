@@ -1208,11 +1208,11 @@ __global__ void sm75_int4_pair_wmma_native_store_probe_kernel(int* output) {
   combined.clear();
   combined[0].x[0] = low_accum[0] + 16 * high_accum[0];
   combined[0].x[1] = low_accum[1] + 16 * high_accum[1];
-  typename CompleteWmma::IteratorC iter_c(
-      {accumulator + case_id * kMatrixElements,
-       CompleteWmma::LayoutC::packed({8, 8})},
-      cutlass::arch::LaneId());
-  iter_c.store(combined);
+  nvcuda::wmma::store_matrix_sync(
+      accumulator + case_id * kMatrixElements,
+      combined[0],
+      8,
+      nvcuda::wmma::mem_row_major);
   __syncwarp();
   for (int item = lane; item < kMatrixElements; item += kWarpSize) {
     output[case_id * kMatrixElements + item] =
