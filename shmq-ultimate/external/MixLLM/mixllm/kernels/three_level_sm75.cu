@@ -21,7 +21,6 @@
 #include <unordered_map>
 #include <mma.h>
 #include "sm75_cutlass_testbed.h"
-#include "cutlass/gemm/warp/default_mma_wmma_tensor_op.h"
 
 namespace {
 namespace wmma = nvcuda::wmma;
@@ -1198,21 +1197,20 @@ __global__ void sm75_int4_pair_wmma_native_store_probe_kernel(int* output) {
   low_mma(low_accum, low_a, weights, low_accum);
   high_mma(high_accum, high_a, weights, high_accum);
 
-  using CompleteWmma = typename cutlass::gemm::warp::DefaultMmaTensorOpWmma<
-      cutlass::gemm::GemmShape<8, 8, 32>,
-      cutlass::gemm::GemmShape<8, 8, 32>,
-      cutlass::int4b_t, cutlass::layout::RowMajor,
-      cutlass::int4b_t, cutlass::layout::ColumnMajor,
-      int, cutlass::layout::RowMajor>::Type;
-  typename CompleteWmma::FragmentC combined;
+  using NativeAccumulatorIterator =
+      cutlass::gemm::warp::MmaTensorOpAccumulatorTileIterator<
+          cutlass::MatrixShape<8, 8>, int, cutlass::layout::RowMajor,
+          shmq_cutlass_sm75::int4_pair_probe::InstructionShape,
+          cutlass::MatrixShape<1, 1>>;
+  shmq_cutlass_sm75::int4_pair_probe::LowMma::FragmentC combined;
   combined.clear();
-  combined[0].x[0] = low_accum[0] + 16 * high_accum[0];
-  combined[0].x[1] = low_accum[1] + 16 * high_accum[1];
-  nvcuda::wmma::store_matrix_sync(
-      accumulator + case_id * kMatrixElements,
-      combined[0],
-      8,
-      nvcuda::wmma::mem_row_major);
+  combined[0] = low_accum[0] + 16 * high_accum[0];
+  combined[1] = low_accum[1] + 16 * high_accum[1];
+  NativeAccumulatorIterator iter_c(
+      {accumulator + case_id * kMatrixElements,
+       cutlass::layout::RowMajor::packed({8, 8})},
+      lane);
+  iter_c.store(combined);
   __syncwarp();
   for (int item = lane; item < kMatrixElements; item += kWarpSize) {
     output[case_id * kMatrixElements + item] =
