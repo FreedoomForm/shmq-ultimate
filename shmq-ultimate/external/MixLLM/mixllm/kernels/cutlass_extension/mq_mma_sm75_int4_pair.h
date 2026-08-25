@@ -83,6 +83,27 @@ using NativeWarpU4BIterator = cutlass::gemm::warp::MmaTensorOpMultiplicandTileIt
     NativeWarpBTile, cutlass::gemm::Operand::kB, cutlass::uint4b_t,
     NativeWarpBLayout, NativeWarpBInstruction, 1, 32, 1>;
 
+// LDSM is a b16 transfer on SM75.  This physical-storage contract models one
+// four-bit logical value in the low nibble of each 16-bit shared-memory word,
+// then lets the probe explicitly repack eight loaded words into the one 32-bit
+// U4/S4 MMA operand register.  It is distinct from the rejected dense-u4
+// interpretation above and still uses the production Crosswise swizzles.
+using NativeWarpU16ATile = cutlass::MatrixShape<8, 32>;
+using NativeWarpU16BTile = cutlass::MatrixShape<32, 8>;
+using NativeWarpU16AInstruction = cutlass::MatrixShape<8, 32>;
+using NativeWarpU16BInstruction = cutlass::MatrixShape<32, 8>;
+using NativeWarpU16ALayout = cutlass::layout::RowMajorTensorOpMultiplicandCrosswise<16, 64>;
+using NativeWarpU16BLayout = cutlass::layout::ColumnMajorTensorOpMultiplicandCrosswise<16, 64>;
+using NativeWarpU16AIterator = cutlass::gemm::warp::MmaTensorOpMultiplicandTileIterator<
+    NativeWarpU16ATile, cutlass::gemm::Operand::kA, uint16_t,
+    NativeWarpU16ALayout, NativeWarpU16AInstruction, 1, 32, 1>;
+using NativeWarpS16AIterator = cutlass::gemm::warp::MmaTensorOpMultiplicandTileIterator<
+    NativeWarpU16ATile, cutlass::gemm::Operand::kA, uint16_t,
+    NativeWarpU16ALayout, NativeWarpU16AInstruction, 1, 32, 1>;
+using NativeWarpU16BIterator = cutlass::gemm::warp::MmaTensorOpMultiplicandTileIterator<
+    NativeWarpU16BTile, cutlass::gemm::Operand::kB, uint16_t,
+    NativeWarpU16BLayout, NativeWarpU16BInstruction, 1, 32, 1>;
+
 static_assert(NativeWarpCongruousU4AIterator::Fragment::kElements > 0 &&
                   NativeWarpU4AIterator::Fragment::kElements > 0 &&
                   NativeWarpS4AIterator::Fragment::kElements > 0 &&

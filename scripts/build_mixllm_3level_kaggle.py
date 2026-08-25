@@ -316,6 +316,10 @@ if capability == (7, 5):
     expected_iterator_negative = torch.tensor(([1, 0] * 4) + ([1, 0] * 4) + ([2] * 8) + ([32] * 4), device='cuda', dtype=torch.int32).expand_as(iterator_probe)
     assert torch.equal(iterator_probe, expected_iterator_negative), (iterator_probe, expected_iterator_negative)
     print('SM75_INT4_WARP_ITERATOR_PROBE_EXPECTED_NEGATIVE', iterator_probe[0].tolist(), flush=True)
+    crosswise_u16_probe = torch.ops.mixllm_sm75.sm75_int4_pair_crosswise_u16_probe(torch.empty(0, device='cuda'))
+    expected_crosswise_u16 = torch.tensor(([1] * 8) + ([1] * 8) + ([2] * 8) + ([64] * 4), device='cuda', dtype=torch.int32).expand_as(crosswise_u16_probe)
+    assert torch.equal(crosswise_u16_probe, expected_crosswise_u16), (crosswise_u16_probe, expected_crosswise_u16)
+    print('SM75_INT4_CROSSWISE_U16_PROBE_PASS', crosswise_u16_probe[0].tolist(), flush=True)
     native_store_probe = torch.ops.mixllm_sm75.sm75_int4_pair_wmma_native_store_probe(torch.empty(0, device='cuda'))
     expected_native_store = torch.cat([
         torch.full((1, 64), 64, device='cuda', dtype=torch.int32),
