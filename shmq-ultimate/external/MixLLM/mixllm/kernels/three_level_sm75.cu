@@ -1133,7 +1133,7 @@ __global__ void sm75_int4_pair_crosswise_u16_probe_kernel(int* output) {
 
   using AccumIterator = cutlass::gemm::warp::MmaTensorOpAccumulatorTileIterator<
       cutlass::MatrixShape<8, 8>, int, cutlass::layout::RowMajor,
-      cutlass::MatrixShape<8, 8>, cutlass::MatrixShape<1, 1>>;
+      cutlass::gemm::GemmShape<8, 8, 32>, cutlass::MatrixShape<1, 1>>;
   AccumIterator::Fragment combined;
   combined[0] = low_accum[0] + 16 * high_accum[0];
   combined[1] = low_accum[1] + 16 * high_accum[1];
@@ -1215,7 +1215,7 @@ __global__ void sm75_int4_pair_wmma_native_store_probe_kernel(int* output) {
 
   using AccumIterator = cutlass::gemm::warp::MmaTensorOpAccumulatorTileIterator<
       cutlass::MatrixShape<8, 8>, int, cutlass::layout::RowMajor,
-      cutlass::MatrixShape<8, 8>, cutlass::MatrixShape<1, 1>>;
+      cutlass::gemm::GemmShape<8, 8, 32>, cutlass::MatrixShape<1, 1>>;
   AccumIterator::Fragment combined;
   combined[0] = low_accum[0] + 16 * high_accum[0];
   combined[1] = low_accum[1] + 16 * high_accum[1];
