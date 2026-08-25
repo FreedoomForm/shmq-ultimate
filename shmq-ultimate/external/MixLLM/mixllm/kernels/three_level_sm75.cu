@@ -1122,14 +1122,14 @@ __global__ void sm75_int4_pair_crosswise_u16_probe_kernel(int* output) {
   low_mma(low_accum, low_a, weights, low_accum);
   high_mma(high_accum, high_a, weights, high_accum);
   for (int i = 0; i < 8; ++i) {
-    output[lane * 28 + i] = static_cast<int>(u16a_fragment[i]);
-    output[lane * 28 + 8 + i] = static_cast<int>(s16a_fragment[i]);
-    output[lane * 28 + 16 + i] = static_cast<int>(u16b_fragment[i]);
+    output[lane * 92 + i] = static_cast<int>(u16a_fragment[i]);
+    output[lane * 92 + 8 + i] = static_cast<int>(s16a_fragment[i]);
+    output[lane * 92 + 16 + i] = static_cast<int>(u16b_fragment[i]);
   }
-  output[lane * 28 + 24] = low_accum[0];
-  output[lane * 28 + 25] = low_accum[1];
-  output[lane * 28 + 26] = high_accum[0];
-  output[lane * 28 + 27] = high_accum[1];
+  output[lane * 92 + 24] = low_accum[0];
+  output[lane * 92 + 25] = low_accum[1];
+  output[lane * 92 + 26] = high_accum[0];
+  output[lane * 92 + 27] = high_accum[1];
 
   using AccumIterator = cutlass::gemm::warp::MmaTensorOpAccumulatorTileIterator<
       cutlass::MatrixShape<8, 8>, int, cutlass::layout::RowMajor,
