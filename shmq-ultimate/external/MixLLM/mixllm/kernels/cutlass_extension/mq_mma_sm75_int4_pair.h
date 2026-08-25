@@ -63,8 +63,12 @@ using NativeWarpCongruousU4AIterator = cutlass::gemm::warp::MmaTensorOpMultiplic
     NativeWarpCongruousTile, cutlass::gemm::Operand::kA, cutlass::uint4b_t,
     NativeWarpCongruousLayout, NativeWarpCongruousInstruction, 1, 32, 1>;
 
-using NativeWarpATile = cutlass::MatrixShape<8, 32>;
-using NativeWarpBTile = cutlass::MatrixShape<32, 8>;
+// The SM75 Crosswise iterator issues LDSM x4 (16 bytes) even for a
+// subbyte fragment. Capture that register payload in a 32-element fragment
+// (16 bytes) before any diagnostic unpacking; the native MMA operand itself
+// remains an eight-element / four-byte register ABI.
+using NativeWarpATile = cutlass::MatrixShape<32, 128>;
+using NativeWarpBTile = cutlass::MatrixShape<128, 32>;
 using NativeWarpAInstruction = cutlass::MatrixShape<8, 32>;
 using NativeWarpBInstruction = cutlass::MatrixShape<32, 8>;
 using NativeWarpALayout = cutlass::layout::RowMajorTensorOpMultiplicandCrosswise<4, 64>;
