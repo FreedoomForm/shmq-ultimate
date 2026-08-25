@@ -1206,8 +1206,8 @@ __global__ void sm75_int4_pair_wmma_native_store_probe_kernel(int* output) {
       int, cutlass::layout::RowMajor>::Type;
   typename CompleteWmma::FragmentC combined;
   combined.clear();
-  combined[0] = low_accum[0] + 16 * high_accum[0];
-  combined[1] = low_accum[1] + 16 * high_accum[1];
+  combined.x[0] = low_accum[0] + 16 * high_accum[0];
+  combined.x[1] = low_accum[1] + 16 * high_accum[1];
   typename CompleteWmma::IteratorC iter_c(
       {accumulator + case_id * kMatrixElements,
        CompleteWmma::LayoutC::packed({8, 8})},
