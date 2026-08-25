@@ -1225,7 +1225,7 @@ at::Tensor sm75_int4_pair_wmma_native_store_probe_cuda(
               "SM75 WMMA/native store probe requires a CUDA tensor argument");
   auto output = at::empty({3, 64}, device_tensor.options().dtype(at::kInt));
   auto stream = at::cuda::getCurrentCUDAStream();
-  sm75_int4_pair_wmma_native_store_probe_kernel<<<3, kWarpSize, 0, stream>>>(
+  sm75_int4_pair_wmma_native_store_probe_kernel<<<1, 3 * kWarpSize, 0, stream>>>(
       output.data_ptr<int>());
   C10_CUDA_KERNEL_LAUNCH_CHECK();
   return output;
