@@ -176,6 +176,8 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("sm75_int4_pair_crosswise_u16_probe_cuda", source_compact)
         self.assertIn("sm75_int4_pair_crosswise_u16_probe(Tensordevice_tensor)->Tensor", source_compact)
         self.assertIn("static_cast<unsigned>(u16a_fragment[i])&0xf", source_compact)
+        self.assertIn("output[28+item]=accumulator[item]", source_compact)
+        self.assertIn("autooutput=at::zeros({kWarpSize,92}", source_compact)
 
     def test_v232_native_int4_decomposition_probe_contract(self):
         source_compact = "".join(self.source.split())

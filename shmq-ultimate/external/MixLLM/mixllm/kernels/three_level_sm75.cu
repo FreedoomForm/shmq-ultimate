@@ -1065,6 +1065,7 @@ __global__ void sm75_int4_pair_crosswise_u16_probe_kernel(int* output) {
   using U16BIterator = shmq_cutlass_sm75::int4_pair_probe::NativeWarpU16BIterator;
   __shared__ __align__(16) uint16_t a_storage[64 * 128];
   __shared__ __align__(16) uint16_t b_storage[128 * 64];
+  __shared__ int accumulator[8 * 8];
   const int lane = threadIdx.x;
   for (int item = lane; item < 64 * 128; item += kWarpSize) {
     a_storage[item] = 0;
@@ -1124,6 +1125,21 @@ __global__ void sm75_int4_pair_crosswise_u16_probe_kernel(int* output) {
   output[lane * 28 + 25] = low_accum[1];
   output[lane * 28 + 26] = high_accum[0];
   output[lane * 28 + 27] = high_accum[1];
+
+  using AccumIterator = cutlass::gemm::warp::MmaTensorOpAccumulatorTileIterator<
+      cutlass::MatrixShape<8, 8>, int, cutlass::layout::RowMajor,
+      cutlass::MatrixShape<8, 8>, cutlass::MatrixShape<1, 1>>;
+  AccumIterator::Fragment combined;
+  combined[0] = low_accum[0] + 16 * high_accum[0];
+  combined[1] = low_accum[1] + 16 * high_accum[1];
+  AccumIterator iter_c(
+      AccumIterator::TensorRef(accumulator, cutlass::layout::RowMajor::packed({8, 8})),
+      lane);
+  iter_c.store(combined);
+  __syncwarp();
+  for (int item = lane; item < 8 * 8; item += kWarpSize) {
+    output[28 + item] = accumulator[item];
+  }
 #endif
 }
 
@@ -1131,7 +1147,7 @@ at::Tensor sm75_int4_pair_crosswise_u16_probe_cuda(
     const at::Tensor& device_tensor) {
   TORCH_CHECK(device_tensor.is_cuda(),
               "SM75 Crosswise U16 probe requires a CUDA tensor argument");
-  auto output = at::empty({kWarpSize, 28}, device_tensor.options().dtype(at::kInt));
+  auto output = at::zeros({kWarpSize, 92}, device_tensor.options().dtype(at::kInt));
   auto stream = at::cuda::getCurrentCUDAStream();
   sm75_int4_pair_crosswise_u16_probe_kernel<<<1, kWarpSize, 0, stream>>>(
       output.data_ptr<int>());
