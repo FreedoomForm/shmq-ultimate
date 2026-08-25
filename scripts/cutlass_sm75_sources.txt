@@ -87,6 +87,7 @@ mixllm/kernels/cutlass/include/cutlass/gemm/threadblock/mma_singlestage.h
 mixllm/kernels/cutlass/include/cutlass/gemm/warp/default_mma_tensor_op.h
 mixllm/kernels/cutlass/include/cutlass/gemm/warp/default_mma_wmma_tensor_op.h
 mixllm/kernels/cutlass/include/cutlass/gemm/warp/mma_tensor_op_wmma.h
+mixllm/kernels/cutlass/include/cutlass/gemm/warp/mma_tensor_op_tile_iterator_wmma.h
 mixllm/kernels/cutlass/include/cutlass/gemm/warp/default_mma_tensor_op_sm80.h
 mixllm/kernels/cutlass/include/cutlass/gemm/warp/mma.h
 mixllm/kernels/cutlass/include/cutlass/gemm/warp/mma_complex_tensor_op_tile_iterator_sm80.h
