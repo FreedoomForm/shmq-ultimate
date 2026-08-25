@@ -22,3 +22,11 @@ If the four-case T4 proof passes, the evidence will establish that the physical 
 2. Vendored SM75 native U4/U4 and S4/U4 aliases and fragment sizes: `shmq-ultimate/external/MixLLM/mixllm/kernels/cutlass_extension/mq_mma_sm75_int4_pair.h`, lines 19–53.
 3. Vendored SM75 physical Crosswise U16 iterator aliases: the same header, lines 66–105.
 4. Current positive T4 evidence: `research-15/worklog.md`, v338 entry and `research-15/kaggle-v338-log-only/mixllm-3-level-real-t4-gate.log` in the connected checkout.
+
+## Follow-up physical-loader proof
+
+The WMMA-loaded nonuniform proof validates native accumulator ownership but does not by itself prove that varied physical Crosswise U16 words arrive in the same native operand slots. The next proof therefore uses the existing positive `NativeWarpU16AIterator`, `NativeWarpS16AIterator`, and `NativeWarpU16BIterator` directly, repacks all eight loaded values per lane exactly as the positive probe does, invokes the two native MMAs, and stores the complete 8x8 result through the same CUTLASS accumulator iterator.
+
+The physical test uses one warp and the already-established full Crosswise backing extents A=`<64,128>` and B=`<128,64>`. Logical A rows 0–7 and B columns 0–7 are filled with the same deterministic nonuniform formulas as the WMMA reference. Because vendored CUTLASS's `add_tile_offset` for Crosswise advances by the instruction's strided dimension and physical layout factor, the first iterator load is the logical origin tile; the full matrix reference is therefore formed over A[0:8,0:32] and B[0:32,0:8]. No guessed lane-to-matrix mapping is used: the accumulator iterator remains the authoritative store mapping.
+
+Historical compile risk is explicit. v327/v328 showed that separate accumulator-iterator instantiations in two kernels could terminate nvcc with code 255. The direct physical-loader full-matrix proof is consequently bounded and may need to share the existing iterator instantiation or be reduced if the compiler reproduces that failure. A compile failure will remain negative evidence, and no production behavior will be changed.
