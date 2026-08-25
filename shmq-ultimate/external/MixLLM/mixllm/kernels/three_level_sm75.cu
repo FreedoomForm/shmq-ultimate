@@ -1201,8 +1201,8 @@ __global__ void sm75_int4_pair_wmma_native_store_probe_kernel(int* output) {
   using CompleteWmma = typename cutlass::gemm::warp::DefaultMmaTensorOpWmma<
       cutlass::gemm::GemmShape<8, 8, 32>,
       cutlass::gemm::GemmShape<8, 8, 32>,
-      cutlass::uint4b_t, cutlass::layout::RowMajor,
-      cutlass::uint4b_t, cutlass::layout::ColumnMajor,
+      cutlass::int4b_t, cutlass::layout::RowMajor,
+      cutlass::int4b_t, cutlass::layout::ColumnMajor,
       int, cutlass::layout::RowMajor>::Type;
   typename CompleteWmma::FragmentC combined;
   combined.clear();
