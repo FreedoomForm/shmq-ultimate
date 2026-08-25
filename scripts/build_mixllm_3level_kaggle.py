@@ -326,11 +326,15 @@ if capability == (7, 5):
         torch.full((1, 64), 1024, device='cuda', dtype=torch.int32),
         torch.full((1, 64), -960, device='cuda', dtype=torch.int32),
     ], dim=0)
-    low_ref = ((torch.arange(8, device='cuda', dtype=torch.int32)[:, None] * 3 + torch.arange(32, device='cuda', dtype=torch.int32)[None, :] * 5 + 1) & 15)
-    high_raw_ref = ((torch.arange(8, device='cuda', dtype=torch.int32)[:, None] * 5 + torch.arange(32, device='cuda', dtype=torch.int32)[None, :] * 3 + 7) & 15)
+    ref_rows = torch.arange(8, dtype=torch.int32)[:, None]
+    ref_k_a = torch.arange(32, dtype=torch.int32)[None, :]
+    ref_k_b = torch.arange(32, dtype=torch.int32)[:, None]
+    ref_cols = torch.arange(8, dtype=torch.int32)[None, :]
+    low_ref = ((ref_rows * 3 + ref_k_a * 5 + 1) & 15)
+    high_raw_ref = ((ref_rows * 5 + ref_k_a * 3 + 7) & 15)
     high_ref = torch.where(high_raw_ref >= 8, high_raw_ref - 16, high_raw_ref)
-    b_ref = ((torch.arange(32, device='cuda', dtype=torch.int32)[:, None] * 7 + torch.arange(8, device='cuda', dtype=torch.int32)[None, :] * 3 + 2) & 15)
-    nonuniform_ref = ((low_ref + 16 * high_ref) @ b_ref).reshape(1, 64)
+    b_ref = ((ref_k_b * 7 + ref_cols * 3 + 2) & 15)
+    nonuniform_ref = ((low_ref + 16 * high_ref).to(torch.int64) @ b_ref.to(torch.int64)).to(torch.int32).reshape(1, 64).to('cuda')
     expected_native_store = torch.cat([expected_native_store, nonuniform_ref], dim=0)
     assert torch.equal(native_store_probe, expected_native_store), (native_store_probe, expected_native_store)
     print('SM75_INT4_WMMA_NATIVE_STORE_PROBE_PASS', native_store_probe[:, :8].tolist(), flush=True)
