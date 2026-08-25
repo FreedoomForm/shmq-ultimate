@@ -1063,12 +1063,14 @@ __global__ void sm75_int4_pair_crosswise_u16_probe_kernel(int* output) {
   using U16AIterator = shmq_cutlass_sm75::int4_pair_probe::NativeWarpU16AIterator;
   using S16AIterator = shmq_cutlass_sm75::int4_pair_probe::NativeWarpS16AIterator;
   using U16BIterator = shmq_cutlass_sm75::int4_pair_probe::NativeWarpU16BIterator;
-  __shared__ __align__(16) uint16_t a_storage[64 * 128];
+  __shared__ __align__(16) uint16_t a_low_storage[64 * 128];
+  __shared__ __align__(16) uint16_t a_high_storage[64 * 128];
   __shared__ __align__(16) uint16_t b_storage[128 * 64];
   __shared__ int accumulator[8 * 8];
   const int lane = threadIdx.x;
   for (int item = lane; item < 64 * 128; item += kWarpSize) {
-    a_storage[item] = 0;
+    a_low_storage[item] = 0;
+    a_high_storage[item] = 0;
   }
   for (int item = lane; item < 128 * 64; item += kWarpSize) {
     b_storage[item] = 0;
@@ -1079,7 +1081,8 @@ __global__ void sm75_int4_pair_crosswise_u16_probe_kernel(int* output) {
   U16BIterator::Layout b_layout = U16BIterator::Layout::packed(b_extent);
   for (int logical = lane; logical < 64 * 128; logical += kWarpSize) {
     U16AIterator::TensorCoord coord(logical / 128, logical % 128);
-    a_storage[static_cast<int>(a_layout(coord))] = 1;
+    a_low_storage[static_cast<int>(a_layout(coord))] = 1;
+    a_high_storage[static_cast<int>(a_layout(coord))] = 15;
   }
   for (int logical = lane; logical < 128 * 64; logical += kWarpSize) {
     U16BIterator::TensorCoord coord(logical / 64, logical % 64);
@@ -1087,8 +1090,8 @@ __global__ void sm75_int4_pair_crosswise_u16_probe_kernel(int* output) {
   }
   __syncwarp();
 
-  U16AIterator u16a(U16AIterator::TensorRef(a_storage, a_layout), lane);
-  S16AIterator s16a(S16AIterator::TensorRef(a_storage, a_layout), lane);
+  U16AIterator u16a(U16AIterator::TensorRef(a_low_storage, a_layout), lane);
+  S16AIterator s16a(S16AIterator::TensorRef(a_high_storage, a_layout), lane);
   U16BIterator u16b(U16BIterator::TensorRef(b_storage, b_layout), lane);
   U16AIterator::Fragment u16a_fragment;
   S16AIterator::Fragment s16a_fragment;
@@ -1105,7 +1108,9 @@ __global__ void sm75_int4_pair_crosswise_u16_probe_kernel(int* output) {
   weights.clear();
   for (int i = 0; i < 8; ++i) {
     low_a[i] = cutlass::uint4b_t(static_cast<unsigned>(u16a_fragment[i]) & 0xf);
-    high_a[i] = cutlass::int4b_t(static_cast<int>(s16a_fragment[i]) & 0xf);
+    int high_value = static_cast<int>(s16a_fragment[i]) & 0xf;
+    high_value = high_value >= 8 ? high_value - 16 : high_value;
+    high_a[i] = cutlass::int4b_t(high_value);
     weights[i] = cutlass::uint4b_t(static_cast<unsigned>(u16b_fragment[i]) & 0xf);
   }
   shmq_cutlass_sm75::int4_pair_probe::LowMma::FragmentC low_accum;
