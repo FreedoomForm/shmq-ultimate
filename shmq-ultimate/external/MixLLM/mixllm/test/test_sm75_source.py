@@ -166,6 +166,10 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("output[lane*28+16+i]", source_compact)
         self.assertIn("output[lane*28+24]", source_compact)
         self.assertIn("output[lane*28+27]", source_compact)
+        self.assertIn("sm75_int4_pair_wmma_native_store_probe_kernel", source_compact)
+        self.assertIn("sm75_int4_pair_wmma_native_store_probe_cuda", source_compact)
+        self.assertIn("sm75_int4_pair_wmma_native_store_probe(Tensordevice_tensor)->Tensor", source_compact)
+        self.assertIn("MmaTensorOpAccumulatorTileIterator", source_compact)
 
     def test_v232_native_int4_decomposition_probe_contract(self):
         source_compact = "".join(self.source.split())

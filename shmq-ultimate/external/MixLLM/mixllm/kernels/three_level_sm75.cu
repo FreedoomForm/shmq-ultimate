@@ -1058,6 +1058,90 @@ at::Tensor sm75_int4_pair_warp_iterator_probe_cuda(
   return output;
 }
 
+__global__ void sm75_int4_pair_wmma_native_store_probe_kernel(int* output) {
+#if __CUDA_ARCH__ >= 750
+  namespace precision = wmma::experimental::precision;
+  constexpr int kCases = 3;
+  constexpr int kMatrixElements = 8 * 8;
+  __shared__ __align__(16) uint8_t a_low_packed[kCases * 8 * 16];
+  __shared__ __align__(16) uint8_t a_high_packed[kCases * 8 * 16];
+  __shared__ __align__(16) uint8_t b_packed[kCases * 8 * 16];
+  __shared__ int accumulator[kCases * kMatrixElements];
+  const int lane = threadIdx.x & (kWarpSize - 1);
+  const int case_id = threadIdx.x / kWarpSize;
+  const int low_value = case_id == 1 ? 0 : 1;
+  const int high_bits = case_id == 2 ? 15 : (case_id == 1 ? 1 : 0);
+  const int weight_value = 2;
+  uint8_t* a_low_case = a_low_packed + case_id * 8 * 16;
+  uint8_t* a_high_case = a_high_packed + case_id * 8 * 16;
+  uint8_t* b_case = b_packed + case_id * 8 * 16;
+  for (int item = lane; item < 8 * 16; item += kWarpSize) {
+    a_low_case[item] = static_cast<uint8_t>(low_value | (low_value << 4));
+    a_high_case[item] = static_cast<uint8_t>(high_bits | (high_bits << 4));
+    b_case[item] = static_cast<uint8_t>(weight_value | (weight_value << 4));
+  }
+  __syncwarp();
+
+  wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::u4,
+                 wmma::row_major> low_fragment;
+  wmma::fragment<wmma::matrix_a, 8, 8, 32, precision::u4,
+                 wmma::row_major> high_fragment;
+  wmma::fragment<wmma::matrix_b, 8, 8, 32, precision::u4,
+                 wmma::col_major> b_fragment;
+  wmma::load_matrix_sync(low_fragment, a_low_case, 32);
+  wmma::load_matrix_sync(high_fragment, a_high_case, 32);
+  wmma::load_matrix_sync(b_fragment, b_case, 32);
+
+  shmq_cutlass_sm75::int4_pair_probe::LowMma::FragmentA low_a;
+  shmq_cutlass_sm75::int4_pair_probe::HighMma::FragmentA high_a;
+  shmq_cutlass_sm75::int4_pair_probe::LowMma::FragmentB weights;
+  low_a.clear();
+  high_a.clear();
+  weights.clear();
+  reinterpret_cast<unsigned&>(low_a) = low_fragment.x[0];
+  reinterpret_cast<unsigned&>(high_a) = high_fragment.x[0];
+  reinterpret_cast<unsigned&>(weights) = b_fragment.x[0];
+
+  shmq_cutlass_sm75::int4_pair_probe::LowMma::FragmentC low_accum;
+  shmq_cutlass_sm75::int4_pair_probe::HighMma::FragmentC high_accum;
+  low_accum.clear();
+  high_accum.clear();
+  shmq_cutlass_sm75::int4_pair_probe::LowMma low_mma;
+  shmq_cutlass_sm75::int4_pair_probe::HighMma high_mma;
+  low_mma(low_accum, low_a, weights, low_accum);
+  high_mma(high_accum, high_a, weights, high_accum);
+
+  using AccumIterator = cutlass::gemm::warp::MmaTensorOpAccumulatorTileIterator<
+      cutlass::MatrixShape<8, 8>, int, cutlass::layout::RowMajor,
+      cutlass::MatrixShape<8, 8>, cutlass::MatrixShape<1, 1>>;
+  AccumIterator::Fragment combined;
+  combined[0] = low_accum[0] + 16 * high_accum[0];
+  combined[1] = low_accum[1] + 16 * high_accum[1];
+  AccumIterator iter_c(
+      AccumIterator::TensorRef(accumulator + case_id * kMatrixElements,
+                               cutlass::layout::RowMajor::packed({8, 8})),
+      lane);
+  iter_c.store(combined);
+  __syncwarp();
+  for (int item = lane; item < kMatrixElements; item += kWarpSize) {
+    output[case_id * kMatrixElements + item] =
+        accumulator[case_id * kMatrixElements + item];
+  }
+#endif
+}
+
+at::Tensor sm75_int4_pair_wmma_native_store_probe_cuda(
+    const at::Tensor& device_tensor) {
+  TORCH_CHECK(device_tensor.is_cuda(),
+              "SM75 WMMA/native store probe requires a CUDA tensor argument");
+  auto output = at::empty({3, 64}, device_tensor.options().dtype(at::kInt));
+  auto stream = at::cuda::getCurrentCUDAStream();
+  sm75_int4_pair_wmma_native_store_probe_kernel<<<3, kWarpSize, 0, stream>>>(
+      output.data_ptr<int>());
+  C10_CUDA_KERNEL_LAUNCH_CHECK();
+  return output;
+}
+
 at::Tensor sm75_int4_pair_wmma_load_probe_cuda(const at::Tensor& device_tensor) {
   TORCH_CHECK(device_tensor.is_cuda(), "SM75 WMMA probe requires a CUDA tensor argument");
   auto output = at::empty({8, 8}, device_tensor.options().dtype(at::kInt));
@@ -1803,6 +1887,7 @@ TORCH_LIBRARY(mixllm_sm75, m) {
   m.def("sm75_int4_native_decomposition_probe(Tensor device_tensor) -> Tensor");
   m.def("sm75_int4_pair_wmma_load_probe(Tensor device_tensor) -> Tensor");
   m.def("sm75_int4_pair_warp_iterator_probe(Tensor device_tensor) -> Tensor");
+  m.def("sm75_int4_pair_wmma_native_store_probe(Tensor device_tensor) -> Tensor");
   m.def("sm75_int4_pair_fused_probe(Tensor device_tensor) -> Tensor");
   m.def("sm75_int4_pair_mixed_stride_probe(Tensor device_tensor) -> Tensor");
   m.def("_three_level_linear_v2_unchecked(Tensor input_fp16, Tensor input_int8, "
@@ -1845,6 +1930,7 @@ TORCH_LIBRARY_IMPL(mixllm_sm75, CUDA, m) {
   m.impl("sm75_int4_native_decomposition_probe", &sm75_int4_native_decomposition_probe_cuda);
   m.impl("sm75_int4_pair_wmma_load_probe", &sm75_int4_pair_wmma_load_probe_cuda);
   m.impl("sm75_int4_pair_warp_iterator_probe", &sm75_int4_pair_warp_iterator_probe_cuda);
+  m.impl("sm75_int4_pair_wmma_native_store_probe", &sm75_int4_pair_wmma_native_store_probe_cuda);
   m.impl("sm75_int4_pair_fused_probe", &sm75_int4_pair_fused_probe_cuda);
   m.impl("sm75_int4_pair_mixed_stride_probe", &sm75_int4_pair_mixed_stride_probe_cuda);
   m.impl("_three_level_linear_v2_unchecked", &three_level_linear_v2_unchecked_cuda);

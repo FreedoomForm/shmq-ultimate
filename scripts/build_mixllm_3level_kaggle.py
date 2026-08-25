@@ -313,9 +313,17 @@ if capability == (7, 5):
     assert torch.equal(native_probe, expected_native.repeat_interleave(32, dim=0)), (native_probe, expected_native)
     print('SM75_INT4_NATIVE_DECOMPOSITION_PROBE_PASS', native_probe[0].tolist(), native_probe[32].tolist(), flush=True)
     iterator_probe = torch.ops.mixllm_sm75.sm75_int4_pair_warp_iterator_probe(torch.empty(0, device='cuda'))
-    expected_iterator = torch.tensor(([1] * 8) + ([1] * 8) + ([2] * 8) + ([32] * 4), device='cuda', dtype=torch.int32).expand_as(iterator_probe)
-    assert torch.equal(iterator_probe, expected_iterator), (iterator_probe, expected_iterator)
-    print('SM75_INT4_WARP_ITERATOR_PROBE_PASS', iterator_probe[0].tolist(), flush=True)
+    expected_iterator_negative = torch.tensor(([1, 0] * 4) + ([1, 0] * 4) + ([2] * 8) + ([32] * 4), device='cuda', dtype=torch.int32).expand_as(iterator_probe)
+    assert torch.equal(iterator_probe, expected_iterator_negative), (iterator_probe, expected_iterator_negative)
+    print('SM75_INT4_WARP_ITERATOR_PROBE_EXPECTED_NEGATIVE', iterator_probe[0].tolist(), flush=True)
+    native_store_probe = torch.ops.mixllm_sm75.sm75_int4_pair_wmma_native_store_probe(torch.empty(0, device='cuda'))
+    expected_native_store = torch.cat([
+        torch.full((1, 64), 64, device='cuda', dtype=torch.int32),
+        torch.full((1, 64), 1024, device='cuda', dtype=torch.int32),
+        torch.full((1, 64), -960, device='cuda', dtype=torch.int32),
+    ], dim=0)
+    assert torch.equal(native_store_probe, expected_native_store), (native_store_probe, expected_native_store)
+    print('SM75_INT4_WMMA_NATIVE_STORE_PROBE_PASS', native_store_probe[:, :8].tolist(), flush=True)
     packed_probe = torch.ops.mixllm_sm75.sm75_int4_pair_wmma_load_probe(torch.empty(0, device='cuda'))
     expected_probe = 32 * (torch.arange(1, 9, device='cuda', dtype=torch.int32)[:, None] * torch.arange(1, 9, device='cuda', dtype=torch.int32)[None, :])
     assert torch.equal(packed_probe, expected_probe), (packed_probe, expected_probe)
