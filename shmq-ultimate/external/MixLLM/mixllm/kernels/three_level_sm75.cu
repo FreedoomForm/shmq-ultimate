@@ -1034,13 +1034,15 @@ __global__ void sm75_int4_pair_warp_iterator_probe_kernel(int* output) {
   shmq_cutlass_sm75::int4_pair_probe::HighMma high_mma;
   low_mma(low_accum, low_a, weights, low_accum);
   high_mma(high_accum, high_a, weights, high_accum);
-  output[lane * 7 + 0] = static_cast<int>(u4a_fragment[0]);
-  output[lane * 7 + 1] = static_cast<int>(s4a_fragment[0]);
-  output[lane * 7 + 2] = static_cast<int>(u4b_fragment[0]);
-  output[lane * 7 + 3] = low_accum[0];
-  output[lane * 7 + 4] = low_accum[1];
-  output[lane * 7 + 5] = high_accum[0];
-  output[lane * 7 + 6] = high_accum[1];
+  for (int i = 0; i < 8; ++i) {
+    output[lane * 28 + i] = static_cast<int>(u4a_fragment[i].get());
+    output[lane * 28 + 8 + i] = static_cast<int>(s4a_fragment[i].get());
+    output[lane * 28 + 16 + i] = static_cast<int>(u4b_fragment[i].get());
+  }
+  output[lane * 28 + 24] = low_accum[0];
+  output[lane * 28 + 25] = low_accum[1];
+  output[lane * 28 + 26] = high_accum[0];
+  output[lane * 28 + 27] = high_accum[1];
 #endif
 }
 
@@ -1048,7 +1050,7 @@ at::Tensor sm75_int4_pair_warp_iterator_probe_cuda(
     const at::Tensor& device_tensor) {
   TORCH_CHECK(device_tensor.is_cuda(),
               "SM75 warp iterator probe requires a CUDA tensor argument");
-  auto output = at::empty({kWarpSize, 7}, device_tensor.options().dtype(at::kInt));
+  auto output = at::empty({kWarpSize, 28}, device_tensor.options().dtype(at::kInt));
   auto stream = at::cuda::getCurrentCUDAStream();
   sm75_int4_pair_warp_iterator_probe_kernel<<<1, kWarpSize, 0, stream>>>(
       output.data_ptr<int>());

@@ -313,7 +313,7 @@ if capability == (7, 5):
     assert torch.equal(native_probe, expected_native.repeat_interleave(32, dim=0)), (native_probe, expected_native)
     print('SM75_INT4_NATIVE_DECOMPOSITION_PROBE_PASS', native_probe[0].tolist(), native_probe[32].tolist(), flush=True)
     iterator_probe = torch.ops.mixllm_sm75.sm75_int4_pair_warp_iterator_probe(torch.empty(0, device='cuda'))
-    expected_iterator = torch.tensor([1, 1, 2, 64, 64, 64, 64], device='cuda', dtype=torch.int32).expand_as(iterator_probe)
+    expected_iterator = torch.tensor(([1] * 8) + ([1] * 8) + ([2] * 8) + ([32] * 4), device='cuda', dtype=torch.int32).expand_as(iterator_probe)
     assert torch.equal(iterator_probe, expected_iterator), (iterator_probe, expected_iterator)
     print('SM75_INT4_WARP_ITERATOR_PROBE_PASS', iterator_probe[0].tolist(), flush=True)
     packed_probe = torch.ops.mixllm_sm75.sm75_int4_pair_wmma_load_probe(torch.empty(0, device='cuda'))

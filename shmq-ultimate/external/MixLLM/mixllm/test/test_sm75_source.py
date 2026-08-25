@@ -161,9 +161,11 @@ class SM75SourceContractTest(unittest.TestCase):
         self.assertIn("HighMma::FragmentAhigh_a", source_compact)
         self.assertIn("low_mma(low_accum,low_a,weights,low_accum)", source_compact)
         self.assertIn("high_mma(high_accum,high_a,weights,high_accum)", source_compact)
-        self.assertIn("output[lane*7+0]", source_compact)
-        self.assertIn("output[lane*7+3]", source_compact)
-        self.assertIn("output[lane*7+6]", source_compact)
+        self.assertIn("output[lane*28+i]", source_compact)
+        self.assertIn("output[lane*28+8+i]", source_compact)
+        self.assertIn("output[lane*28+16+i]", source_compact)
+        self.assertIn("output[lane*28+24]", source_compact)
+        self.assertIn("output[lane*28+27]", source_compact)
 
     def test_v232_native_int4_decomposition_probe_contract(self):
         source_compact = "".join(self.source.split())
