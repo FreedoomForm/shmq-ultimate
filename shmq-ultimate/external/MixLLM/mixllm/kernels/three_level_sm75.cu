@@ -1533,8 +1533,8 @@ __global__ void sm75_int4_pair_crosswise_u16_mn_offset_native_store_probe_kernel
   for (int logical = lane; logical < 16 * 32; logical += kWarpSize) {
     const int row = logical / 32;
     const int k = logical % 32;
-    const int low = (row * 3 + k * 5 + 1) & 15;
-    const int high = (row * 5 + k * 3 + 7) & 15;
+    const int low = (row + k * 5 + 1) & 15;
+    const int high = (row * 2 + k * 3 + 7) & 15;
     const U16AIterator::TensorCoord coord(row, k);
     a_low_storage[static_cast<int>(a_layout(coord))] =
         static_cast<uint16_t>(low);
@@ -1544,7 +1544,7 @@ __global__ void sm75_int4_pair_crosswise_u16_mn_offset_native_store_probe_kernel
   for (int logical = lane; logical < 32 * 16; logical += kWarpSize) {
     const int k = logical / 16;
     const int col = logical % 16;
-    const int weight = (k * 7 + col * 3 + 2) & 15;
+    const int weight = (k * 7 + col * 5 + 2) & 15;
     const U16BIterator::TensorCoord coord(k, col);
     b_storage[static_cast<int>(b_layout(coord))] =
         static_cast<uint16_t>(weight);

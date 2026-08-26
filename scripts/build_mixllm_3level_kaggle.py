@@ -359,13 +359,12 @@ if capability == (7, 5):
     mn_reference = []
     for row_block in range(2):
         rows = torch.arange(row_block * 8, row_block * 8 + 8, dtype=torch.int32)[:, None]
-        cols = torch.arange(row_block * 0, row_block * 0 + 8, dtype=torch.int32)[None, :]
-        a_low_block = ((rows * 3 + torch.arange(32, dtype=torch.int32)[None, :] * 5 + 1) & 15)
-        a_high_raw_block = ((rows * 5 + torch.arange(32, dtype=torch.int32)[None, :] * 3 + 7) & 15)
+        a_low_block = ((rows + torch.arange(32, dtype=torch.int32)[None, :] * 5 + 1) & 15)
+        a_high_raw_block = ((rows * 2 + torch.arange(32, dtype=torch.int32)[None, :] * 3 + 7) & 15)
         a_high_block = torch.where(a_high_raw_block >= 8, a_high_raw_block - 16, a_high_raw_block)
         for col_block in range(2):
             cols = torch.arange(col_block * 8, col_block * 8 + 8, dtype=torch.int32)[None, :]
-            b_block = ((torch.arange(32, dtype=torch.int32)[:, None] * 7 + cols * 3 + 2) & 15)
+            b_block = ((torch.arange(32, dtype=torch.int32)[:, None] * 7 + cols * 5 + 2) & 15)
             mn_reference.append(((a_low_block + 16 * a_high_block).to(torch.int64) @ b_block.to(torch.int64)).to(torch.int32))
     mn_reference = torch.stack(mn_reference).to('cuda')
     mn_native_store_probe = torch.ops.mixllm_sm75.sm75_int4_pair_crosswise_u16_mn_offset_native_store_probe(torch.empty(0, device='cuda'))
