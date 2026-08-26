@@ -1659,25 +1659,25 @@ __global__ void sm75_int4_pair_packed_u4_block_native_store_probe_kernel(
   using U16AIterator = shmq_cutlass_sm75::int4_pair_probe::NativeWarpU16AIterator;
   using S16AIterator = shmq_cutlass_sm75::int4_pair_probe::NativeWarpS16AIterator;
   using U16BIterator = shmq_cutlass_sm75::int4_pair_probe::NativeWarpU16BIterator;
-  __shared__ __align__(16) uint16_t a_low_storage[64 * 128];
-  __shared__ __align__(16) uint16_t a_high_storage[64 * 128];
-  __shared__ __align__(16) uint16_t b_storage[128 * 64];
+  __shared__ __align__(16) uint16_t a_low_storage[16 * 128];
+  __shared__ __align__(16) uint16_t a_high_storage[16 * 128];
+  __shared__ __align__(16) uint16_t b_storage[128 * 16];
   __shared__ int8_t activation_storage[16 * 32];
   __shared__ uint8_t packed_weight_storage[16 * 16];
   const int thread = threadIdx.x;
   const int lane = thread & (kWarpSize - 1);
   const int warp = thread / kWarpSize;
-  U16AIterator::TensorCoord a_extent(64, 128);
+  U16AIterator::TensorCoord a_extent(16, 128);
   U16AIterator::Layout a_layout = U16AIterator::Layout::packed(a_extent);
-  U16BIterator::TensorCoord b_extent(128, 64);
+  U16BIterator::TensorCoord b_extent(128, 16);
   U16BIterator::Layout b_layout = U16BIterator::Layout::packed(b_extent);
-  for (int logical = thread; logical < 64 * 128; logical += blockDim.x) {
+  for (int logical = thread; logical < 16 * 128; logical += blockDim.x) {
     const U16AIterator::TensorCoord coord(logical / 128, logical % 128);
     a_low_storage[static_cast<int>(a_layout(coord))] = 0;
     a_high_storage[static_cast<int>(a_layout(coord))] = 0;
   }
-  for (int logical = thread; logical < 128 * 64; logical += blockDim.x) {
-    const U16BIterator::TensorCoord coord(logical / 64, logical % 64);
+  for (int logical = thread; logical < 128 * 16; logical += blockDim.x) {
+    const U16BIterator::TensorCoord coord(logical / 16, logical % 16);
     b_storage[static_cast<int>(b_layout(coord))] = 0;
   }
   for (int item = thread; item < 16 * 32; item += blockDim.x) {
