@@ -373,6 +373,18 @@ if capability == (7, 5):
     block_native_store_probe = torch.ops.mixllm_sm75.sm75_int4_pair_crosswise_u16_block_native_store_probe(torch.empty(0, device='cuda'))
     assert torch.equal(block_native_store_probe, mn_reference), (block_native_store_probe, mn_reference)
     print('SM75_INT4_CROSSWISE_U16_BLOCK_NATIVE_STORE_REFERENCE_PASS', block_native_store_probe[:, :2, :4].tolist(), flush=True)
+    packed_activation = ((torch.arange(16, dtype=torch.int32)[:, None] * 29 + torch.arange(32, dtype=torch.int32)[None, :] * 17 + 3) % 127) - 63
+    packed_low_ref = packed_activation & 15
+    packed_high_raw_ref = packed_activation >> 4
+    packed_b_ref = ((torch.arange(32, dtype=torch.int32)[:, None] * 7 + torch.arange(16, dtype=torch.int32)[None, :] * 5 + 2) & 15)
+    packed_reference = []
+    for row_block in range(2):
+        for col_block in range(2):
+            packed_reference.append(((packed_low_ref[row_block * 8:row_block * 8 + 8] + 16 * packed_high_raw_ref[row_block * 8:row_block * 8 + 8]).to(torch.int64) @ packed_b_ref[:, col_block * 8:col_block * 8 + 8].to(torch.int64)).to(torch.int32))
+    packed_reference = torch.stack(packed_reference).to('cuda')
+    packed_native_store_probe = torch.ops.mixllm_sm75.sm75_int4_pair_packed_u4_block_native_store_probe(torch.empty(0, device='cuda'))
+    assert torch.equal(packed_native_store_probe, packed_reference), (packed_native_store_probe, packed_reference)
+    print('SM75_INT4_PACKED_U4_BLOCK_NATIVE_STORE_REFERENCE_PASS', packed_native_store_probe[:, :2, :4].tolist(), flush=True)
     packed_probe = torch.ops.mixllm_sm75.sm75_int4_pair_wmma_load_probe(torch.empty(0, device='cuda'))
     expected_probe = 32 * (torch.arange(1, 9, device='cuda', dtype=torch.int32)[:, None] * torch.arange(1, 9, device='cuda', dtype=torch.int32)[None, :])
     assert torch.equal(packed_probe, expected_probe), (packed_probe, expected_probe)
