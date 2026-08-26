@@ -1350,6 +1350,44 @@ at::Tensor sm75_int4_pair_crosswise_u16_native_store_probe_cuda(
   return output;
 }
 
+template <typename AIterator, typename SIterator, typename BIterator>
+__device__ inline void load_pair_store_native_matrix(
+    AIterator& a_iterator, SIterator& s_iterator, BIterator& b_iterator,
+    int* output, int lane) {
+  typename AIterator::Fragment a_fragment;
+  typename SIterator::Fragment s_fragment;
+  typename BIterator::Fragment b_fragment;
+  a_iterator.load(a_fragment);
+  s_iterator.load(s_fragment);
+  b_iterator.load(b_fragment);
+  shmq_cutlass_sm75::int4_pair_probe::LowMma::FragmentA low_a;
+  shmq_cutlass_sm75::int4_pair_probe::HighMma::FragmentA high_a;
+  shmq_cutlass_sm75::int4_pair_probe::LowMma::FragmentB weights;
+  low_a.clear();
+  high_a.clear();
+  weights.clear();
+  for (int i = 0; i < 8; ++i) {
+    low_a[i] = cutlass::uint4b_t(static_cast<unsigned>(a_fragment[i]) & 0xf);
+    int high_value = static_cast<int>(s_fragment[i]) & 0xf;
+    high_value = high_value >= 8 ? high_value - 16 : high_value;
+    high_a[i] = cutlass::int4b_t(high_value);
+    weights[i] = cutlass::uint4b_t(static_cast<unsigned>(b_fragment[i]) & 0xf);
+  }
+  shmq_cutlass_sm75::int4_pair_probe::LowMma::FragmentC low_accum;
+  shmq_cutlass_sm75::int4_pair_probe::HighMma::FragmentC high_accum;
+  low_accum.clear();
+  high_accum.clear();
+  shmq_cutlass_sm75::int4_pair_probe::LowMma low_mma;
+  shmq_cutlass_sm75::int4_pair_probe::HighMma high_mma;
+  low_mma(low_accum, low_a, weights, low_accum);
+  high_mma(high_accum, high_a, weights, high_accum);
+  shmq_cutlass_sm75::int4_pair_probe::LowMma::FragmentC combined;
+  combined.clear();
+  combined[0] = low_accum[0] + 16 * high_accum[0];
+  combined[1] = low_accum[1] + 16 * high_accum[1];
+  store_native_accumulator(output, lane, combined);
+}
+
 __global__ void sm75_int4_pair_crosswise_u16_k64_native_store_probe_kernel(
     int* output) {
 #if __CUDA_ARCH__ >= 750
@@ -1463,6 +1501,80 @@ at::Tensor sm75_int4_pair_crosswise_u16_k64_native_store_probe_cuda(
   auto output = at::empty({8, 8}, device_tensor.options().dtype(at::kInt));
   auto stream = at::cuda::getCurrentCUDAStream();
   sm75_int4_pair_crosswise_u16_k64_native_store_probe_kernel<<<1, kWarpSize, 0, stream>>>(
+      output.data_ptr<int>());
+  C10_CUDA_KERNEL_LAUNCH_CHECK();
+  return output;
+}
+
+__global__ void sm75_int4_pair_crosswise_u16_mn_offset_native_store_probe_kernel(
+    int* output) {
+#if __CUDA_ARCH__ >= 750
+  using U16AIterator = shmq_cutlass_sm75::int4_pair_probe::NativeWarpU16AIterator;
+  using S16AIterator = shmq_cutlass_sm75::int4_pair_probe::NativeWarpS16AIterator;
+  using U16BIterator = shmq_cutlass_sm75::int4_pair_probe::NativeWarpU16BIterator;
+  __shared__ __align__(16) uint16_t a_low_storage[64 * 128];
+  __shared__ __align__(16) uint16_t a_high_storage[64 * 128];
+  __shared__ __align__(16) uint16_t b_storage[128 * 64];
+  const int lane = threadIdx.x;
+  U16AIterator::TensorCoord a_extent(64, 128);
+  U16AIterator::Layout a_layout = U16AIterator::Layout::packed(a_extent);
+  U16BIterator::TensorCoord b_extent(128, 64);
+  U16BIterator::Layout b_layout = U16BIterator::Layout::packed(b_extent);
+  for (int logical = lane; logical < 64 * 128; logical += kWarpSize) {
+    const U16AIterator::TensorCoord coord(logical / 128, logical % 128);
+    a_low_storage[static_cast<int>(a_layout(coord))] = 0;
+    a_high_storage[static_cast<int>(a_layout(coord))] = 0;
+  }
+  for (int logical = lane; logical < 128 * 64; logical += kWarpSize) {
+    const U16BIterator::TensorCoord coord(logical / 64, logical % 64);
+    b_storage[static_cast<int>(b_layout(coord))] = 0;
+  }
+  __syncwarp();
+  for (int logical = lane; logical < 16 * 32; logical += kWarpSize) {
+    const int row = logical / 32;
+    const int k = logical % 32;
+    const int low = (row * 3 + k * 5 + 1) & 15;
+    const int high = (row * 5 + k * 3 + 7) & 15;
+    const U16AIterator::TensorCoord coord(row, k);
+    a_low_storage[static_cast<int>(a_layout(coord))] =
+        static_cast<uint16_t>(low);
+    a_high_storage[static_cast<int>(a_layout(coord))] =
+        static_cast<uint16_t>(high);
+  }
+  for (int logical = lane; logical < 32 * 16; logical += kWarpSize) {
+    const int k = logical / 16;
+    const int col = logical % 16;
+    const int weight = (k * 7 + col * 3 + 2) & 15;
+    const U16BIterator::TensorCoord coord(k, col);
+    b_storage[static_cast<int>(b_layout(coord))] =
+        static_cast<uint16_t>(weight);
+  }
+  __syncwarp();
+
+  U16AIterator a0(U16AIterator::TensorRef(a_low_storage, a_layout), lane);
+  S16AIterator s0(S16AIterator::TensorRef(a_high_storage, a_layout), lane);
+  U16BIterator b0(U16BIterator::TensorRef(b_storage, b_layout), lane);
+  U16AIterator a1 = a0;
+  S16AIterator s1 = s0;
+  U16BIterator b1 = b0;
+  a1.add_tile_offset(U16AIterator::TensorCoord(1, 0));
+  s1.add_tile_offset(S16AIterator::TensorCoord(1, 0));
+  b1.add_tile_offset(U16BIterator::TensorCoord(0, 1));
+
+  load_pair_store_native_matrix(a0, s0, b0, output + 0 * 64, lane);
+  load_pair_store_native_matrix(a0, s0, b1, output + 1 * 64, lane);
+  load_pair_store_native_matrix(a1, s1, b0, output + 2 * 64, lane);
+  load_pair_store_native_matrix(a1, s1, b1, output + 3 * 64, lane);
+#endif
+}
+
+at::Tensor sm75_int4_pair_crosswise_u16_mn_offset_native_store_probe_cuda(
+    const at::Tensor& device_tensor) {
+  TORCH_CHECK(device_tensor.is_cuda(),
+              "SM75 Crosswise U16 M/N-offset native-store probe requires a CUDA tensor argument");
+  auto output = at::empty({4, 8, 8}, device_tensor.options().dtype(at::kInt));
+  auto stream = at::cuda::getCurrentCUDAStream();
+  sm75_int4_pair_crosswise_u16_mn_offset_native_store_probe_kernel<<<1, kWarpSize, 0, stream>>>(
       output.data_ptr<int>());
   C10_CUDA_KERNEL_LAUNCH_CHECK();
   return output;
@@ -2218,6 +2330,7 @@ TORCH_LIBRARY(mixllm_sm75, m) {
   m.def("sm75_int4_pair_crosswise_u16_probe(Tensor device_tensor) -> Tensor");
   m.def("sm75_int4_pair_crosswise_u16_native_store_probe(Tensor device_tensor) -> Tensor");
   m.def("sm75_int4_pair_crosswise_u16_k64_native_store_probe(Tensor device_tensor) -> Tensor");
+  m.def("sm75_int4_pair_crosswise_u16_mn_offset_native_store_probe(Tensor device_tensor) -> Tensor");
   m.def("sm75_int4_pair_fused_probe(Tensor device_tensor) -> Tensor");
   m.def("sm75_int4_pair_mixed_stride_probe(Tensor device_tensor) -> Tensor");
   m.def("_three_level_linear_v2_unchecked(Tensor input_fp16, Tensor input_int8, "
@@ -2264,6 +2377,7 @@ TORCH_LIBRARY_IMPL(mixllm_sm75, CUDA, m) {
   m.impl("sm75_int4_pair_crosswise_u16_probe", &sm75_int4_pair_crosswise_u16_probe_cuda);
   m.impl("sm75_int4_pair_crosswise_u16_native_store_probe", &sm75_int4_pair_crosswise_u16_native_store_probe_cuda);
   m.impl("sm75_int4_pair_crosswise_u16_k64_native_store_probe", &sm75_int4_pair_crosswise_u16_k64_native_store_probe_cuda);
+  m.impl("sm75_int4_pair_crosswise_u16_mn_offset_native_store_probe", &sm75_int4_pair_crosswise_u16_mn_offset_native_store_probe_cuda);
   m.impl("sm75_int4_pair_fused_probe", &sm75_int4_pair_fused_probe_cuda);
   m.impl("sm75_int4_pair_mixed_stride_probe", &sm75_int4_pair_mixed_stride_probe_cuda);
   m.impl("_three_level_linear_v2_unchecked", &three_level_linear_v2_unchecked_cuda);
